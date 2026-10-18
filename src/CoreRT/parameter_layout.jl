@@ -15,7 +15,9 @@ median radius and geometric width are `exp(μ_logr)` and `exp(σ_logr)`.
 Convert to derivatives with respect to those YAML values by dividing the native
 columns by the median radius and geometric width, respectively.
 Gas columns are flattened species-major: all TOA-to-BOA layers for gas 1,
-then all layers for gas 2, and so on. Surface parameters are followed by the
+then all layers for gas 2, and so on. Each is the native partial
+`∂τ/∂VMR = σ·N_dry` described by [`AbundanceTangentContract`](@ref).
+Surface parameters are followed by the
 optional two-column SIF block `[SIF755, slope]`, then canopy parameters.
 The final two columns are `(p₀, σ_p)` for a pressure-form `Normal` profile and
 `(z₀, σ₀)` for an altitude-form `LogNormal` profile.

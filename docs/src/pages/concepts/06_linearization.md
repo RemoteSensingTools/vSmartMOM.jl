@@ -300,7 +300,7 @@ new parameters):
 | `τ_ref` (aerosol OD) | analytic | fixed-microphysics loading response |
 | profile location/width | analytic | physical profile coordinates; see `atmo_prof_lin.jl` |
 | `n_r, n_i, μ_logr, σ_logr` | hand-linearized Mie | `compute_aerosol_optical_properties(LinMode(), model, FT)` |
-| Gas VMR | analytic line-absorption scaling | `∂τ_abs/∂VMR = σ*N_dry`; CIA/continuum abundance response is incomplete |
+| Gas VMR | analytic line-absorption scaling | `∂τ_abs/∂VMR = σ*N_dry`; requests omitting H₂O broadening, CIA or MT_CKD response are rejected unless `abundance_jacobians=:frozen_cross_section` |
 | Surface pressure | profile/column response plus upstream line/LUT pressure response | only the bottom interface of the final grid moves, at fixed layer temperature/composition |
 | Temperature profile | future extension | no general end-to-end temperature Jacobian |
 

@@ -217,6 +217,34 @@ Base.@kwdef struct AddedLayerLin{FT} <: AbstractLayerLin
 end
 
 """
+    AbundanceTangentContract
+
+Records what the native gas-abundance tangents `τ̇_abs` omit. Each native gas
+column is the partial `∂τ/∂VMR = σ·N_dry`: it differentiates the explicit
+abundance factor of line/LUT absorption with every cross section, CIA and
+MT_CKD optical depth held fixed. `omitted[i_band][igas]` lists the forward
+terms of band `i_band` that nevertheless respond to native gas slot `igas`
+(slot 1 is q-driven H₂O, slot `1+i` is `variable_molecules[i_band][i]`).
+
+With `abundance_jacobians == :complete` (the default), a solve or Jacobian
+plan that requests a slot with omitted terms is rejected. `:frozen_cross_section`
+accepts the documented native partial explicitly. When `q ≡ 0`, H₂O absorption
+is not evaluated and the q-driven H₂O columns are structural zeros rather than
+derivatives; Jacobian plans may not select them.
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct AbundanceTangentContract
+    "Accepted abundance-derivative definition: `:complete` or `:frozen_cross_section`"
+    abundance_jacobians::Symbol
+    "Species label of each native gas slot, per band"
+    species::Vector{Vector{String}}
+    "Forward terms responding to each native gas slot but absent from τ̇_abs, per band"
+    omitted::Vector{Vector{Vector{String}}}
+end
+
+"""
     struct RTModelLin{A,B,C}
 
 Holds linearized (Jacobian) model parameters: derivatives of optical depths
@@ -238,7 +266,20 @@ mutable struct RTModelLin{A,B,C,D,E,F}
     τ̇_aer_psurf::E
     "∂τ_abs/∂p_surf per band: [nSpec × nLayers]; nothing when pressure is disabled"
     τ̇_abs_psurf::F
+    "Terms omitted by the gas-abundance tangents; nothing when the caller supplied τ̇_abs"
+    abundance_contract::Union{Nothing,AbundanceTangentContract}
 end
+
+# Hand-assembled tangents carry no construction record; their provenance
+# remains the caller's responsibility (as for a manual `PlannedRTModelLin`).
+RTModelLin(τ̇_abs, τ̇_aer, lin_aerosol_optics, τ̇_rayl_psurf, τ̇_aer_psurf,
+           τ̇_abs_psurf) =
+    RTModelLin(τ̇_abs, τ̇_aer, lin_aerosol_optics, τ̇_rayl_psurf,
+               τ̇_aer_psurf, τ̇_abs_psurf, nothing)
+RTModelLin{A,B,C,D,E,F}(τ̇_abs, τ̇_aer, lin_aerosol_optics, τ̇_rayl_psurf,
+                        τ̇_aer_psurf, τ̇_abs_psurf) where {A,B,C,D,E,F} =
+    RTModelLin{A,B,C,D,E,F}(τ̇_abs, τ̇_aer, lin_aerosol_optics, τ̇_rayl_psurf,
+                            τ̇_aer_psurf, τ̇_abs_psurf, nothing)
 
 """
     PlannedRTModelLin

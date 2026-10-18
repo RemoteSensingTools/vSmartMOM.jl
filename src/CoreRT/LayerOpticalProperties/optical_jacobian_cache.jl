@@ -128,6 +128,11 @@ function build_m_invariant_cache_lin(iBand, model, lin_model;
         throw(ArgumentError("Surface-pressure derivatives are unavailable; rebuild " *
             "with compute_pressure_jacobians=true or use a plan without pressure"))
     end
+    contract = _abundance_contract(lin_model)
+    for iB in bands
+        _require_complete_abundance_tangents(contract, iB,
+            selection === nothing ? (1:nGas) : selection.gas_columns, nZ)
+    end
     rayl = Vector{Vector}(undef, length(bands))
     aeros = Vector{Vector{Vector}}(undef, length(bands))
     gas = Vector{Vector}(undef, length(bands))

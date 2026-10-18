@@ -303,8 +303,9 @@ knots are not differentiable at their jumps/kinks; a centered difference
 there need not match the chosen local derivative. Regridding the atmosphere,
 interpolating composition, or moving other interfaces with pressure adds a
 separate coordinate transformation that this column does not include.
-CIA/MT_CKD include their pressure-scaling terms, but their abundance derivatives
-remain incomplete. See the [absorption contract](IO/Schema/absorption.md).
+CIA/MT_CKD include their pressure-scaling terms, but not their abundance
+response; see [Gas-abundance columns](#Gas-abundance-columns) and the
+[absorption contract](IO/Schema/absorption.md).
 
 ```julia
 layout = result.layout
@@ -320,6 +321,47 @@ dR_surface = dR[:, 1, :, surface_idx]
 dR_dgas1_profile = dR[:, :, :, gas1_profile]
 dT_dgas1_bottom = dT[:, :, :, gas1_bottom]
 ```
+
+### Gas-abundance columns
+
+Each gas column is the native partial `∂τ/∂VMR = σ·N_dry`. Temperature,
+pressure, the dry-air column, every line cross section, and the CIA and
+MT_CKD optical depths are held fixed. For q-driven H₂O the coordinate is the
+dry-air molar ratio `r = N_H2O/N_dry` at fixed dry column, not `q`.
+
+This partial is the complete derivative of the forward absorption only when
+no other term in the band responds to that abundance. Construction records
+the exceptions:
+
+| Abundance | Forward response omitted by the native column |
+|:--|:--|
+| q-driven H₂O | self broadening of line-by-line or ABSCO H₂O cross sections; multi-node H₂O-broadener axes of other gases' ABSCO tables; MT_CKD continuum; every CIA pair (through the dry-air number density) |
+| variable gas | CIA pairs with that gas as a collider, including at zero VMR |
+
+A full-layout solve, or a Jacobian plan, that requests such a column throws
+an `ArgumentError` naming the omitted terms. Hold the abundance fixed
+(`compute_h2o_jacobians=false`, or list the gas in `fixed_molecules`), omit
+its columns from the plan, or accept the native partial explicitly:
+
+```julia
+model, lin_model = model_from_parameters(LinMode(), params;
+    abundance_jacobians=:frozen_cross_section)
+```
+
+The keyword changes no derivative values. Legacy interpolation tables carry a
+fixed broadener abundance, so a q-driven H₂O column computed from them is
+complete with respect to that forward model (unless ABSCO tables, MT_CKD or
+CIA are also configured in the band); the forward model itself then ignores
+humidity-dependent broadening. When `q ≡ 0`, H₂O absorption is not evaluated
+and the H₂O columns are structural zeros, not derivatives; Jacobian plans may
+not select them.
+
+For illustration, with HITRAN2016 H₂O lines at 6200–6260 cm⁻¹ in a
+500–1000 hPa layer at 290 K, the native H₂O column differed from a
+step-converged finite difference of the complete forward absorption (dry
+column fixed) by 4.4% (q = 0.0125) and 8.1% (q = 0.025) in norm; the
+line-centre ratios were 1.061 and 1.116. These are case-specific
+diagnostics of different derivative definitions, not retrieval biases.
 
 `NGas = size(lin_model.τ̇_abs[1], 1)` is the number of flattened gas-layer
 columns, not merely the number of molecular species. Consequently,

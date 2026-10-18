@@ -198,7 +198,9 @@ function model_from_parameters(flavor::AbstractJacobianFlavor, params; kwargs...
         length(model.profile.p_full), [size(t, 1) for t in base_lin.τ̇_abs];
         compute_aerosol_microphysics_jacobians=options.compute_aerosol_microphysics_jacobians,
         compute_h2o_jacobians=options.compute_h2o_jacobians,
-        compute_pressure_jacobians=options.compute_pressure_jacobians)
+        compute_pressure_jacobians=options.compute_pressure_jacobians,
+        abundance_contract=_abundance_contract(base_lin),
+        h2o_profile_zero=isnothing(params.q) || all(iszero, params.q))
     return model, PlannedRTModelLin(base_lin, plan)
 end
 
@@ -207,7 +209,9 @@ end
 function _validate_plan_upstream(plan::JacobianPlan, n_aerosols, nz, gas_counts;
         compute_aerosol_microphysics_jacobians::Bool,
         compute_h2o_jacobians::Bool,
-        compute_pressure_jacobians::Bool=true)
+        compute_pressure_jacobians::Bool=true,
+        abundance_contract::Union{Nothing,AbundanceTangentContract}=nothing,
+        h2o_profile_zero::Bool=false)
     length(plan.bands) == length(gas_counts) || throw(DimensionMismatch(
         "Jacobian plan must contain one layout per model band"))
     for (ib, layout) in enumerate(plan.bands)
@@ -230,9 +234,51 @@ function _validate_plan_upstream(plan::JacobianPlan, n_aerosols, nz, gas_counts;
                 "derivatives disabled by compute_h2o_jacobians=false; " *
                 "enable upstream derivatives or remove these parameters from the plan"))
         end
+        # With q ≡ 0 no H2O absorption is evaluated: its columns are zeros by
+        # construction, not derivatives of the forward model.
+        if h2o_profile_zero && any(p -> p <= nz, selection.gas_columns)
+            throw(ArgumentError("Jacobian plan band $ib requests q-driven H2O " *
+                "derivatives, but q ≡ 0, so H2O absorption is not evaluated and " *
+                "these columns are structural zeros; supply a nonzero humidity " *
+                "profile or remove these parameters from the plan"))
+        end
+        _require_complete_abundance_tangents(abundance_contract, ib,
+                                             selection.gas_columns, nz)
     end
     return nothing
 end
+
+_abundance_contract(lin_model::RTModelLin) = lin_model.abundance_contract
+_abundance_contract(lin_model::PlannedRTModelLin) = _abundance_contract(lin_model.base)
+_abundance_contract(lin_model) = nothing
+
+"""
+    _require_complete_abundance_tangents(contract, i_band, gas_columns, nz)
+
+Reject requested native gas columns (positions within the gas block) whose
+abundance tangent omits a forward term, unless the model was built with
+`abundance_jacobians=:frozen_cross_section`. Like the other upstream checks,
+this validates the derivative definition, never a numerical value.
+"""
+function _require_complete_abundance_tangents(contract::AbundanceTangentContract,
+                                              i_band, gas_columns, nz)
+    contract.abundance_jacobians === :frozen_cross_section && return nothing
+    for slot in unique((p - 1) ÷ nz + 1 for p in gas_columns)
+        terms = contract.omitted[i_band][slot]
+        isempty(terms) && continue
+        species = contract.species[i_band][slot]
+        hold_fixed = slot == 1 ? "compute_h2o_jacobians=false" :
+                                 "list $species in fixed_molecules"
+        throw(ArgumentError(
+            "band $i_band requests $species abundance Jacobians, but the native " *
+            "tangent ∂τ/∂VMR = σ·N_dry omits the forward response of: " *
+            join(terms, "; ") * ". Hold the abundance fixed ($hold_fixed), " *
+            "omit its columns from the Jacobian plan, or build the model with " *
+            "abundance_jacobians=:frozen_cross_section to accept this partial derivative"))
+    end
+    return nothing
+end
+_require_complete_abundance_tangents(::Nothing, i_band, gas_columns, nz) = nothing
 
 """
     globalize_jacobian(jacobian, layout)

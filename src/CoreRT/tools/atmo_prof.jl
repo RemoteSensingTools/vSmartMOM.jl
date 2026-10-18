@@ -745,6 +745,17 @@ _default_broadener(model, profile, iz) = nothing
 _default_broadener(::AtmosphericAbsorption.AbscoLUT, profile, iz) =
     profile.vmr_h2o[iz]
 
+# Whether a cross section responds to an explicit broadener abundance, as
+# `compute_h2o_absorption_profile!` supplies for H₂O. Keep in step with the
+# `_layer_absorption_cross_section` methods above: line-by-line models apply
+# self broadening and ABSCO tables interpolate their broadener axis, whereas
+# fixed-broadener tables (including a single-node ABSCO broadener axis) and
+# other absorbers ignore the argument.
+_cross_section_uses_broadener(model) = false
+_cross_section_uses_broadener(::AtmosphericAbsorption.LineByLineModel) = true
+_cross_section_uses_broadener(model::AtmosphericAbsorption.AbscoLUT) =
+    length(model.vmr) > 1
+
 "Given the CrossSectionModel, the grid, and the AtmosphericProfile, fill up the τ_abs array with the cross section at each layer
 (using pressures/temperatures) from the profile. `self_broadener_vmr`, when
 provided, is a moist-air mole fraction passed to AtmosphericAbsorption's
