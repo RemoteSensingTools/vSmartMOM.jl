@@ -191,6 +191,20 @@ vSmartMOM.CoreRT.requires_pressure_jacobians
 vSmartMOM.CoreRT.globalize_jacobian
 ```
 
+## Surface-Pressure Vertical-Grid Conventions
+
+How the vertical grid responds to a change in surface pressure, both when a
+retrieval rebuilds the profile at a trial pressure and in the analytic
+surface-pressure Jacobian (`model_from_parameters(LinMode(), params;
+vertical_grid=...)`). `FixedPressureGrid()` is the default.
+
+```@docs
+vSmartMOM.CoreRT.AbstractVerticalGridConvention
+vSmartMOM.CoreRT.FixedPressureGrid
+vSmartMOM.CoreRT.FixedAltitudeGrid
+vSmartMOM.CoreRT.surface_pressure_interfaces
+```
+
 ## Quadrature Types
 
 ```@docs

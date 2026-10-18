@@ -116,10 +116,18 @@ function _absorption_pressure_derivative(
     return Array(σp)
 end
 
-_accumulate_absorption_pressure!(::Nothing, model, grid, vmr, profile, broadener) = nothing
+# `vertical_grid` selects which layers' mid-layer pressures respond to p_surf
+# (see AbstractVerticalGridConvention); without a tangent array there is
+# nothing to accumulate.
+_accumulate_absorption_pressure!(::Nothing, ::AbstractVerticalGridConvention,
+                                 model, grid, vmr, profile, broadener) = nothing
 
-"Accumulate only the cross-section part of dτ/dp_surf; column scaling is added by the constructor."
-function _accumulate_absorption_pressure!(τp, model, grid, vmr, profile, broadener)
+"""
+Accumulate only the cross-section part of dτ/dp_surf, `(dσ/dp)·(dp_full/dp_surf)·N_dry·vmr`;
+the molecular-column part is added by the constructor.
+"""
+function _accumulate_absorption_pressure!(τp::AbstractMatrix, ::FixedPressureGrid, model, grid,
+                                          vmr, profile, broadener)
     iz = length(profile.p_full)
     abundance = vmr isa AbstractArray ? vmr[iz] : vmr
     iszero(abundance) && return nothing
@@ -131,5 +139,23 @@ function _accumulate_absorption_pressure!(τp, model, grid, vmr, profile, broade
     # Fixed final grid: only p_half[end] varies, hence dp_full[end]/dp_surf=1/2.
     column = profile.vcd_dry[iz] * abundance / 2
     view(τp, :, iz) .+= σp .* column
+    return nothing
+end
+
+function _accumulate_absorption_pressure!(τp::AbstractMatrix, ::FixedAltitudeGrid, model, grid,
+                                          vmr, profile, broadener)
+    p_surf = profile.p_half[end]
+    for iz in eachindex(profile.p_full)
+        abundance = vmr isa AbstractArray ? vmr[iz] : vmr
+        iszero(abundance) && continue
+        broadener_layer = broadener isa AbstractArray ? broadener[iz] : broadener
+        broadener_layer = broadener_layer === nothing ?
+            _default_broadener(model, profile, iz) : broadener_layer
+        σp = _absorption_pressure_derivative(
+            model, grid, profile.p_full[iz], profile.T[iz], broadener_layer)
+        # Every interface scales with p_surf: dp_full[iz]/dp_surf = p_full[iz]/p_surf.
+        column = profile.vcd_dry[iz] * abundance * (profile.p_full[iz] / p_surf)
+        view(τp, :, iz) .+= σp .* column
+    end
     return nothing
 end

@@ -136,6 +136,16 @@ function prepare_retrieval_parameters(;
     return _validate_retrieval_convolution_support(params)
 end
 
+"""
+Three-band OCO forward model and selected Jacobian at one retrieval state.
+
+`vertical_grid` fixes how the 16-layer template responds to the retrieved
+surface pressure: `FixedPressureGrid()` (default, used through Round 7) keeps
+the interfaces above the surface fixed in pressure, while
+`FixedAltitudeGrid()` keeps every interface fixed in geometric altitude and
+rescales all interface pressures. The same convention rebuilds the forward
+profile, selects the analytic surface-pressure tangents, and weights XCO2.
+"""
 mutable struct OCOForwardEvaluator
     base_parameters
     coefficients::Dict{Symbol,Vector{Float64}}
@@ -143,6 +153,7 @@ mutable struct OCOForwardEvaluator
     fixed_upper_co2_vmr::Float64
     solar_transmission
     synchronize_backend::Function
+    vertical_grid::CoreRT.AbstractVerticalGridConvention
 end
 
 function OCOForwardEvaluator(;
@@ -151,7 +162,8 @@ function OCOForwardEvaluator(;
         nstreams::Int=9,
         fixed_upper_co2_ppm::Real=400.0,
         coefficient_path::AbstractString=DEFAULT_COEFFICIENT_PATH,
-        component_path::AbstractString=DEFAULT_COMPONENT_PATH)
+        component_path::AbstractString=DEFAULT_COMPONENT_PATH,
+        vertical_grid::CoreRT.AbstractVerticalGridConvention=FixedPressureGrid())
     isfinite(fixed_upper_co2_ppm) && 0 < fixed_upper_co2_ppm < 10_000 ||
         throw(ArgumentError("fixed upper-atmosphere CO2 must lie in (0,10000) ppm"))
     params = prepare_retrieval_parameters(;
@@ -168,7 +180,7 @@ function OCOForwardEvaluator(;
     return OCOForwardEvaluator(
         params, coefficients, tau_ref_per_aod760(component_path),
         Float64(fixed_upper_co2_ppm) * 1e-6, solar_transmission,
-        synchronize_backend)
+        synchronize_backend, vertical_grid)
 end
 
 """
@@ -200,8 +212,11 @@ X_{CO_2} = 10^6
 ```
 
 The diagnostic uses the same pressure interfaces, specific-humidity profile,
-and hydrostatic dry-air columns as the retrieval forward model. Consequently,
-the layer weights respond to retrieved surface pressure. The non-active upper
+and hydrostatic dry-air columns as the retrieval forward model, rebuilt with
+`evaluator.vertical_grid`. Under the default `FixedPressureGrid` the bottom
+layer weight responds to retrieved surface pressure; under
+`FixedAltitudeGrid` every layer column scales by the same factor, so the
+normalized weights do not depend on surface pressure. The non-active upper
 CO2 layers use `evaluator.fixed_upper_co2_vmr`, which is set from the current
 truth scene before each retrieval.
 """
@@ -212,11 +227,8 @@ function column_averaged_co2_ppm(evaluator::OCOForwardEvaluator,
     params = evaluator.base_parameters
     FT = params.float_type
 
-    p_half = copy(params.p)
-    p_half[end] = FT(state[1])
-    p_half[end] > p_half[end - 1] || throw(ArgumentError(
-        "surface pressure $(state[1]) hPa is not below the final layer top " *
-        "$(p_half[end - 1]) hPa"))
+    p_half = surface_pressure_interfaces(
+        evaluator.vertical_grid, params.p, FT(state[1]))
 
     co2 = fill(FT(evaluator.fixed_upper_co2_vmr), 16)
     co2[ACTIVE_CO2_LAYERS] .= FT.(state[CO2_RANGE])
@@ -233,20 +245,23 @@ function column_averaged_co2_ppm(evaluator::OCOForwardEvaluator,
     return 1.0e6 * dot(vmr, weights) / sum(weights)
 end
 
-"""Map the 30 retrieval coordinates into a fresh parameter template."""
+"""
+Map the 30 retrieval coordinates into a fresh parameter template. The
+retrieved surface pressure rebuilds the interface pressures with
+`vertical_grid` (see `surface_pressure_interfaces`).
+"""
 function apply_retrieval_state!(params, state::AbstractVector,
                                 tau_ref_scale::AbstractVector;
-                                fixed_upper_co2_vmr::Real=400e-6)
+                                fixed_upper_co2_vmr::Real=400e-6,
+                                vertical_grid::CoreRT.AbstractVerticalGridConvention=
+                                    FixedPressureGrid())
     length(state) == ACTIVE_STATE_COUNT || throw(DimensionMismatch(
         "OCO retrieval state must contain $ACTIVE_STATE_COUNT entries"))
     length(tau_ref_scale) == 3 || throw(DimensionMismatch(
         "three AOD760-to-tau_ref scale factors are required"))
     FT = params.float_type
     psurf = FT(state[1])
-    psurf > params.p[end-1] || throw(ArgumentError(
-        "surface pressure $psurf hPa is not below the final layer top " *
-        "$(params.p[end-1]) hPa"))
-    params.p[end] = psurf
+    params.p = surface_pressure_interfaces(vertical_grid, params.p, psurf)
 
     isfinite(fixed_upper_co2_vmr) && 0 < fixed_upper_co2_vmr < 0.01 ||
         throw(ArgumentError(
@@ -321,12 +336,14 @@ function evaluate_oco_forward(evaluator::OCOForwardEvaluator,
     params = copy_parameters(evaluator.base_parameters; share_luts=true)
     physical = apply_retrieval_state!(
         params, state, evaluator.tau_ref_scale;
-        fixed_upper_co2_vmr=evaluator.fixed_upper_co2_vmr)
+        fixed_upper_co2_vmr=evaluator.fixed_upper_co2_vmr,
+        vertical_grid=evaluator.vertical_grid)
     evaluator.synchronize_backend()
     model_pair = nothing
     model_build_seconds = @elapsed begin
         model_pair = model_from_parameters(
-            OCO_RRS_synth(), params; external_solar=true)
+            OCO_RRS_synth(), params; external_solar=true,
+            vertical_grid=evaluator.vertical_grid)
         evaluator.synchronize_backend()
     end
     model, lin_model = model_pair

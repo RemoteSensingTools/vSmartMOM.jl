@@ -774,7 +774,9 @@ provided, is a moist-air mole fraction passed to AtmosphericAbsorption's
 line-by-line cross-section call; when it is `nothing`, the per-layer
 `profile.vmr_h2o` supplies the broadener so native ABSCO tables (which carry
 a tabulated H₂O-broadener axis — dispatch below) keep their surface-split
-behavior."
+behavior. When `pressure_tangent` is an array, the cross-section part of the
+surface-pressure tangent is accumulated into it for the layers that
+`vertical_grid` (an `AbstractVerticalGridConvention`) lets respond to p_surf."
 function compute_absorption_profile!(τ_abs::Array{FT,2}, 
                                      absorption_model, 
                                      grid,
@@ -784,6 +786,7 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
                                      self_broadener_vmr=nothing,
                                      batched::Bool=true,
                                      pressure_tangent=nothing,
+                                     vertical_grid::AbstractVerticalGridConvention=FixedPressureGrid(),
                                      ) where FT 
 
     # The array to store the cross-sections must be same length as number of layers
@@ -811,7 +814,7 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
             vmr_curr = vmr isa AbstractArray ? vmr[iz] : vmr
             @views τ_abs[:, iz] .+= σmat[:, iz] .* (profile.vcd_dry[iz] * vmr_curr)
         end
-        _accumulate_absorption_pressure!(pressure_tangent, absorption_model,
+        _accumulate_absorption_pressure!(pressure_tangent, vertical_grid, absorption_model,
             grid, vmr, profile, self_broadener_vmr)
         return
     end
@@ -834,7 +837,7 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
             absorption_model, grid, p, T, broadener_curr))
         @views τ_abs[:,iz] .+= σ .* (profile.vcd_dry[iz] * vmr_curr)
     end
-    _accumulate_absorption_pressure!(pressure_tangent, absorption_model,
+    _accumulate_absorption_pressure!(pressure_tangent, vertical_grid, absorption_model,
         grid, vmr, profile, self_broadener_vmr)
     
 end
@@ -874,9 +877,10 @@ function compute_h2o_absorption_profile!(τ_abs::Array{FT,2},
                                          absorption_model,
                                          grid,
                                          profile::AtmosphericProfile;
-                                         pressure_tangent=nothing) where FT
+                                         pressure_tangent=nothing,
+                                         vertical_grid::AbstractVerticalGridConvention=FixedPressureGrid()) where FT
     x_h2o = _h2o_moist_mole_fraction.(profile.vmr_h2o)
     return compute_absorption_profile!(
         τ_abs, absorption_model, grid, profile.vmr_h2o, profile;
-        self_broadener_vmr=x_h2o, pressure_tangent)
+        self_broadener_vmr=x_h2o, pressure_tangent, vertical_grid)
 end

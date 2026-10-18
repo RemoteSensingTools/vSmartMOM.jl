@@ -81,6 +81,50 @@ end
 # current VMR (and hence the present opacity) is zero.
 _cia_has_cross_section(table) = any(σ -> isfinite(σ) && !iszero(σ), table.σ_νT)
 
+#= Molecular-column parts of dτ_abs/dp_surf.
+
+At fixed layer T, q, and mixing ratio, a line absorber has
+τᵢ = σ(p_full,i, Tᵢ) · N_dry,i · vmrᵢ, so dτᵢ/dp_surf has a cross-section part
+(accumulated by `_accumulate_absorption_pressure!`) and the column part
+τᵢ · (dN_dry,i/dp_surf)/N_dry,i added here. Binary absorbers (CIA, MT_CKD)
+scale with a number density as well as a column, τᵢ ∝ p_full,i · N_i, and
+receive the extra factor (dp_full,i/dp_surf)/p_full,i. =#
+
+"Add the column part of the line-absorption surface-pressure tangent."
+function _add_column_psurf_tangent!(τ̇_psurf, τ_abs, ::FixedPressureGrid,
+                                    tangents, profile)
+    # Only the bottom layer's column depends on p_surf.
+    dry_ratio_dot = tangents.vcd_dry_dot[end] / profile.vcd_dry[end]
+    τ̇_psurf[:, end] .+= τ_abs[:, end] .* dry_ratio_dot
+    return τ̇_psurf
+end
+
+function _add_column_psurf_tangent!(τ̇_psurf, τ_abs, ::FixedAltitudeGrid,
+                                    tangents, profile)
+    # Every layer column scales with p_surf: dN/dp_surf = N/p_surf.
+    dry_ratio_dot = tangents.vcd_dry_dot ./ profile.vcd_dry
+    τ̇_psurf .+= τ_abs .* dry_ratio_dot'
+    return τ̇_psurf
+end
+
+"Add the surface-pressure tangent of a binary (density × column) absorber."
+function _add_binary_psurf_tangent!(τ̇_psurf, τ_binary, ::FixedPressureGrid,
+                                    tangents, profile)
+    FT = eltype(profile.p_full)
+    dry_ratio_dot = tangents.vcd_dry_dot[end] / profile.vcd_dry[end]
+    binary_ratio_dot = dry_ratio_dot + FT(0.5) / profile.p_full[end]
+    τ̇_psurf[:, end] .+= @view(τ_binary[:, end]) .* binary_ratio_dot
+    return τ̇_psurf
+end
+
+function _add_binary_psurf_tangent!(τ̇_psurf, τ_binary, ::FixedAltitudeGrid,
+                                    tangents, profile)
+    binary_ratio_dot = tangents.vcd_dry_dot ./ profile.vcd_dry .+
+                       tangents.p_full_dot ./ profile.p_full
+    τ̇_psurf .+= τ_binary .* binary_ratio_dot'
+    return τ̇_psurf
+end
+
 """
     model_from_parameters(::LinMode, params::vSmartMOM_Parameters)
 
@@ -129,6 +173,14 @@ This is the **linearized** counterpart of `model_from_parameters(params)`. It co
   Pressure tangent fields are then `nothing`, not zero sensitivities; use a
   `PlannedRTModelLin` whose layout omits pressure. Full-layout solves reject
   these models. Forward-only absorber extensions remain usable in such plans.
+- `vertical_grid` selects how the vertical grid responds to surface pressure
+  in the surface-pressure tangents: [`FixedPressureGrid`](@ref) (default;
+  only the bottom boundary moves) or [`FixedAltitudeGrid`](@ref) (every
+  interface fixed in geometric altitude, so every interface pressure scales
+  with `p_surf`). The forward optics do not depend on it. A retrieval that
+  varies `p_surf` must rebuild `params.p` with the same convention, via
+  [`surface_pressure_interfaces`](@ref), for the Jacobian to be the derivative
+  of its forward model.
 - `aerosol_anchor_bands` has the same meaning as in the forward constructor:
   it fixes aerosol spectral endpoint calculations to canonical full-band
   grids while evaluating the interpolated optics on chunked or
@@ -143,7 +195,8 @@ function model_from_parameters(lin::LinMode,
     compute_aerosol_microphysics_jacobians::Bool = true,
     compute_h2o_jacobians::Bool = true,
     compute_pressure_jacobians::Bool = true,
-    abundance_jacobians::Symbol = :complete)
+    abundance_jacobians::Symbol = :complete,
+    vertical_grid::AbstractVerticalGridConvention = FixedPressureGrid())
     abundance_jacobians in (:complete, :frozen_cross_section) || throw(ArgumentError(
         "abundance_jacobians must be :complete or :frozen_cross_section; " *
         "got :$abundance_jacobians"))
@@ -204,7 +257,8 @@ function model_from_parameters(lin::LinMode,
         [zeros(FT2, length(params.spec_bands[i]), Nz) for i in 1:n_bands] : nothing
     τ̇_aer_psurf = compute_pressure_jacobians ?
         [zeros(FT2, n_aer, length(params.spec_bands[i]), Nz) for i in 1:n_bands] : nothing
-    psurf_tangents = compute_pressure_jacobians ? psurf_profile_tangents(profile) : nothing
+    psurf_tangents = compute_pressure_jacobians ?
+        psurf_profile_tangents(vertical_grid, profile) : nothing
     # Forward terms that respond to a native gas abundance but are absent from
     # its tangent, per band and gas slot (see `AbundanceTangentContract`).
     h2o_tangent = compute_h2o_jacobians && !isnothing(params.q) && any(!iszero, params.q)
@@ -272,12 +326,12 @@ function model_from_parameters(lin::LinMode,
                     @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
                         τ_abs[i_band], τ̇_abs[i_band], jac_idx,
                         h2o_setting, params.spec_bands[i_band], profile;
-                        pressure_tangent)
+                        pressure_tangent, vertical_grid)
                 else
                     @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
                         τ_abs[i_band], h2o_setting,
                         params.spec_bands[i_band], profile;
-                        pressure_tangent)
+                        pressure_tangent, vertical_grid)
                 end
             else
                 @timeit "Read HITRAN" lines_h2o = _hitran_lines("H2O", FT)
@@ -294,12 +348,12 @@ function model_from_parameters(lin::LinMode,
                     @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
                         τ_abs[i_band], τ̇_abs[i_band], jac_idx,
                         absorption_model, params.spec_bands[i_band], profile;
-                        pressure_tangent)
+                        pressure_tangent, vertical_grid)
                 else
                     @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
                         τ_abs[i_band], absorption_model,
                         params.spec_bands[i_band], profile;
-                        pressure_tangent)
+                        pressure_tangent, vertical_grid)
                 end
             end
         end
@@ -323,13 +377,13 @@ function model_from_parameters(lin::LinMode,
                                 absorption_model,
                                 params.spec_bands[i_band],
                                 profile.vmr[mol_name],
-                                profile; pressure_tangent)
+                                profile; pressure_tangent, vertical_grid)
                     else
                         compute_absorption_profile!(τ_abs[i_band],
                             abs_params.luts[i_band][molec_i],
                             params.spec_bands[i_band],
                             profile.vmr[mol_name],
-                            profile; pressure_tangent)
+                            profile; pressure_tangent, vertical_grid)
                         h2o_tangent && _omit_profile_broadener!(omitted, i_band,
                             abs_params.luts[i_band][molec_i], mol_name, profile)
                     end
@@ -359,7 +413,7 @@ function model_from_parameters(lin::LinMode,
                                 absorption_model,
                                 params.spec_bands[i_band],
                                 profile.vmr[mol_name],
-                                profile; pressure_tangent)
+                                profile; pressure_tangent, vertical_grid)
                     else
                         compute_absorption_profile!(
                             τ_abs[i_band],
@@ -368,7 +422,7 @@ function model_from_parameters(lin::LinMode,
                             abs_params.luts[i_band][lut_offset + molec_i],
                             params.spec_bands[i_band],
                             profile.vmr[mol_name],
-                            profile; pressure_tangent)
+                            profile; pressure_tangent, vertical_grid)
                         h2o_tangent && _omit_profile_broadener!(omitted, i_band,
                             abs_params.luts[i_band][lut_offset + molec_i],
                             mol_name, profile)
@@ -379,16 +433,13 @@ function model_from_parameters(lin::LinMode,
 
         # At fixed final-grid T, q, and VMR, dτ/dp_surf contains both the
         # cross-section response (accumulated above) and molecular-column
-        # response. Only the bottom interface moves: dp_full[end]/dp_surf=1/2.
+        # response. Which layers respond depends on `vertical_grid`: only the
+        # bottom layer (FixedPressureGrid) or every layer (FixedAltitudeGrid).
         # CIA and MT_CKD receive their separate density scaling below.
-        dry_ratio_dot = compute_pressure_jacobians ?
-            psurf_tangents.vcd_dry_dot[end] / profile.vcd_dry[end] : zero(FT)
         if compute_pressure_jacobians
-            τ̇_abs_psurf[i_band][:, end] .+=
-                τ_abs[i_band][:, end] .* dry_ratio_dot
+            _add_column_psurf_tangent!(τ̇_abs_psurf[i_band], τ_abs[i_band],
+                                       vertical_grid, psurf_tangents, profile)
         end
-        midpoint_pressure_ratio_dot = FT(0.5) / profile.p_full[end]
-        binary_ratio_dot = dry_ratio_dot + midpoint_pressure_ratio_dot
 
         # Collision-induced absorption (HITRAN .cia files), if any. CIA is
         # held fixed in the gas-profile Jacobian τ̇_abs; a collider abundance
@@ -413,12 +464,9 @@ function model_from_parameters(lin::LinMode,
                                 _omit_abundance_term!(omitted, i_band, 1 + i, term)
                         end
                     end
-                    # No @views here: Julia 1.10.12's lowering rejects this
-                    # particular `@views lhs .+=` in situ ("invalid let
-                    # syntax"; fine on 1.11+). An indexed `.+=` LHS is already
-                    # in-place via dotview, so only the RHS slice needs @view.
                     if compute_pressure_jacobians
-                        τ̇_abs_psurf[i_band][:, end] .+= @view(τ_cia[:, end]) .* binary_ratio_dot
+                        _add_binary_psurf_tangent!(τ̇_abs_psurf[i_band], τ_cia,
+                            vertical_grid, psurf_tangents, profile)
                     end
                 end
             end
@@ -441,11 +489,9 @@ function model_from_parameters(lin::LinMode,
                     h2o_tangent && any(!iszero, τ_continuum) &&
                         _omit_abundance_term!(omitted, i_band, 1,
                             "MT_CKD H₂O self and foreign continuum")
-                    # Same 1.10.12 lowering quirk as the CIA block above:
-                    # indexed `.+=` is already in-place; @view the RHS only.
                     if compute_pressure_jacobians
-                        τ̇_abs_psurf[i_band][:, end] .+=
-                            @view(τ_continuum[:, end]) .* binary_ratio_dot
+                        _add_binary_psurf_tangent!(τ̇_abs_psurf[i_band], τ_continuum,
+                            vertical_grid, psurf_tangents, profile)
                     end
                 end
             end
@@ -617,7 +663,7 @@ function model_from_parameters(lin::LinMode,
             τ_aer[i_band][i_aer,:,:] = τ_ref .* aod_scale .* τₚ'
             if compute_pressure_jacobians
                 dτₚdpsurf = aerosol_profile_psurf_tangent(
-                    c_aero.profile, profile, psurf_tangents.Δz_dot)
+                    vertical_grid, c_aero.profile, profile, psurf_tangents)
                 τ̇_aer_psurf[i_band][i_aer, :, :] .=
                     τ_ref .* aod_scale .* dτₚdpsurf'
             end

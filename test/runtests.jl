@@ -25,6 +25,7 @@ try
 @testset "Idiomatic Julia interfaces" begin include("test_julia_interfaces.jl") end
 @testset "Absorption column integration" begin include("test_absorption_column_integration.jl") end
 @testset "Absorption pressure derivatives" begin include("test_absorption_pressure.jl") end
+@testset "Vertical-grid surface-pressure Jacobians" begin include("test_vertical_grid_psurf.jl") end
 @testset "H2O self broadening" begin include("test_h2o_self_broadening.jl") end
 @testset "Scattering" begin include("test_Scattering.jl") end
 @testset "Molecular Rayleigh" begin include("test_molecular_rayleigh.jl") end

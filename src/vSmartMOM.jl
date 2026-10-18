@@ -55,6 +55,8 @@ export AbstractJacobianFlavor, OCO_RRS_synth, JacobianPlan,
        parameter_names, local_to_global, n_global, globalize_jacobian,
        requires_aerosol_microphysics_jacobians, requires_h2o_jacobians,
        requires_pressure_jacobians
+export AbstractVerticalGridConvention, FixedPressureGrid, FixedAltitudeGrid,
+       surface_pressure_interfaces
 
 export HenyeyGreensteinPhaseFunction,
        SyntheticPolarizedHenyeyGreensteinPhaseFunction,
