@@ -26,6 +26,7 @@ using vSmartMOM.InelasticScattering
 using Test
 using LinearAlgebra
 using Interpolations
+using YAML
 
 const _LS = vSmartMOM.CoreRT
 
@@ -208,4 +209,53 @@ const _LS = vSmartMOM.CoreRT
         @test_throws ArgumentError rt_run(lin_model, optical_lin, 0,
                                            size(optical_lin.τ̇_abs[1], 1), 1)
     end
+end
+
+# B8 (docs/dev_notes/RELEASE_READINESS_AND_CLAUDE_HANDOFF_2026-10-16.md): a
+# combined-band solve applies one lower boundary to every band. It used to take
+# the first band's surface silently; differing or band-resolved surfaces must
+# now be rejected.
+@testset "Combined-band solves require a common surface" begin
+    d = YAML.load_file(joinpath(pkgdir(vSmartMOM), "config", "quickstart.yaml"))
+    d["radiative_transfer"]["spec_bands"] = ["[12987.0, 12988.0]", "[13100.0, 13101.0]"]
+    d["radiative_transfer"]["surface"] = ["LambertianSurfaceScalar(0.15)",
+                                          "LambertianSurfaceScalar(0.3)"]
+    differing = model_from_parameters(read_parameters(d))
+    rs = noRS{Float64}()
+    @test_throws r"solved together with a single lower boundary" CoreRT.rt_run(rs, differing, [1, 2])
+    @test_throws r"solved together with a single lower boundary" CoreRT.rt_run_ss(rs, differing, [1, 2])
+    @test_throws r"solved together with a single lower boundary" CoreRT.rt_run_test_ms(rs, [1], differing, [1, 2])
+    # Each band alone is unaffected.
+    @test CoreRT.rt_run(rs, differing, [2]).toa ≈ rt_run(differing; i_band = 2).toa
+
+    # Equal plain-value surfaces from separate entries are the same boundary,
+    # and the elastic combined solve reproduces the separate band solves.
+    d["radiative_transfer"]["surface"] = ["LambertianSurfaceScalar(0.15)",
+                                          "LambertianSurfaceScalar(0.15)"]
+    common = model_from_parameters(read_parameters(d))
+    separate = cat(rt_run(common; i_band = 1).toa, rt_run(common; i_band = 2).toa; dims = 3)
+    @test CoreRT.rt_run(rs, common, [1, 2]).toa ≈ separate rtol = 1e-12
+
+    # A shared spectral albedo spanning both bands gives each band its own
+    # albedo; it must match separate solves with those albedos.
+    spanning = LambertianSurfaceSpectrum([0.15, 0.15, 0.3, 0.3])
+    common.surfaces[1] = spanning
+    common.surfaces[2] = spanning
+    combined = CoreRT.rt_run(rs, common, [1, 2]).toa
+    @test combined[:, :, 1:2] ≈ separate[:, :, 1:2] rtol = 1e-12
+    @test combined[:, :, 3:4] ≈ rt_run(differing; i_band = 2).toa rtol = 1e-12
+    one_band = LambertianSurfaceSpectrum([0.1, 0.2])
+    common.surfaces[1] = one_band
+    common.surfaces[2] = one_band
+    @test_throws r"albedo values" CoreRT.rt_run(rs, common, [1, 2])
+
+    # Legendre albedos and canopies cannot span bands.
+    legendre = CoreRT.LambertianSurfaceLegendre([0.2, 0.1])
+    common.surfaces[1] = legendre
+    common.surfaces[2] = legendre
+    @test_throws r"LambertianSurfaceLegendre" CoreRT.rt_run(rs, common, [1, 2])
+    canopy = CanopySurface(; soil = LambertianSurfaceScalar(0.15), LAI = 2.0)
+    common.surfaces[1] = canopy
+    common.surfaces[2] = canopy
+    @test_throws r"CanopySurface" CoreRT.rt_run(rs, common, [1, 2])
 end

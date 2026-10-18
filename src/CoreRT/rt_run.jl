@@ -371,11 +371,7 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
 
     n_aer = CoreRT.n_aerosols(model)
 
-    # Also to be changed if more than 1 band is used!!
-    brdf = get_surface(model, iBand[1])
-    if length(iBand) > 1
-        @info "More than one band has been chosen, be aware that multiple BRDFs are not yet implemented and only the first one will be used!"
-    end
+    brdf = common_band_surface(model, iBand)
 
     if quad_points.external_solar
         toa_only || throw(ArgumentError(
@@ -963,6 +959,7 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
                 m_max_override::Union{Nothing, Int} = nothing,
                 fourier_convergence_override::Union{Nothing, AbstractFourierConvergence} = nothing)
     bands = iBand isa Integer ? [Int(iBand)] : collect(Int, iBand)
+    common_band_surface(model, bands)   # reject before any path mutates RS_type
     geom = model.obs_geom
     model.quad_points.external_solar && !isempty(geom.sensor_levels) &&
         throw(ArgumentError(
@@ -1095,10 +1092,7 @@ function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
     (; quad_points) = model
     FT       = CoreRT.float_type(model)
 
-    brdf = get_surface(model, iBand[1])
-    if length(iBand) > 1
-        @info "More than one band has been chosen; single-scatter path uses only the first BRDF."
-    end
+    brdf = common_band_surface(model, iBand)
 
     # Same ϖ_λ₁λ₀ normalization as rt_run (ported from sanghavi rt_run_ss:466).
     InelasticScattering.normalize_raman_weights!(RS_type, model, iBand)

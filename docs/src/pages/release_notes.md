@@ -65,6 +65,12 @@ the repository's `CITATION.bib`, with their original publication author order.
   narrower floating-point precision. Change geometry through model construction
   or `remake_geometry`. Multiple beams are rejected; for a common geometry,
   sum their irradiance spectra into one `SolarBeam`.
+- A solve over several bands at once applies one surface to all of them. Bands
+  with different surfaces now raise an `ArgumentError` instead of silently
+  using the first band's surface. A shared spectral or spline albedo must cover
+  the spectral points of all selected bands; Legendre albedos and canopies are
+  not supported across bands. Run independent bands separately; coupled
+  (Raman) solves need one supported common surface.
 - Nonzero or retrievable `SurfaceSIF` requires a supported Lambertian surface.
   Unsupported source/surface combinations now throw instead of ignoring SIF.
 - The legacy HITRAN reader rejects malformed required fields and non-ASCII or

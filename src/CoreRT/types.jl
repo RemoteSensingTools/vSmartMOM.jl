@@ -1578,6 +1578,61 @@ n_fourier_moments_bands(m::RTModel) = m.solver.n_fourier_moments_bands
 
 # ── RTModel accessors ─────────────────────────────────────────────────────
 get_surface(m::RTModel, iBand) = m.surfaces[iBand]
+
+"""
+    common_band_surface(m::RTModel, iBand)
+
+Lower boundary for a solve over the bands `iBand` together (combined-band
+Raman calls). Such a solve applies one surface to every band, so all selected
+bands must hold the same surface (`===`: the same object, or an identical
+plain-value surface such as two `LambertianSurfaceScalar(0.15)` entries).
+The shared surface must also describe the combined spectral grid: a spectral
+or spline albedo needs one value per spectral point of all selected bands;
+a Legendre albedo (a polynomial over one band's sample index) and a canopy
+(whose cache is built for one band's grid) are not supported across bands.
+Anything else raises an `ArgumentError` instead of silently using the first
+band's surface.
+"""
+function common_band_surface(m::RTModel, iBand)
+    surface = get_surface(m, first(iBand))
+    bands = unique(iBand)
+    length(bands) == 1 && return surface
+    for ib in bands
+        get_surface(m, ib) === surface || throw(ArgumentError(
+            "bands $bands are solved together with a single lower boundary, but " *
+            "band $ib holds a different surface ($(get_surface(m, ib))) from band " *
+            "$(first(bands)) ($surface); run these bands separately"))
+    end
+    n_spec = sum(ib -> length(get_spec_bands(m)[ib]), bands)
+    _check_combined_band_surface(surface, n_spec, bands)
+    return surface
+end
+
+_check_combined_band_surface(::AbstractSurfaceType, n_spec, bands) = nothing
+
+function _check_combined_band_surface(s::LambertianSurfaceSpectrum, n_spec, bands)
+    length(s.albedo) == n_spec || throw(ArgumentError(
+        "bands $bands are solved together on $n_spec spectral points, but the shared " *
+        "LambertianSurfaceSpectrum has $(length(s.albedo)) albedo values"))
+    return nothing
+end
+
+function _check_combined_band_surface(s::LambertianSurfaceSpline, n_spec, bands)
+    length(s.wlGrid) == n_spec || throw(ArgumentError(
+        "bands $bands are solved together on $n_spec spectral points, but the shared " *
+        "LambertianSurfaceSpline is evaluated on $(length(s.wlGrid)) grid points"))
+    return nothing
+end
+
+_check_combined_band_surface(::LambertianSurfaceLegendre, n_spec, bands) =
+    throw(ArgumentError(
+        "LambertianSurfaceLegendre is a polynomial over one band's spectral-point " *
+        "index and cannot span bands $bands solved together; run them separately"))
+
+_check_combined_band_surface(::CanopySurface, n_spec, bands) =
+    throw(ArgumentError(
+        "CanopySurface caches its optics for one band's spectral grid and is not " *
+        "supported for bands $bands solved together; run them separately"))
 get_surfaces(m::RTModel) = m.surfaces
 get_spec_bands(m::RTModel) = m.atmosphere.spec_bands
 

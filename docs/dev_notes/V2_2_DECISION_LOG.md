@@ -218,6 +218,10 @@ Round 7.
 - [ ] ExoOptics audit item 16 (`_read_hitran2024`): delegate to
   AtmosphericAbsorption's `load_lines(HitranPort(path))`, not to vSmartMOM's
   legacy `read_hitran` (the standalone line engine is deprecated in 2.2).
+- [ ] `CanopySurface` caches its optics without keying them on the spectral
+  grid: one canopy object reused for bands with different grids (or after a
+  combined-band solve) reuses a stale cache. Combined-band canopy solves are
+  rejected for now (B8); key the cache on the grid in a follow-up.
 - [ ] Generic analytic surfaces (`analytic_surface.jl`, RPV and Ross–Li) pass
   the reflected (row) direction as `μᵢ`; harmless for these reciprocal scalar
   BRDFs, but fix the order and docstring in a separate commit.

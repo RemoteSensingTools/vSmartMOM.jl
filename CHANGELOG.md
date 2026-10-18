@@ -53,6 +53,13 @@ review of General's sequential-version rule.
   builder `make_interpolation_model`, still the route for YAML `LUTfiles`, now
   uses its `vmr` argument (previously ignored) and rejects wavelength grids
   early with a uniform-wavenumber recipe.
+- Combined-band solves (`rt_run(RS_type, model, iBand)` with several bands,
+  and the single-scatter and multisensor equivalents) apply one lower
+  boundary. They now require every selected band to hold the same surface
+  (an identical plain-value surface counts); a shared spectral or spline
+  albedo must cover all selected bands' spectral points, and Legendre albedos
+  and canopies are rejected across bands. Previously the first band's surface
+  was used silently.
 - Pure-gas molecular-Rayleigh API in `Scattering` (also exported from
   `vSmartMOM`): `molecular_rayleigh_properties` and
   `molecular_rayleigh_cross_section_ratio` dispatch on

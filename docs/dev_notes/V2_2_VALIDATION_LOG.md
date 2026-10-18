@@ -117,3 +117,18 @@ Frankenberg's checkout (SHA-256 identical to the source file).
   bullet and docstring note: Codex APPROVE; Claude reviewer
   APPROVE-WITH-FIXES (provenance scope, "two-argument" wording) → fixed.
 - Open scientific points for Suniti are in the decision log.
+
+## 7. fix(rt): combined-band solves require one supported common surface (B8)
+
+- `test_lambertian_surfaces.jl` 63/63 (new testset 10/10, message-matched).
+  Raman, multisensor, canopy and SS suites (`test_multisensor_heights`,
+  `test_ray_cab_raman`, `test_inelastic_vs_smoke`,
+  `test_forward_raman_phase1b`, `test_external_solar_raman`, `test_canopy`,
+  `test_forward_ss`): 379 pass, 1 pre-existing `@test_broken`.
+- Combined elastic solve with a common scalar surface, and with one spectral
+  albedo spanning both bands, equals the separate band solves (rtol 1e-12).
+- Reviews: Codex REJECT (generic value equality) → rewritten to identity +
+  per-type grid checks → APPROVE-WITH-FIXES (scalar-soil canopy) → final
+  contract → APPROVE. Claude reviewer APPROVE-WITH-FIXES (spanning spectral
+  surfaces, Legendre, early check, message tests) → fixed → APPROVE.
+- Downstream: RRS_XCO2, OCORaman and ExoOptics call one band at a time.
