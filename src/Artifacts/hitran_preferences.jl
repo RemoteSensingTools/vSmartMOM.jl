@@ -18,6 +18,13 @@ Set the active HITRAN edition. Valid values:
 - Any other string (e.g., `"HITRAN2024"`) — use data downloaded from hitran.org,
   stored in a local scratch-space cache. Data is auto-downloaded on first access.
 
+A downloaded edition string is a cache/provenance label, not a database
+selector: hitran.org serves only its current edition, so a label such as
+`"HITRAN2020"` does not prove that the cached lines come from HITRAN2020. The
+SHA-256, download date and source URL shown by `hitran_info` record what was
+downloaded. `hitran_info` reports the metadata as stored and does not check it
+against the data file; `hitran_is_cached` and `artifact` do.
+
 # Example
 ```julia
 set_hitran_edition!("HITRAN2024")  # switch to latest HITRAN
@@ -62,7 +69,8 @@ Return metadata for the given molecule under the current HITRAN edition.
 
 For `"artifact"` edition, returns basic info. For downloaded editions,
 returns the full metadata from the `.meta.toml` file (edition, download date,
-wavenumber range, SHA256, source URL).
+wavenumber range, SHA256, source URL). The metadata is returned as recorded;
+it is not checked against the data file here (see `hitran_is_cached`).
 """
 function hitran_info(molecule::AbstractString)
     edition = get_hitran_edition()

@@ -1,2 +1,4 @@
 *.ipynb linguist-detectable=false
 *.py linguist-detectable=false
+# Byte-exact HITRAN API response fixture: never convert line endings.
+test/reference/hitran_api_*.par -text
