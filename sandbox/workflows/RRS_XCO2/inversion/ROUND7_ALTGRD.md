@@ -152,6 +152,21 @@ Float32 cancellation in the FD (it does not by itself exclude a small Float32
 tangent error); noise-weighted errors at 2 hPa are
 0.5–0.6 % (altitude) and 0.8–1.0 % (pressure).
 
+## 5b. Pilot (run at checkpoint `4075fa16a0adfa5bf524b32d44b075854ab4e2d5`)
+
+Sealed release `RRS_XCO2/bottom_layer_XCO2_retrievals/round7_altgrd_fixed_sif_imperfect_correction/deployment/round7_altgrd_release.json`;
+clean-checkout campaign test 183/183 including the full 80-scene preflight
+(44); `run_round7_altgrd_pilot.sh --check-only`, then `--smoke-only` (states
+001 and 036, member 11: both converged, fit_ok), then the full pilot: 160/160
+solves (members 01 and 11 of all 80 scenes) on curry physical GPU1, 0 failed
+solves. The SIF-on block needed two relaunches after a GPU-compiler
+`InvalidIRError` at its first kernel compile. The suspected, circumstantial
+cause is another session rewriting the shared `~/.julia/compiled` caches;
+the root cause was not isolated, and the private first depot does not shield
+the runs from that depot. See the report's execution log. Results and the comparison with Round 7 are in
+`ROUND7_ALTGRD_PILOT_REPORT.md` (copy of the report in the output tree), made
+with `retrieval_setup/compare_round7_altgrd_pilot.jl`.
+
 ## 6. Reproduction
 
 From `test/`, with Julia 1.12.5:
@@ -210,3 +225,33 @@ Commit 1 (implementation, tests, campaign set-up):
   array name. Codex (`exec -C <worktree> -s read-only`, xhigh): no P1/P2;
   two P3 note-accuracy items (skipped full preflight not disclosed; Float32
   FD attribution too strong), both fixed.
+
+Commit 2 (pilot report, comparison script, this section 5b):
+
+* Codex (`exec -C <worktree> -s read-only`, xhigh): numbers verified against
+  all 160 CSV/NetCDF pairs and the 800 Round 7 noisy-member files; three P2
+  findings (interpretation wrongly described the change as tangent-only after
+  the first step; InvalidIRError attribution stated too strongly; script
+  silently tolerated missing files) and one P3 (timing attribution). Coverage
+  is now reported (160/160 pairs, all scenes with ten members).
+* Independent Claude reviewer: numbers and script confirmed; findings fixed:
+  non-converged solves described by their actual trial histories (two
+  divergences, γ → 10⁴, still drifting); truth bias reported by class (the
+  pooled improvement was a cancellation; aerosol bias reverses sign);
+  χ²-based "not a fit failure" claim softened and the convergence-path
+  caveat added; maxima attributed to individual solves; cache-churn timeline
+  corrected and the private-depot limitation stated; 006/11 provenance
+  (diagnostic solve) and Round 7 host split stated; Float32 FD figures added;
+  Rounds 1–2 timing argument; script now asserts state model/grid and emits
+  the class tables and non-converged list.
+* Re-review (both reviewers): fixes verified against the data; remaining
+  wording items fixed — desert no-aerosol O₂A χ² change (up to −0.13) stated
+  instead of "χ² unchanged"; the attribution hedge restored (it had been lost
+  when the report was regenerated) and repeated here; Round 7 host split
+  corrected (curry 440 no-aerosol + 165 SIF-on aerosol, wurst 275 aerosol);
+  Float32 FD numbers given with their step; the timing statement limited to
+  measured totals (a final Codex check caught a remaining attribution of the
+  0.11 s model-build increase and a misquoted χ² range; both corrected); Rounds 1–2 described as unpinned; the alternative
+  (optimizer-damping) reading of the non-converged solves added; smoke
+  outputs identified as official pilot outputs; hand-computed numbers in §1/§5
+  labelled as such.
