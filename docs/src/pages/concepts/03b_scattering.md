@@ -198,11 +198,9 @@ refractive-index method. `RefractiveIndexRayleigh` is kept as an alias of
 
 The RI helper returns a refractive index, King factor, solver depolarization
 ratio, and scattering cross section in cm² molecule⁻¹ for `He`, `Ar`, `N2`,
-`O2`, and `CO2`. The HWO campaign's new provenance review and method-explicit
-route are scoped only to Ar and CO₂; He/N₂/O₂ remain compatibility coefficient
-sets and their production scattering paths are unchanged. The presence of a
-provenance record is evidence, not a declaration that a campaign is qualified.
-The method argument is intentionally visible so an RI calculation cannot be
+`O2`, and `CO2`. Its Ar and CO₂ coefficients were reviewed for the Habitable
+Worlds Observatory (HWO) exo-Earth studies and carry a machine-readable
+provenance record; He, N₂ and O₂ have no such record yet. The method argument is intentionally visible so an RI calculation cannot be
 confused with the polarizability-tensor implementation.
 
 The cross-section-ratio helper is useful for a matched-reference-optical-depth
@@ -233,8 +231,7 @@ build the Greek phase source from the returned depolarization at each
 wavelength (or place wavelengths with distinct depolarization in separate
 bands).
 
-For the HWO additions Ar and CO₂, the coefficient provenance and distinct
-evidence intervals are machine-readable through
+For Ar and CO₂, the coefficient provenance and distinct evidence intervals are machine-readable through
 `molecular_rayleigh_provenance`:
 
 - The [Peck--Fisher Ar measurement](https://doi.org/10.1364/JOSA.54.001362)
@@ -267,11 +264,8 @@ evidence intervals are machine-readable through
   continuous 307--725 nm direct check for CO₂.
 
 The primary-measurement range, adopted dispersion envelope, King-factor
-support, and direct-scattering checks are not interchangeable. Downstream
-audits must report dispersion and King extrapolation separately. Interval
-membership is evidence only: absent an explicit campaign validator or waiver,
-the authoritative campaign qualification state remains pending or blocked,
-never implicitly qualified.
+support, and direct-scattering checks are not interchangeable; dispersion and
+King-factor extrapolation should be reported separately.
 
 The N₂ and O₂ RI coefficient sets are those listed in
 [He et al. (2021)](https://doi.org/10.5194/acp-21-14927-2021), Table 1, which
@@ -282,9 +276,7 @@ dispersion extrapolations.
 This API performs no explicit frequency redistribution. Its conventional
 Rayleigh cross section and effective King factor are not a separately computed
 Cabannes-only cross section. The RI method neither calls nor modifies the
-tensor/Raman machinery in `InelasticScattering`. The HWO campaign uses the
-method-explicit route for Ar and CO₂; existing N₂/O₂ production paths remain
-unchanged.
+tensor/Raman machinery in `InelasticScattering`.
 
 #### Polarizability tensor (`UsingPolTen`)
 
@@ -346,6 +338,8 @@ band-centre wavenumber and the column-weighted mean temperature. Using these
 pure-gas helpers inside an RT run requires setting the optical-depth profile
 and the Greek source explicitly. Atmospheric composition is not yet connected
 to molecular columns and scattering-weighted phase-matrix mixing.
+
+### Elastic Rayleigh vs Cabannes in RT runs
 
 For the molecular contribution (no aerosols, just air molecules):
 

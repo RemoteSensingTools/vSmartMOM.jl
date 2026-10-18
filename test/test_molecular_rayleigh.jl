@@ -251,8 +251,61 @@ end
         end
     end
 
+    # Independent anchor: closed form evaluated here from the raw tensor
+    # constants as written in src/Inelastic/src/molecular_constructors.jl
+    # (α̅₀₀, ω₀, α_b, α_c, γ̅₀₀; cgs units). The first check catches an edit
+    # to those constants; the second checks the Raman-module algebra and the
+    # adapter against the textbook expressions
+    #   α̅ = α̅₀₀(1 + α_b T + α_c T²)/(1 - (2πcν/ω₀)²),
+    #   ρ = 6γ²/(45α̅² + 7γ²),  F_K = 1 + 2γ²/(9α̅²),
+    #   σ = (128/3) π⁵ ν⁴ α̅² F_K.
+    # The pinned 400 nm, 288.15 K values (5 significant figures) guard
+    # against silent drift of both.
+    raw = (N2 = (α̅₀₀ = 1.7406e-24, ω₀ = 2.6049e16, α_b = 1.8e-6,
+                 α_c = 0.0, γ̅₀₀ = 0.71e-24, mol = IS.N₂()),
+           O2 = (α̅₀₀ = 1.5658e-24, ω₀ = 2.1801e16, α_b = -2.369e-6,
+                 α_c = 8.687e-9, γ̅₀₀ = 1.080e-24, mol = IS.O₂()),
+           H2 = (α̅₀₀ = 0.8032e-24, ω₀ = 2.1399e16, α_b = 5.870e-6,
+                 α_c = 7.544e-9, γ̅₀₀ = 0.288e-24, mol = IS.H₂()))
+    pinned_400 = (N2 = (σ = 1.7103e-26, ρ = 0.020247),
+                  O2 = (σ = 1.5082e-26, ρ = 0.054014),
+                  H2 = (σ = 3.7447e-27, ρ = 0.015177))
+    c_cgs = 2.99792458e10   # cm s⁻¹
+    for gas in (:N2, :O2, :H2)
+        r = getproperty(raw, gas)
+        tensor = IS.getMolecularConstants(r.mol, 1.0).PolTensor
+        @test (tensor.α̅₀₀, tensor.ω₀, tensor.α_b, tensor.α_c, tensor.γ̅₀₀) ==
+              (r.α̅₀₀, r.ω₀, r.α_b, r.α_c, r.γ̅₀₀)
+        for λ in (400.0, 650.0), T in (250.0, 288.15)
+            ν = 1.0e7 / λ
+            α̅ = r.α̅₀₀ * (1 + r.α_b * T + r.α_c * T^2) /
+                 (1 - (2π * c_cgs * ν / r.ω₀)^2)
+            γ = r.γ̅₀₀
+            ρ = 6γ^2 / (45α̅^2 + 7γ^2)
+            F = 1 + 2γ^2 / (9α̅^2)
+            σ = 128 / 3 * π^5 * ν^4 * α̅^2 * F
+            p = molecular_rayleigh_properties(pt, gas, λ; temperature_K = T)
+            @test p.cross_section_cm2 ≈ σ rtol = 1e-12
+            @test p.depolarization ≈ ρ rtol = 1e-12
+            @test p.king_factor ≈ F rtol = 1e-12
+        end
+        p400 = molecular_rayleigh_properties(pt, gas, 400.0)
+        @test p400.cross_section_cm2 ≈ getproperty(pinned_400, gas).σ rtol = 1e-4
+        @test p400.depolarization ≈ getproperty(pinned_400, gas).ρ rtol = 1e-4
+    end
+
     # The tensor anisotropy is λ- and T-independent; only α̅ carries the
     # Buldakov dispersion and temperature dependence.
+    hook = vSmartMOM.Scattering._poltensor_rayleigh_coefficients
+    for gas in (:N2, :O2, :H2)
+        samples = [hook(gas, ν, T) for (ν, T) in ((1.0e7 / 350.0, 200.0),
+                                                   (1.0e7 / 532.0, 288.15),
+                                                   (1.0e7 / 800.0, 300.0),
+                                                   (25_000.0, 1000.0))]
+        @test all(c.γ̅ == first(samples).γ̅ for c in samples)
+        @test first(samples).γ̅ == getproperty(raw, gas).γ̅₀₀
+        @test length(unique(c.α̅ for c in samples)) == length(samples)
+    end
     @test molecular_rayleigh_properties(pt, :N2, 500.0; temperature_K = 200.0).cross_section_cm2 !=
           molecular_rayleigh_properties(pt, :N2, 500.0; temperature_K = 300.0).cross_section_cm2
 

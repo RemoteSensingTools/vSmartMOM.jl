@@ -15,10 +15,10 @@ Concrete methods:
   polarizability tensor, taken from the `InelasticScattering` (Raman) module
   constants.
 
-This abstraction is deliberately part of `Scattering`, not `Inelastic`: the
-HWO calculation must not alter or depend on the RRS molecular state. The
-`UsingPolTen` method only *reads* freshly constructed Raman-module constants;
-it never mutates shared Raman state.
+This abstraction is part of `Scattering`, not `Inelastic`. Only
+`UsingRefInd` is independent of the Raman-module (`InelasticScattering`)
+constants. `UsingPolTen` deliberately uses them: it builds fresh Raman-module
+molecular constants on each call and never mutates shared Raman state.
 """
 abstract type AbstractMolecularRayleighMethod end
 
@@ -28,8 +28,8 @@ abstract type AbstractMolecularRayleighMethod end
 
 Select the conventional refractive-index plus effective-King-factor Rayleigh
 formulation without constructing frequency-shifted Raman branches.
-The HWO A--D experiment uses this explicit method for the newly required Ar
-and CO₂ cross sections.  `RefractiveIndexRayleigh` is a compatibility alias
+The Habitable Worlds Observatory (HWO) exo-Earth studies use this explicit
+method for the Ar and CO₂ cross sections. `RefractiveIndexRayleigh` is a compatibility alias
 (`RefractiveIndexRayleigh === UsingRefInd`) kept so existing calling code,
 e.g. ExoOptics, continues to work unchanged. The polarizability-tensor
 implementation uses the distinct dispatch type [`UsingPolTen`](@ref); it never
@@ -48,30 +48,35 @@ Return no-frequency-redistribution Rayleigh properties for a pure gas at
 vacuum wavelength `wavelength_nm` (nm). Supported species are `:He`, `:Ar`,
 `:N2`, `:O2`, and `:CO2` (Unicode aliases such as `:N₂` are accepted).
 
-The HWO workflow uses the method-explicit form for Ar and CO₂. The two-
-argument form and the He/N₂/O₂ coefficient sets predate that workflow and
-remain compatibility behavior; they are not part of the new provenance review.
+The two-argument form is equivalent to passing `UsingRefInd()`. The
+machine-readable provenance record ([`molecular_rayleigh_provenance`](@ref))
+currently covers Ar and CO₂ only; the He, N₂ and O₂ coefficient sets have no
+such record yet.
 
 The returned named tuple contains
 
-- `refractive_index`: refractive index at the source reference number density;
+- `refractive_index`: refractive index at the source reference number density.
+  It is stored as ``n`` itself, so a `Float32` result resolves ``n-1`` only to
+  about `eps(1f0)/(n-1)` relative (`eps(1f0)` ≈ 1.2e-7): a few times 1e-4
+  for N₂, O₂, Ar and CO₂, and a few times 1e-3 for He. The cross section is computed from the refractivity
+  directly and is not affected;
 - `king_factor`: molecular-anisotropy correction ``F_K``;
-- `depolarization`: depolarization ratio ``rho`` in the convention consumed by
+- `depolarization`: depolarization ratio ``\\rho`` in the convention consumed by
   [`get_greek_rayleigh`](@ref), related by
-  ``F_K = (6 + 3rho)/(6 - 7rho)``;
+  ``F_K = (6 + 3\\rho)/(6 - 7\\rho)``;
 - `cross_section_cm2`: Rayleigh scattering cross section in cm² molecule⁻¹.
 
 The individual dispersion and King-factor sources are returned by
-[`molecular_rayleigh_provenance`](@ref) for the HWO additions Ar and CO₂.
+[`molecular_rayleigh_provenance`](@ref) for Ar and CO₂.
 Wilmouth and Sayres (2019) provide a direct 333--363 nm check of both gases.
 The cross-section expression is
 
 ```math
-sigma_R = \\frac{24 pi^3 nu^4}{N^2}
+\\sigma_R = \\frac{24 \\pi^3 \\nu^4}{N^2}
           \\left(\\frac{n^2-1}{n^2+2}\\right)^2 F_K,
 ```
 
-where `nu` is in cm⁻¹ and `N` in molecule cm⁻³. The implementation can
+where ``\\nu`` is in cm⁻¹ and `N` in molecule cm⁻³. The implementation can
 evaluate any positive wavelength, but callers must use the distinct
 dispersion, King-factor, and validation evidence returned by
 `molecular_rayleigh_provenance` and mark extrapolation. The returned
@@ -138,7 +143,8 @@ molecular_rayleigh_properties(species, wavelength_nm::Real) =
                                             temperature_K = 288.15)
     molecular_rayleigh_cross_section_ratio(species, wavelength_nm, reference_nm)
 
-Return ``sigma_R(wavelength_nm) / sigma_R(reference_nm)`` for a pure gas.
+Return ``\\sigma_R(\\lambda) / \\sigma_R(\\lambda_\\mathrm{ref})`` for a pure gas,
+with ``\\lambda`` = `wavelength_nm` and ``\\lambda_\\mathrm{ref}`` = `reference_nm`.
 This ratio is the appropriate scaling when a comparison fixes the Rayleigh
 optical depth at one reference wavelength and varies molecular identity.
 For [`UsingPolTen`](@ref) both cross sections are evaluated at the same
@@ -164,12 +170,11 @@ molecular_rayleigh_cross_section_ratio(species, wavelength_nm::Real,
 """
     molecular_rayleigh_provenance(::UsingRefInd, species)
 
-Return the coefficient provenance and separate evidence intervals for the HWO
-refractive-index/King-factor additions Ar and CO₂. The primary RI measurement
-range, adopted dispersion-formula envelope, King-factor support, and direct
-scattering checks are distinct facts. Callers spanning a wider interval must
-record and approve each extrapolation; this function does not disguise an
-adopted formula envelope as measured or directly validated coverage.
+Return the coefficient provenance and separate evidence intervals for the
+refractive-index/King-factor coefficients of Ar and CO₂. The primary RI
+measurement range, adopted dispersion-formula envelope, King-factor support,
+and direct scattering checks are reported as distinct fields, so callers can
+tell measured or directly validated coverage from formula extrapolation.
 
 Ar uses the Peck--Fisher dispersion relation and unity King factor.  CO₂ uses
 the Bideau-Mehu dispersion relation (scaled to the stated reference density)
@@ -177,13 +182,12 @@ and the Sneep--Ubachs King-factor fit to Alms--Burnham--Flygare measurements.
 Wilmouth and Sayres (2019) directly measured both gases at 333--363 nm;
 Thalman et al. (2014) checked Ar in selected regions between 350 and 660 nm;
 and He et al. (2021) provide a continuous 307--725 nm direct check for CO₂.
-This provenance API is intentionally limited to Ar and CO₂ because those are
-the only newly required RI cross sections in the initial HWO A--D campaign.
+This provenance API is currently limited to Ar and CO₂.
 """
 function molecular_rayleigh_provenance(::UsingRefInd, species)
     gas = _canonical_rayleigh_species(species)
     gas in (:Ar, :CO2) || throw(ArgumentError(
-        "HWO RI provenance is available only for Ar and CO2; got $species"))
+        "RI provenance is available only for Ar and CO2; got $species"))
 
     if gas === :Ar
         # Sneep & Ubachs quote this domain in wavenumber.
@@ -511,9 +515,12 @@ that density. The RT model's own molecular-depolarization path instead uses the 
 mean temperature of the profile at the band-centre wavenumber. Calling this
 function does not change any model default.
 
-The internal evaluation is in `Float64` (``\\bar\\alpha^2 \\sim 10^{-48}``
-underflows `Float32`); results are returned in the floating-point type of
-`float(wavelength_nm)`. The polarizability constants and their temperature
+The internal evaluation is always in `Float64` (``\\bar\\alpha^2 \\sim 10^{-48}``
+underflows `Float32`); results are converted to the floating-point type of
+`float(wavelength_nm)`. The method is therefore not ForwardDiff-aware (dual
+numbers are not propagated) and does not gain precision from `BigFloat`
+inputs. As for the RI method, a `Float32` `refractive_index` resolves ``n-1``
+only to a few times 1e-4 relative. The polarizability constants and their temperature
 coefficients come from the Raman module (Buldakov et al.; Asawaroengchai &
 Rosenblatt (1980) for the O₂ and H₂ anisotropies, per the source comments).
 No separate validation interval is attached to them here.
