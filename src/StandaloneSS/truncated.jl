@@ -99,12 +99,9 @@ function truncated_ss_path1(config::ExactSSConfig, l_trunc)
     return run_exact_ss(truncated_config; paths = :path1).path1
 end
 
-@inline function _ss_azimuthal_kernel(si::Int, sj::Int, m::Int,
-                                      dϕ::FT) where {FT}
-    row_is_iq = si <= 2
-    col_is_iq = sj <= 2
-    return row_is_iq == col_is_iq ? cos(m * dϕ) : sin(m * dϕ)
-end
+# Same Fourier storage convention as the CoreRT surface operators.
+@inline _ss_azimuthal_kernel(si::Int, sj::Int, m::Int, dϕ::FT) where {FT} =
+    _azimuthal_kernel(si, sj, m, dϕ)
 
 function _gauss_legendre_0π(n::Int, ::Type{FT}) where {FT}
     n > 0 || throw(ArgumentError("azimuth quadrature must be positive"))
@@ -120,7 +117,7 @@ function _coxmunk_fourier_coeff_element(core_surface::CoxMunkSurface{FT},
                                         n_water::Complex{FT}) where {FT}
     result = zero(FT)
     @inbounds for iϕ in eachindex(ϕ)
-        M = coxmunk_brdf_mueller(core_surface, n_stokes, μᵥ, μ₀, ϕ[iϕ];
+        M = coxmunk_brdf_mueller(core_surface, n_stokes, μ₀, μᵥ, ϕ[iϕ];
                                   n_water)
         result += w[iϕ] * M[si, sj] *
                   _ss_azimuthal_kernel(si, sj, m, ϕ[iϕ])

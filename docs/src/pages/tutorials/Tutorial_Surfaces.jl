@@ -193,25 +193,33 @@ rossli = RossLiSurfaceScalar(0.05, 0.03, 0.1)  ## fvol, fgeo, fiso
 #
 # The Fresnel **Mueller matrix** for reflection is:
 #
-# $$\mathbf{M}_F = \begin{pmatrix} \tfrac{|r_s|^2+|r_p|^2}{2} & \tfrac{|r_s|^2-|r_p|^2}{2} & 0 & 0 \\ \tfrac{|r_s|^2-|r_p|^2}{2} & \tfrac{|r_s|^2+|r_p|^2}{2} & 0 & 0 \\ 0 & 0 & \operatorname{Re}(r_s r_p^*) & \operatorname{Im}(r_s r_p^*) \\ 0 & 0 & -\operatorname{Im}(r_s r_p^*) & \operatorname{Re}(r_s r_p^*) \end{pmatrix}$$
+# $$\mathbf{M}_F = \begin{pmatrix} \tfrac{|r_s|^2+|r_p|^2}{2} & \tfrac{|r_s|^2-|r_p|^2}{2} & 0 & 0 \\ \tfrac{|r_s|^2-|r_p|^2}{2} & \tfrac{|r_s|^2+|r_p|^2}{2} & 0 & 0 \\ 0 & 0 & \operatorname{Re}(r_s r_p^*) & -\operatorname{Im}(r_s r_p^*) \\ 0 & 0 & \operatorname{Im}(r_s r_p^*) & \operatorname{Re}(r_s r_p^*) \end{pmatrix}$$
 #
-# The off-diagonal (1,2) and (2,1) elements couple the $I$ and $Q$ Stokes
-# parameters -- this is the polarizing effect of the ocean surface.
+# It refers to the facet basis $(\hat s, \hat p = \mathbf{k}\times\hat s)$, with $\hat s$
+# normal to the plane of reflection. The off-diagonal (1,2) and (2,1) elements
+# couple the $I$ and $Q$ Stokes parameters -- this is the polarizing effect of
+# the ocean surface.
 #
 # ### 5c) BRDF Mueller matrix
 #
-# For a given geometry $(\mu_i, \mu_r, \Delta\phi)$ the full BRDF is:
+# For incident cosine $\mu_i$ (azimuth 0), reflected cosine $\mu_r$ and relative
+# azimuth $\Delta\phi$ (the glint lies at $\Delta\phi = 0$) the full BRDF is:
 #
-# $$\boldsymbol{\rho} \;=\; \frac{P(z_x, z_y)\;\cdot\; S(\mu_i, \mu_r)}{4\,\mu_i\,\mu_r\,\cos^4\!\beta}\;\; \mathbf{L}(\alpha_2)\;\mathbf{M}_F(\cos\theta_\text{local})\;\mathbf{L}(-\alpha_1)$$
+# $$\boldsymbol{\rho} \;=\; \frac{P(z_x, z_y)\;\cdot\; S(\mu_i, \mu_r)}{4\,\mu_i\,\mu_r\,\cos^4\!\beta}\;\; \mathbf{L}(\chi_2)\;\mathbf{M}_F(\cos\theta_\text{local})\;\mathbf{L}(\chi_1)$$
 #
 # where:
-# - $\beta$ is the facet tilt angle ($\cos\beta = n_z$, the $z$-component of the facet normal)
+# - $\beta$ is the facet tilt angle ($\cos\beta = n_z$ for the facet normal
+#   $\hat n \propto \mathbf{k}_r - \mathbf{k}_i$)
 # - $\theta_\text{local}$ is the local incidence angle on the tilted facet
-# - $\alpha_1$, $\alpha_2$ are rotation angles between the scattering plane
-#   and the facet incidence/reflection planes
-# - $\mathbf{L}(\phi)$ is the Stokes rotation matrix:
+# - $\mathbf{L}(\chi)$ changes the Stokes basis between a beam's meridian plane
+#   $(\hat\varphi, \hat\theta)$ and the facet basis $(\hat s, \hat p)$. The field
+#   components transform as $(E_s, E_p) = \begin{pmatrix} \cos\chi & \sin\chi \\ \sin\chi & -\cos\chi\end{pmatrix}(E_\varphi, E_\theta)$
+#   with $\hat s = \cos\chi\,\hat\varphi + \sin\chi\,\hat\theta$ — a reflection of
+#   the basis, which is its own inverse — so
 #
-# $$\mathbf{L}(\phi) = \begin{pmatrix} 1 & 0 & 0 & 0 \\ 0 & \cos 2\phi & \sin 2\phi & 0 \\ 0 & -\sin 2\phi & \cos 2\phi & 0 \\ 0 & 0 & 0 & 1 \end{pmatrix}$$
+# $$\mathbf{L}(\chi) = \begin{pmatrix} 1 & 0 & 0 & 0 \\ 0 & \cos 2\chi & \sin 2\chi & 0 \\ 0 & \sin 2\chi & -\cos 2\chi & 0 \\ 0 & 0 & 0 & -1 \end{pmatrix}$$
+#
+#   $\chi_1$ belongs to the incident and $\chi_2$ to the reflected beam.
 #
 # - $S$ is the Smith (1967) bistatic shadow masking factor
 #
@@ -337,10 +345,10 @@ canopy = CanopySurface(
 # ### Cox-Munk (analytical)
 # The derivative of the surface reflectance w.r.t. wind speed $U$ is computed
 # analytically via the chain rule:
-# $$\frac{\partial \boldsymbol{\rho}}{\partial U} \;=\; (1 - f_\text{wc})\!\left[\frac{\partial P}{\partial \sigma^2}\,S + P\,\frac{\partial S}{\partial \sigma^2}\right]\!\frac{d\sigma^2}{dU}\;\frac{\mathbf{L}_2\,\mathbf{M}_F\,\mathbf{L}_1}{4\mu_i\mu_r\cos^4\!\beta} \;+\; \frac{df_\text{wc}}{dU}\left(\boldsymbol{\rho}_\text{wc} - \boldsymbol{\rho}_\text{glint}\right)$$
+# $$\frac{\partial \boldsymbol{\rho}}{\partial U} \;=\; (1 - f_\text{wc})\!\left[\frac{\partial P}{\partial \sigma^2}\,S + P\,\frac{\partial S}{\partial \sigma^2}\right]\!\frac{d\sigma^2}{dU}\;\frac{\mathbf{L}(\chi_2)\,\mathbf{M}_F\,\mathbf{L}(\chi_1)}{4\mu_i\mu_r\cos^4\!\beta} \;+\; \frac{df_\text{wc}}{dU}\left(\boldsymbol{\rho}_\text{wc} - \boldsymbol{\rho}_\text{glint}\right)$$
 #
 # where $d\sigma^2/dU = 0.00256$.  The geometry, Fresnel coefficients, and
-# rotation matrices are all independent of $U$ and shared with the forward
+# Stokes basis changes are all independent of $U$ and shared with the forward
 # evaluation.
 #
 # ### Canopy

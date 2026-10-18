@@ -330,7 +330,7 @@ end
             μ_out = (i - 0.5) * dμ
             for j in 1:N_ϕ
                 ϕ = (j - 0.5) * dϕ
-                M = CM.coxmunk_brdf_mueller(surf, 1, μ_out, μ_in, ϕ;
+                M = CM.coxmunk_brdf_mueller(surf, 1, μ_in, μ_out, ϕ;
                                               n_water=complex(1.33, 0.0))
                 integral += M[1, 1] * μ_out * dμ * dϕ
             end

@@ -36,6 +36,17 @@ review of General's sequential-version rule.
   specular point), and the
   Smith shadowing function uses its correct `√π` normalization (shadowing at
   grazing angles was underestimated or zero). Both change ocean radiances.
+- Polarized Cox–Munk reflection corrected: Stokes vectors are transformed
+  explicitly between each beam's meridian plane and the facet's plane of
+  reflection; all callers pass (incident, reflected) as documented; the
+  surface Fourier moments follow the atmospheric phase-matrix storage
+  convention (the I,Q ← U,V block had the opposite sign, which affected
+  polarized skylight reflected at the surface); and the circular (V) terms of
+  the Fresnel Mueller matrix follow vSmartMOM's convention. The full Mueller
+  matrix now agrees with VLIDORT 2.8.3's Cox–Munk kernels. **Polarized ocean
+  runs change in every Stokes component, including I when there is a
+  scattering atmosphere** (up to ~3e-3 relative in a Rayleigh test case);
+  `Stokes_I` runs and vacuum intensity are unchanged by this item.
 - Shared aerosol reference normalization and spectral angular-cache sizing
   fixes restore constructor parity and avoid spectral-quadratic cache growth.
 - The experimental aerosol ingestion adapter now rejects calls that previously

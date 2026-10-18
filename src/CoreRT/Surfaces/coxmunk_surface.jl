@@ -128,177 +128,137 @@ end
 # ──────────────────────────────────────────────────────────────────────
 
 """
-    coxmunk_geometry(μᵢ, μᵣ, dϕ)
+    coxmunk_geometry(μᵢ, μᵣ, Δϕ)
 
-Compute the facet-reflection geometry for given incident (μᵢ, azimuth=0)
-and reflected (μᵣ, azimuth=dϕ) directions.
+Facet geometry for specular reflection of the incident propagation direction
+`kᵢ = (sinθᵢ, 0, −μᵢ)` (downward, azimuth 0) into `kᵣ = (sinθᵣ cosΔϕ,
+sinθᵣ sinΔϕ, μᵣ)` (upward, azimuth Δϕ). This is the azimuth convention of the
+atmospheric phase matrix (`Scattering.phase_matrix_first_column`): forward
+reflection, and hence the sun glint, lies at Δϕ = 0.
 
-Returns a NamedTuple with:
-- `cos_β`: cosine of facet tilt angle
-- `cos_θ_local`: cosine of the local incidence angle on the facet
-- `zx, zy`: slope components
-- `α₁, α₂`: rotation angles (scattering plane ↔ facet incidence plane)
+The reflecting facet has normal `n̂ ∝ kᵣ − kᵢ`, tilt `cos β = n̂_z`, local
+incidence `cos θ = kᵣ·n̂`, and slopes `zx = −n̂ₓ/n̂_z`, `zy = −n̂_y/n̂_z`.
+
+Fresnel reflection is diagonal in the facet basis `(ŝ, p̂ = k × ŝ)`, where
+`ŝ ∝ kᵢ × kᵣ` is normal to the plane of reflection. vSmartMOM Stokes vectors
+refer to the meridian basis `(φ̂, θ̂)` of each beam, with
+`Q = |E_φ|² − |E_θ|²`, `U = 2Re(E_φ E_θ*)`, `V = 2Im(E_φ E_θ*)`. The field
+components transform as
+
+    (E_s, E_p) = [cos χ  sin χ; sin χ  −cos χ] (E_φ, E_θ),   ŝ = cos χ φ̂ + sin χ θ̂,
+
+an improper (reflecting) change of basis that is its own inverse. Its Stokes
+matrix, `meridian_facet_stokes`, depends on `cos 2χ` and `sin 2χ`; `χ₁`
+belongs to the incident and `χ₂` to the reflected beam.
 """
-function coxmunk_geometry(μᵢ::FT, μᵣ::FT, dϕ::FT) where FT
-    sin_θᵢ = sqrt(max(FT(0), one(FT) - μᵢ^2))
-    sin_θᵣ = sqrt(max(FT(0), one(FT) - μᵣ^2))
-    cos_dϕ = cos(dϕ)
-    sin_dϕ = sin(dϕ)
+function coxmunk_geometry(μᵢ::FT, μᵣ::FT, Δϕ::FT) where FT
+    sinθᵢ = sqrt(max(zero(FT), one(FT) - μᵢ^2))
+    sinθᵣ = sqrt(max(zero(FT), one(FT) - μᵣ^2))
+    cosΔϕ, sinΔϕ = cos(Δϕ), sin(Δϕ)
 
-    # Facet normal = bisector of (-incident) and reflected directions
-    # Incident direction: (sin_θᵢ, 0, -μᵢ)  [downward]
-    # Reflected direction: (sin_θᵣ cos(dϕ), sin_θᵣ sin(dϕ), μᵣ)  [upward]
-    # Half-vector (unnormalized facet normal):
-    nx = -sin_θᵢ + sin_θᵣ * cos_dϕ
-    ny = sin_θᵣ * sin_dϕ
-    nz = μᵢ + μᵣ
-    norm_n = sqrt(nx^2 + ny^2 + nz^2)
+    # Propagation directions and their meridian bases (φ̂, θ̂)
+    kᵢ  = SVector(sinθᵢ, zero(FT), -μᵢ)
+    kᵣ  = SVector(sinθᵣ * cosΔϕ, sinθᵣ * sinΔϕ, μᵣ)
+    φ̂ᵢ = SVector(zero(FT), one(FT), zero(FT))
+    θ̂ᵢ = SVector(-μᵢ, zero(FT), -sinθᵢ)
+    φ̂ᵣ = SVector(-sinΔϕ, cosΔϕ, zero(FT))
+    θ̂ᵣ = SVector(μᵣ * cosΔϕ, μᵣ * sinΔϕ, -sinθᵣ)
 
-    # Guard against degenerate geometry
-    if norm_n < FT(1e-15)
-        return (; cos_β=one(FT), cos_θ_local=one(FT),
-                  zx=zero(FT), zy=zero(FT), α₁=zero(FT), α₂=zero(FT))
-    end
+    # Facet normal (half vector), tilt, local incidence, slopes. For unit
+    # vectors |kᵣ − kᵢ| = 2 cos θ_local; using the norm avoids the cancellation
+    # of dot(kᵣ, n̂) for nearly parallel grazing rays in Float32.
+    h = kᵣ - kᵢ
+    norm_h = norm(h)
+    n̂ = h / norm_h
+    cos_β = max(FT(1e-10), n̂[3])
+    cos_θ_local = clamp(norm_h / 2, zero(FT), one(FT))
+    zx = -n̂[1] / cos_β
+    zy = -n̂[2] / cos_β
 
-    nx /= norm_n
-    ny /= norm_n
-    nz /= norm_n
+    # Normal to the plane of reflection; at exact backscatter (kᵣ = −kᵢ, i.e.
+    # μᵣ = μᵢ and Δϕ = π: normal incidence on a facet tilted by θᵢ) every
+    # ŝ ⟂ kᵢ is valid.
+    s_vec = cross(kᵢ, kᵣ)
+    ŝ = norm(s_vec) > eps(FT) ? normalize(s_vec) : φ̂ᵢ
 
-    # Tilt angle
-    cos_β = max(FT(1e-10), nz)
-
-    # Local incidence angle on facet: cos_θ_local = |k_i · n|
-    cos_θ_local = clamp((μᵢ + μᵣ) / (FT(2) * cos_β), FT(0), one(FT))
-
-    # Slope components
-    zx = -nx / cos_β
-    zy = -ny / cos_β
-
-    # ── Rotation angles (Mishchenko & Travis 1997, Eqs. 4-5) ──
-    # α₁: rotation from scattering plane to the plane of incidence on the facet
-    # α₂: rotation from the plane of reflection on the facet back to scattering plane
-
-    # Scattering angle cosine
-    cos_Θ = -μᵢ * μᵣ + sin_θᵢ * sin_θᵣ * cos_dϕ
-    sin_Θ² = max(FT(0), one(FT) - cos_Θ^2)
-    sin_Θ  = sqrt(sin_Θ²)
-
-    if sin_Θ < FT(1e-12)
-        # Forward or backward scattering: rotation angles are zero
-        α₁ = zero(FT)
-        α₂ = zero(FT)
-    else
-        # sin(α₁) and cos(α₁) from spherical geometry:
-        # cos(α₁) = (μᵢ cos_Θ + μᵣ) / (sin_θᵢ · sin_Θ)  (not quite right for reflection)
-        # We use the facet-based formulas from Zhai et al. (2010), Appendix A:
-
-        # The local incidence plane is defined by (k_i, n).
-        # We need the angle between the scattering plane (k_i, k_r) and this incidence plane.
-        # Both planes contain k_i, so the angle between them is the dihedral angle.
-
-        # Cross products to get plane normals:
-        # Scattering plane normal: k_i × k_r  (defines the reference for Stokes)
-        # Incidence plane normal:  k_i × n
-
-        # k_i = (sin_θᵢ, 0, -μᵢ)  [in our convention: propagation direction]
-        # k_r = (-sin_θᵣ cos_dϕ, -sin_θᵣ sin_dϕ, μᵣ)  [outgoing]
-        # n   = (nx, ny, nz)
-
-        # Scattering plane normal (k_i × k_r):
-        sp_x = FT(0) * μᵣ - (-μᵢ) * (-sin_θᵣ * sin_dϕ)
-        sp_y = (-μᵢ) * (-sin_θᵣ * cos_dϕ) - sin_θᵢ * μᵣ
-        sp_z = sin_θᵢ * (-sin_θᵣ * sin_dϕ) - FT(0) * (-sin_θᵣ * cos_dϕ)
-        # Simplify:
-        sp_x = -μᵢ * sin_θᵣ * sin_dϕ
-        sp_y = μᵢ * sin_θᵣ * cos_dϕ - sin_θᵢ * μᵣ
-        sp_z = -sin_θᵢ * sin_θᵣ * sin_dϕ
-
-        # Incidence plane normal (k_i × n):
-        ip_x = FT(0) * nz - (-μᵢ) * ny
-        ip_y = (-μᵢ) * nx - sin_θᵢ * nz
-        ip_z = sin_θᵢ * ny - FT(0) * nx
-        # Simplify:
-        ip_x = μᵢ * ny
-        ip_y = -μᵢ * nx - sin_θᵢ * nz
-        ip_z = sin_θᵢ * ny
-
-        # cos(α₁) = (sp · ip) / (|sp| |ip|)
-        dot_si = sp_x * ip_x + sp_y * ip_y + sp_z * ip_z
-        mag_sp = sqrt(sp_x^2 + sp_y^2 + sp_z^2)
-        mag_ip = sqrt(ip_x^2 + ip_y^2 + ip_z^2)
-
-        if mag_sp < FT(1e-15) || mag_ip < FT(1e-15)
-            α₁ = zero(FT)
-        else
-            cos_α₁ = clamp(dot_si / (mag_sp * mag_ip), -one(FT), one(FT))
-            # Sign from triple product (k_i · (sp × ip))
-            cross_x = sp_y * ip_z - sp_z * ip_y
-            cross_y = sp_z * ip_x - sp_x * ip_z
-            cross_z = sp_x * ip_y - sp_y * ip_x
-            sign_α₁ = sin_θᵢ * cross_x + FT(0) * cross_y + (-μᵢ) * cross_z
-            α₁ = sign_α₁ >= 0 ? acos(cos_α₁) : -acos(cos_α₁)
-        end
-
-        # For α₂: angle between the reflection plane on the facet and the scattering plane
-        # Reflection plane normal (k_r × n):
-        rp_x = (-sin_θᵣ * sin_dϕ) * nz - μᵣ * ny
-        rp_y = μᵣ * nx - (-sin_θᵣ * cos_dϕ) * nz
-        rp_z = (-sin_θᵣ * cos_dϕ) * ny - (-sin_θᵣ * sin_dϕ) * nx
-
-        dot_sr = sp_x * rp_x + sp_y * rp_y + sp_z * rp_z
-        mag_rp = sqrt(rp_x^2 + rp_y^2 + rp_z^2)
-
-        if mag_sp < FT(1e-15) || mag_rp < FT(1e-15)
-            α₂ = zero(FT)
-        else
-            cos_α₂ = clamp(dot_sr / (mag_sp * mag_rp), -one(FT), one(FT))
-            # Sign from triple product (k_r · (sp × rp))
-            cross2_x = sp_y * rp_z - sp_z * rp_y
-            cross2_y = sp_z * rp_x - sp_x * rp_z
-            cross2_z = sp_x * rp_y - sp_y * rp_x
-            sign_α₂ = (-sin_θᵣ * cos_dϕ) * cross2_x +
-                       (-sin_θᵣ * sin_dϕ) * cross2_y +
-                       μᵣ * cross2_z
-            α₂ = sign_α₂ >= 0 ? acos(cos_α₂) : -acos(cos_α₂)
-        end
-    end
-
-    return (; cos_β, cos_θ_local, zx, zy, α₁, α₂)
+    # cos χ = ŝ·φ̂ and sin χ = ŝ·θ̂ for each beam
+    cos_χ₁, sin_χ₁ = dot(ŝ, φ̂ᵢ), dot(ŝ, θ̂ᵢ)
+    cos_χ₂, sin_χ₂ = dot(ŝ, φ̂ᵣ), dot(ŝ, θ̂ᵣ)
+    return (; cos_β, cos_θ_local, zx, zy,
+              cos_2χ₁ = cos_χ₁^2 - sin_χ₁^2, sin_2χ₁ = 2 * cos_χ₁ * sin_χ₁,
+              cos_2χ₂ = cos_χ₂^2 - sin_χ₂^2, sin_2χ₂ = 2 * cos_χ₂ * sin_χ₂)
 end
 
 """
-    coxmunk_brdf_mueller(surf, n_stokes, μᵢ, μᵣ, dϕ; n_water)
+    meridian_facet_stokes(cos_2χ, sin_2χ)
 
-Evaluate the Cox-Munk BRDF Mueller matrix at a single geometry.
+Stokes matrix of the field-basis change
+`(E_s, E_p) = [cos χ  sin χ; sin χ  −cos χ](E_φ, E_θ)` (see `coxmunk_geometry`):
 
-Returns an `SMatrix{n_stokes, n_stokes}` with the BRDF value
-(units: sr⁻¹), including whitecap contribution if enabled.
+    [1     0        0      0
+     0   cos 2χ   sin 2χ   0
+     0   sin 2χ  −cos 2χ   0
+     0     0        0     −1]
+
+It is symmetric and involutory, so the same matrix maps meridian → facet
+Stokes vectors for the incident beam and facet → meridian for the
+reflected beam.
+"""
+@inline function meridian_facet_stokes(cos_2χ::FT, sin_2χ::FT) where FT
+    o, z = one(FT), zero(FT)
+    # Column-major; the matrix is symmetric.
+    return SMatrix{4,4,FT}(o, z,       z,       z,
+                           z, cos_2χ,  sin_2χ,  z,
+                           z, sin_2χ, -cos_2χ,  z,
+                           z, z,       z,      -o)
+end
+
+"Leading `n_stokes × n_stokes` block of a 4×4 Stokes matrix."
+@inline function _leading_stokes_block(M::SMatrix{4,4,FT}, n_stokes::Int) where FT
+    n_stokes == 4 && return M
+    n_stokes == 3 && return M[SOneTo(3), SOneTo(3)]
+    n_stokes == 2 && return M[SOneTo(2), SOneTo(2)]
+    return M[SOneTo(1), SOneTo(1)]
+end
+
+"""
+    coxmunk_facet_mueller(geom, n_water, n_stokes)
+
+Polarized Fresnel reflection of one facet in the meridian bases of the
+incident and reflected beams: `L(χ₂) · M_F · L(χ₁)`, truncated to
+`n_stokes` after the full 4×4 product (truncating the factors first would
+drop the U-mediated part of the I–Q coupling).
+"""
+@inline function coxmunk_facet_mueller(geom, n_water::Complex{FT}, n_stokes::Int) where FT
+    r_s, r_p = fresnel_coefficients(n_water, geom.cos_θ_local)
+    M = meridian_facet_stokes(geom.cos_2χ₂, geom.sin_2χ₂) *
+        fresnel_mueller(r_s, r_p, 4) *
+        meridian_facet_stokes(geom.cos_2χ₁, geom.sin_2χ₁)
+    return _leading_stokes_block(M, n_stokes)
+end
+
+"""
+    coxmunk_brdf_mueller(surf, n_stokes, μᵢ, μᵣ, Δϕ; n_water)
+
+Cox–Munk BRDF Mueller matrix (sr⁻¹) for light incident with cosine `μᵢ`
+(azimuth 0) and reflected into cosine `μᵣ` at relative azimuth `Δϕ` (radians;
+the glint is at Δϕ = 0, see `coxmunk_geometry`). Element `[i, j]` maps
+incident Stokes component `j` to reflected component `i`, in vSmartMOM's
+meridian-plane convention. Includes Smith shadowing and the whitecap
+contribution when enabled.
 """
 function coxmunk_brdf_mueller(surf::CoxMunkSurface{FT}, n_stokes::Int,
                                μᵢ::FT, μᵣ::FT, dϕ::FT;
                                n_water::Complex{FT} = _get_n_water(surf, FT(550))) where FT
     σ² = wind_to_sigma2(surf.wind_speed)
 
-    # Geometry
+    # Facet geometry and its polarized Fresnel reflection
     geom = coxmunk_geometry(μᵢ, μᵣ, dϕ)
-    (; cos_β, cos_θ_local, zx, zy, α₁, α₂) = geom
-
-    # Slope PDF
-    P = cox_munk_pdf(zx, zy, σ²)
-
-    # Fresnel reflection
-    r_s, r_p = fresnel_coefficients(n_water, cos_θ_local)
-    M_F = fresnel_mueller(r_s, r_p, n_stokes)
-
-    # Rotation matrices
-    L₁ = stokes_rotation_matrix(-α₁, n_stokes)  # scattering plane → incidence plane
-    L₂ = stokes_rotation_matrix(α₂, n_stokes)   # reflection plane → scattering plane
-
-    # Full Mueller matrix for the facet contribution
-    M_facet = L₂ * M_F * L₁
+    M_facet = coxmunk_facet_mueller(geom, n_water, n_stokes)
 
     # Cox-Munk BRDF weighting
-    prefactor = P / (FT(4) * μᵢ * μᵣ * cos_β^4)
+    P = cox_munk_pdf(geom.zx, geom.zy, σ²)
+    prefactor = P / (FT(4) * μᵢ * μᵣ * geom.cos_β^4)
 
     # Shadow masking
     if surf.shadowing
@@ -323,7 +283,7 @@ end
 
 Evaluate the Cox-Munk BRDF Mueller matrix **and** its analytical derivative
 w.r.t. wind speed U at a single geometry, sharing all U-independent work
-(geometry, Fresnel, rotations).
+(geometry, Fresnel reflection, Stokes basis changes).
 
 Returns `(M, dM_dU)` — both `SMatrix{n_stokes, n_stokes}`.
 """
@@ -334,15 +294,10 @@ function coxmunk_brdf_mueller_and_deriv(surf::CoxMunkSurface{FT}, n_stokes::Int,
     σ² = wind_to_sigma2(U)
     dσ²_dU = wind_to_sigma2_dU(FT)
 
-    # ── Geometry, Fresnel, rotations (all independent of U) ──
+    # ── Geometry and polarized Fresnel reflection (independent of U) ──
     geom = coxmunk_geometry(μᵢ, μᵣ, dϕ)
-    (; cos_β, cos_θ_local, zx, zy, α₁, α₂) = geom
-
-    r_s, r_p = fresnel_coefficients(n_water, cos_θ_local)
-    M_F  = fresnel_mueller(r_s, r_p, n_stokes)
-    L₁   = stokes_rotation_matrix(-α₁, n_stokes)
-    L₂   = stokes_rotation_matrix(α₂, n_stokes)
-    M_facet = L₂ * M_F * L₁
+    (; cos_β, zx, zy) = geom
+    M_facet = coxmunk_facet_mueller(geom, n_water, n_stokes)
 
     geom_weight = one(FT) / (FT(4) * μᵢ * μᵣ * cos_β^4)
 
@@ -404,8 +359,8 @@ function reflectance_and_deriv(surf::CoxMunkSurface{FT}, pol_type,
     for iϕ in eachindex(ϕ)
         dϕ = ϕ[iϕ]
         wϕ = w[iϕ]
-        for j in 1:Nμ, i in 1:Nμ
-            M, dM = coxmunk_brdf_mueller_and_deriv(surf, n, μ[i], μ[j], dϕ;
+        for j in 1:Nμ, i in 1:Nμ       # incident j → reflected i
+            M, dM = coxmunk_brdf_mueller_and_deriv(surf, n, μ[j], μ[i], dϕ;
                                                      n_water=n_water)
             @inbounds for sj in 1:n, si in 1:n
                 az  = _azimuthal_kernel(si, sj, m, dϕ)
@@ -458,14 +413,27 @@ end
 """
     _azimuthal_kernel(si, sj, m, dϕ)
 
-Azimuthal Fourier kernel for Stokes element (si, sj) at Fourier moment m.
-Matches the postprocessing reconstruction weight `Diagonal([cos,cos,sin,sin])`.
+Azimuthal Fourier kernel for Stokes element (si, sj) at Fourier moment m, in
+the storage convention of the atmospheric phase-matrix moments
+(`Scattering.compute_Z_moments`), so that surface and atmospheric operators
+combine consistently in the adding method:
+
+| block (row ← column) | kernel        |
+|----------------------|---------------|
+| IQ ← IQ, UV ← UV     | `cos(mϕ)`     |
+| UV ← IQ              | `sin(mϕ)`     |
+| IQ ← UV              | `−sin(mϕ)`    |
+
+The same kernel synthesizes the real-space matrix from its moments, and the
+UV ← IQ column matches the postprocessing weights for I, Q (cos) and U, V (sin).
 """
 @inline function _azimuthal_kernel(si::Int, sj::Int, m::Int, dϕ::FT) where FT
     row_is_iq = (si <= 2)
     col_is_iq = (sj <= 2)
     if row_is_iq == col_is_iq
         return cos(m * dϕ)
+    elseif row_is_iq
+        return -sin(m * dϕ)
     else
         return sin(m * dϕ)
     end
@@ -497,7 +465,7 @@ function reflectance(surf::CoxMunkSurface{FT}, pol_type, μ::AbstractArray{FT}, 
         wϕ = w[iϕ]
         for j in 1:Nμ       # incident direction
             for i in 1:Nμ   # reflected direction
-                M = coxmunk_brdf_mueller(surf, n, μ[i], μ[j], dϕ; n_water=n_water)
+                M = coxmunk_brdf_mueller(surf, n, μ[j], μ[i], dϕ; n_water=n_water)
                 # Place each Stokes sub-element with the correct azimuthal kernel
                 @inbounds for sj in 1:n, si in 1:n
                     az = _azimuthal_kernel(si, sj, m, dϕ)
@@ -525,13 +493,13 @@ there is no additional half-weight in this physical BRDF reconstruction.
 function _coxmunk_glint_residual(surf::CoxMunkSurface{FT}, n, μ_v, μ₀,
                                   dϕ, m_max, n_water) where FT
     exact, dexact = coxmunk_brdf_mueller_and_deriv(
-        surf, n, μ_v, μ₀, dϕ; n_water)
+        surf, n, μ₀, μ_v, dϕ; n_water)
     truncated = zeros(FT, n)
     dtruncated = zeros(FT, n)
     ϕ, w = CanopyOptics.gauleg(100, zero(FT), FT(π))
     for i in eachindex(ϕ)
         M, dM = coxmunk_brdf_mueller_and_deriv(
-            surf, n, μ_v, μ₀, ϕ[i]; n_water)
+            surf, n, μ₀, μ_v, ϕ[i]; n_water)
         for m in 0:m_max, si in 1:n
             scale = (m == 0 ? one(FT) : FT(2)) * w[i] / FT(π)
             az = _azimuthal_kernel(si, 1, m, dϕ) *
@@ -595,23 +563,4 @@ function apply_ss_correction!(R_SFI::AbstractArray{FT,3}, Ṙ,
         end
     end
     return nothing
-end
-
-"""
-Compute one element of the Fourier coefficient of the BRDF at a specific (μ_v, μ₀) pair.
-Uses the same Gauss-Legendre quadrature as `reflectance`.
-"""
-function _fourier_coeff_element(surf::CoxMunkSurface{FT}, n_stokes::Int,
-                                 si::Int, sj::Int, μᵢ::FT, μⱼ::FT, m::Int;
-                                 n_water::Complex{FT} = _get_n_water(surf, FT(550))) where FT
-    nQuad = 100
-    ϕ, w = CanopyOptics.gauleg(nQuad, FT(0), FT(π))
-    result = zero(FT)
-    ff = m == 0 ? FT(1.0) : FT(2.0)
-    for iϕ in eachindex(ϕ)
-        M = coxmunk_brdf_mueller(surf, n_stokes, μᵢ, μⱼ, ϕ[iϕ]; n_water=n_water)
-        az = _azimuthal_kernel(si, sj, m, ϕ[iϕ])
-        result += w[iϕ] * M[si, sj] * az
-    end
-    return ff * result / FT(π)
 end

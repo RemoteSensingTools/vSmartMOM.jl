@@ -37,3 +37,31 @@ Frankenberg's checkout (SHA-256 identical to the source file).
 - Claude reviewer and Codex: no code defects; documentation, release-note
   and test additions requested and made; both re-reviews passed.
 - Not run in this commit: CUDA, the full suite, documentation build.
+
+## 3. fix(coxmunk): polarized geometry, argument order, Fourier storage sign and V terms (B3)
+
+- `test_coxmunk.jl` + `test_coxmunk_polarization.jl` + `test_coxmunk_rt_contract.jl`:
+  992/992 pass (Claude reviewer run); polarization file alone 726/726.
+  `test_surface_split.jl`, `test_component_m_max.jl` (with the Cox–Munk files):
+  357/357. `StandaloneSS/runtests.jl`: 242 pass, 1 pre-existing `@test_broken`.
+- VLIDORT baseline Case D (new): 48/48 — Rayleigh layer (τ = 0.1, 0.3,
+  ρ = 0.03) over GISS Cox–Munk (U = 2, 7 m/s, shadowing on/off), Lambertian
+  and Ross–Li (80° cap), NSTREAMS 16, TOA and BOA (BOA excludes the μ = μ₀
+  view, which carries the direct beam in vSmartMOM): I within 7e-5, Q and U
+  within 1e-5 of max I. References from an external driver calling
+  unmodified VLIDORT 2.8.3; driver, inputs and full outputs archived in
+  `/home/sanghavi/vsmartmom-release-evidence/2026-10-17/` with SHA256SUMS.
+- Defect detection: HEAD fails 32/40 stored VLIDORT kernel matrices (Codex)
+  and 274/521 of the original polarization tests in all six testsets (Claude
+  reviewer); HEAD violates full-matrix reciprocity at order 1. With only the
+  old Fourier sign restored, Case D fails 22/48 (I off by up to 3.2e-3,
+  Q/U by 1.2e-3).
+- Independent references: Jones-vector field calculation whose Stokes basis
+  is anchored to the code's own Rayleigh phase matrix (with and without the
+  Fourier kernel); stored VLIDORT GISS and GCMCRI (complex index) kernels;
+  Hovenier reciprocity; the V sign was also cross-checked by the reviewer
+  against vSmartMOM's Mie code for a large absorbing sphere.
+- Reviews: Claude reviewer APPROVE-WITH-FIXES (docs, latent StandaloneSS
+  kernel, extra tests) → fixed → APPROVE. Codex APPROVE-WITH-FIXES (Float32
+  cancellation in cos θ_local, conventions page, comment) → fixed → APPROVE.
+- Not run: CUDA hardware, Documenter build, full suite.

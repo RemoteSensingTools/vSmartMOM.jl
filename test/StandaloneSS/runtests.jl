@@ -559,7 +559,7 @@ end
         τ = sum(absorption.τ[:, 1])
         for iv in eachindex(geometry.μv)
             M = vSmartMOM.CoreRT.coxmunk_brdf_mueller(
-                core_surface, 1, geometry.μv[iv], geometry.μ₀,
+                core_surface, 1, geometry.μ₀, geometry.μv[iv],
                 geometry.Δϕ[iv]; n_water=n_water)
             expected[iv, 1, 1] = geometry.μ₀ * M[1, 1] *
                                  exp(-τ / geometry.μ₀) *
@@ -578,7 +578,7 @@ end
         vector_expected = zeros(FT, 2, 4, 1)
         for iv in eachindex(geometry.μv)
             M = vSmartMOM.CoreRT.coxmunk_brdf_mueller(
-                core_surface, 4, geometry.μv[iv], geometry.μ₀,
+                core_surface, 4, geometry.μ₀, geometry.μv[iv],
                 geometry.Δϕ[iv]; n_water=n_water)
             vector_expected[iv, :, 1] .= geometry.μ₀ .* M[:, 1] .*
                                          exp(-τ / geometry.μ₀) .*
@@ -594,7 +594,7 @@ end
         iq_expected = zeros(FT, 2, 2, 1)
         for iv in eachindex(geometry.μv)
             M = vSmartMOM.CoreRT.coxmunk_brdf_mueller(
-                core_surface, 2, geometry.μv[iv], geometry.μ₀,
+                core_surface, 2, geometry.μ₀, geometry.μv[iv],
                 geometry.Δϕ[iv]; n_water=n_water)
             iq_expected[iv, :, 1] .= geometry.μ₀ .* M[:, 1] .*
                                      exp(-τ / geometry.μ₀) .*

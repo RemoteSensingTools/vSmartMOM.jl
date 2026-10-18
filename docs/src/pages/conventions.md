@@ -22,12 +22,29 @@ If you only read one section, read **§4 — comparing against VLIDORT**.
 
 ## 1. Stokes vector and reference plane
 
-vSmartMOM uses the standard **Stokes vector** ``(I, Q, U, V)`` defined with
-respect to the **meridian plane**: the vertical plane containing the
-zenith direction and the propagation direction. ``Q > 0`` means linear
-polarization parallel to the meridian plane; ``U > 0`` means linear
-polarization at +45° from the meridian; ``V > 0`` is right-circular
-polarization (looking *toward* the source).
+vSmartMOM uses the **Stokes vector** ``(I, Q, U, V)`` defined with respect
+to the **meridian plane**: the vertical plane containing the zenith
+direction and the propagation direction. For a beam with propagation
+direction ``\hat k``, let ``\hat\theta`` (in the meridian plane) and
+``\hat\varphi`` (horizontal, perpendicular to it) be its spherical basis
+vectors, and ``E_\varphi``, ``E_\theta`` the field components. Then
+
+```math
+I = |E_\varphi|^2 + |E_\theta|^2,\quad
+Q = |E_\varphi|^2 - |E_\theta|^2,\quad
+U = 2\,\mathrm{Re}(E_\varphi E_\theta^*),\quad
+V = 2\,\mathrm{Im}(E_\varphi E_\theta^*).
+```
+
+So ``Q > 0`` means linear polarization **perpendicular** to the meridian
+plane. These are the Q, U, V of the Mishchenko/VLIDORT convention with
+opposite sign (§4.2). The definitions are verified in
+`test/test_coxmunk_polarization.jl`: an independent electric-field
+calculation reproduces vSmartMOM's own Rayleigh phase matrix only in this
+basis, and VLIDORT's complex-index Cox–Munk kernel fixes the sign of V.
+(Earlier versions of this page stated that ``Q > 0`` meant polarization
+parallel to the meridian plane; the code has always used the convention
+above.)
 
 This is the **Hovenier–van der Mee–Domke convention** (Hovenier &
 van der Mee 1983; Hovenier, van der Mee & Domke 2004). It is the same

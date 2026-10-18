@@ -197,6 +197,22 @@ Round 7.
 - [ ] Fixed-altitude grid + Round 7_altgrd pilot (in progress); decide on
   re-running Rounds 3–4 / all rounds afterwards.
 - [ ] TMS GPU efficiency — Christian.
+- [x] **For Suniti (convention, documented 2026-10-17):** `conventions.md` §1
+  said Q > 0 means polarization parallel to the meridian plane. The code's
+  convention (calibrated against its own Rayleigh phase matrix and VLIDORT)
+  is Q = |E_φ|² − |E_θ|², U = 2Re(E_φE_θ*), V = 2Im(E_φE_θ*), i.e. Q > 0
+  *perpendicular* to the meridian plane. The page now states this; please
+  confirm the wording.
+- [ ] **For Suniti (surface definition):** vSmartMOM's Ross–Li caps both zenith
+  angles at 80° inside the kernels; VLIDORT does not (its Li-sparse kernel
+  turns strongly negative at grazing quadrature nodes). The cap changes TOA
+  intensity by 0.35–0.84 % in the VLIDORT comparison (BOA by up to 1.1 %).
+  Keep the cap (physical, non-negative BRDF) or follow the MODIS definition?
+- [ ] Generic analytic surfaces (`analytic_surface.jl`, RPV and Ross–Li) pass
+  the reflected (row) direction as `μᵢ`; harmless for these reciprocal scalar
+  BRDFs, but fix the order and docstring in a separate commit.
+- [ ] Extremely grazing Float32 Cox–Munk inputs can overflow the
+  1/(4μᵢμᵣcos⁴β) weight (pre-existing; reviewer finding) — add a tail guard.
 - [ ] Ocean/glint products made before the Cox–Munk corrections (B1 slope
   variance, B2 shadowing, B3 polarization) are stale, e.g. the outputs of
   `sandbox/workflows/RRS_XCO2/scripts/generate_truth_map_land_glint.jl`;

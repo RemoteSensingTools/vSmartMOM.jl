@@ -46,7 +46,7 @@ using vSmartMOM, vSmartMOM.CoreRT, vSmartMOM.Scattering
         expected = similar(actual)
         for iv in eachindex(p.vza), s in axes(F,2)
             μv, μ0 = cosd(p.vza[iv]), cosd(p.sza)
-            M = CoreRT.coxmunk_brdf_mueller(original, 3, μv, μ0, deg2rad(p.vaz[iv]))
+            M = CoreRT.coxmunk_brdf_mueller(original, 3, μ0, μv, deg2rad(p.vaz[iv]))
             expected[iv,:,s] = μ0 * F[1,s] * M[:,1] *
                               exp(-optical_depth * (inv(μ0) + inv(μv)))
         end

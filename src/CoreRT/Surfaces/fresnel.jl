@@ -34,15 +34,20 @@ end
 """
     fresnel_mueller(r_s, r_p, n_stokes)
 
-Mueller matrix for Fresnel reflection given complex amplitude coefficients.
-
-For `n_stokes = 4` (IQUV):
+Mueller matrix for Fresnel reflection given complex amplitude coefficients,
+in the facet basis (ŝ, p̂ = k × ŝ) with ŝ normal to the plane of reflection.
+Stokes parameters follow vSmartMOM's convention for a basis (e₁, e₂) = (ŝ, p̂):
+Q = |E₁|² − |E₂|², U = 2Re(E₁E₂*), V = 2Im(E₁E₂*), with the refractive index
+n = n_r + i n_i (n_i ≥ 0). For `n_stokes = 4` (IQUV):
 ```
 M = [(|rs|²+|rp|²)/2   (|rs|²-|rp|²)/2    0              0           ]
     [(|rs|²-|rp|²)/2   (|rs|²+|rp|²)/2    0              0           ]
-    [0                  0                   Re(rs·rp*)     Im(rs·rp*)  ]
-    [0                  0                  -Im(rs·rp*)     Re(rs·rp*)  ]
+    [0                  0                   Re(rs·rp*)    -Im(rs·rp*)  ]
+    [0                  0                   Im(rs·rp*)     Re(rs·rp*)  ]
 ```
+The U–V elements follow from U' + iV' = 2 E₁'E₂'* = (rs rp*)(U + iV); this
+sign is confirmed against VLIDORT 2.8.3's complex-index Cox–Munk kernel
+(test_coxmunk_polarization.jl).
 """
 function fresnel_mueller(r_s::Complex{FT}, r_p::Complex{FT}, n_stokes::Int) where FT
     rs2 = abs2(r_s)
@@ -71,11 +76,12 @@ function fresnel_mueller(r_s::Complex{FT}, r_p::Complex{FT}, n_stokes::Int) wher
             FT(0),     FT(0),    re_rsp
         )
     else  # n_stokes == 4
+        # Column-major: column 3 is (0, 0, Re, Im), column 4 is (0, 0, −Im, Re).
         return SMatrix{4,4,FT}(
             half_sum,  half_diff, FT(0),    FT(0),
             half_diff, half_sum,  FT(0),    FT(0),
-            FT(0),     FT(0),    re_rsp,  -im_rsp,
-            FT(0),     FT(0),    im_rsp,   re_rsp
+            FT(0),     FT(0),    re_rsp,   im_rsp,
+            FT(0),     FT(0),   -im_rsp,   re_rsp
         )
     end
 end

@@ -7,8 +7,7 @@
 # Usage:
 #   cd test && julia --project=. vlidort_baseline/runtests.jl
 #
-# This file is intentionally NOT included from test/runtests.jl. It can be
-# wired in later when we want CI integration.
+# It is also included from test/runtests.jl as part of the default suite.
 
 using Test
 
@@ -23,6 +22,7 @@ try
         include(joinpath(@__DIR__, "cases", "case_A_siewert2000.jl"))
         include(joinpath(@__DIR__, "cases", "case_B_solar_tester.jl"))
         include(joinpath(@__DIR__, "cases", "case_C_solar_tester_vector.jl"))
+        include(joinpath(@__DIR__, "cases", "case_D_rayleigh_brdf_coupled.jl"))
     end
 finally
     cd(_ORIGINAL_PWD)
