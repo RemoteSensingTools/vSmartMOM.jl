@@ -9,8 +9,9 @@ const _HITRAN_LINES = Dict{Tuple{String,DataType},Any}()
 
 Load a HITRAN file once per process and floating-point type. The resolved path
 separates artifacts and downloaded editions, so switching editions selects a
-different key. Call `clear_spectroscopy_cache!` after replacing a downloaded
-file in place; automatic reloads are deliberately avoided.
+different key. Replacements made by `fetch_hitran`/`artifact` clear this cache;
+after replacing a file at the same path by other means, call
+`clear_spectroscopy_cache!`. Automatic reloads are deliberately avoided.
 The lock covers the first parse as well as lookup: concurrent constructors do
 not independently parse the same file. No spectral clipping is introduced;
 line wings and pressure shifts retain the existing absorption-model semantics.
@@ -31,8 +32,10 @@ Release the process-local parsed HITRAN line cache. Existing models remain
 valid; later constructors parse their data again. This does not delete any
 downloaded files or clear caller-owned LUTs/BatchContexts. Normal repeated
 forward and linearized construction reuses cached data without this call.
-Use it after replacing a downloaded spectroscopy file at the same path, or
-to release retained databases when they are no longer needed.
+`fetch_hitran`, `fetch_hitran_by_ids` and `artifact` call it after they
+replace a downloaded file. Call it yourself after replacing a spectroscopy
+file at the same path by other means, or to release retained databases when
+they are no longer needed.
 """
 function clear_spectroscopy_cache!()
     lock(_HITRAN_LINES_LOCK) do

@@ -18,6 +18,12 @@ Set the active HITRAN edition. Valid values:
 - Any other string (e.g., `"HITRAN2024"`) — use data downloaded from hitran.org,
   stored in a local scratch-space cache. Data is auto-downloaded on first access.
 
+A downloaded edition string is a cache/provenance label, not a database
+selector: hitran.org serves only its current edition, so a label such as
+`"HITRAN2020"` does not prove that the cached lines come from HITRAN2020. The
+SHA-256, download date and source URL in `hitran_info` record what was
+actually downloaded.
+
 # Example
 ```julia
 set_hitran_edition!("HITRAN2024")  # switch to latest HITRAN
