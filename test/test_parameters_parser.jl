@@ -4,6 +4,7 @@ using vSmartMOM
 using vSmartMOM.IO
 using vSmartMOM.CoreRT
 using CanopyOptics
+using Distributions: Normal
 
 function _minimal_parameter_dict(; surface = ["LambertianSurfaceScalar(0.1)"],
                                    float_type = "Float64",
@@ -269,6 +270,39 @@ end
 
     cfg["absorption"]["h2o_absorption"] = [false, true]
     @test_throws ArgumentError parameters_from_dict(cfg)
+end
+
+@testset "no absorption block means no gas absorption" begin
+    # q still enters the dry-air column, but without an `absorption` block
+    # neither the forward nor the LinMode builder adds H₂O lines.
+    cfg = _minimal_parameter_dict()
+    cfg["atmospheric_profile"]["T"] = [250.0, 290.0]
+    cfg["atmospheric_profile"]["p"] = [0.1, 500.0, 1000.0]
+    cfg["atmospheric_profile"]["q"] = [0.001, 0.01]
+    cfg["atmospheric_profile"]["profile_reduction"] = nothing
+    params = parameters_from_dict(cfg)
+    @test params.absorption_params === nothing
+    forward = model_from_parameters(params)
+    model, lin_model = model_from_parameters(LinMode(), params)
+    @test all(iszero, forward.optics.τ_abs[1])
+    @test all(iszero, model.optics.τ_abs[1])
+    @test all(iszero, lin_model.τ̇_abs[1])
+end
+
+@testset "default parameters place the aerosol in hPa" begin
+    params = with_logger(NullLogger()) do
+        CoreRT.default_parameters()
+    end
+    profile = only(params.scattering_params.rt_aerosols).profile
+    p_surf = maximum(params.p)
+    @test 0 < profile.μ < p_surf
+    @test profile.σ < p_surf
+    # Pa values here underflowed every layer weight to 0/0 in Float32.
+    atm, _ = CoreRT.prepare_observer_profile(Float32.(params.T), Float32.(params.p),
+        Float32.(params.q), Dict{String,Any}(), 0f0, -1)
+    τ = CoreRT.getAerosolLayerOptProp(1f0, Normal(Float32(profile.μ), Float32(profile.σ)), atm)
+    @test all(isfinite, τ)
+    @test sum(τ) ≈ 1
 end
 
 @testset "invalid configuration raises ArgumentError" begin

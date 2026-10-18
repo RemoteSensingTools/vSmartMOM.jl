@@ -60,15 +60,12 @@ compatibility with the 3-core doubling path.
         n2_lin = n
     end
 
-    # D-matrix Stokes signs
-    i_stokes = mod(i, pol_n)
-    j_stokes = mod(j, pol_n)
-    i12 = (pol_n == 1) | ((1 <= i_stokes) & (i_stokes <= 2))
-    j12 = (pol_n == 1) | ((1 <= j_stokes) & (j_stokes <= 2))
+    # D-matrix Stokes signs: D = diag(1, 1, -1, -1) over (I, Q, U, V), as in
+    # the forward kernel (`mod1`, so I and Q keep positive parity for IQ).
+    i12 = mod1(i, pol_n) <= 2
+    j12 = mod1(j, pol_n) <= 2
     same_block = (i12 & j12) | (!i12 & !j12)
     d_sign = ifelse(same_block, one(FT), -one(FT))
-    di = ifelse(i12, one(FT), -one(FT))
-    dj = ifelse(j12, one(FT), -one(FT))
 
     # R⁻⁺ row-sign correction for elemental D-matrix (ndoubl >= 1 negates Stokes 3,4 rows)
     sign_r = ifelse((ndoubl >= 1) & !i12, -one(FT), one(FT))
@@ -166,11 +163,12 @@ compatibility with the 3-core doubling path.
             ap_ṫ⁺⁺[i,j,n,iparam] = val_t
 
             if ndoubl < 1
-                # For ndoubl < 1 (no doubling): compute ⁺⁻ and ⁻⁻ via D-matrix
-                # ṙ⁺⁻ = d_sign * (ṙ_tau*dτ̇ + ṙ_w*ϖ̇ + ṙ_Z * D·Ż⁻⁺·D)
-                # where D·Ż·D at (i,j) = di*dj*Ż
-                ap_ṙ⁺⁻[i,j,n,iparam] = d_sign * (ṙ_tau * dτ̇[n,iparam] + ṙ_w * ϖ̇[n,iparam] + ṙ_Z * di * dj * Ż⁻⁺[i,j,n2_lin,iparam])
-                ap_ṫ⁻⁻[i,j,n,iparam] = d_sign * (ṫ_tau * dτ̇[n,iparam] + ṫ_w * ϖ̇[n,iparam] + ṫ_Z * di * dj * Ż⁺⁺_lin[i,j,n2_lin,iparam])
+                # For ndoubl < 1 (no doubling) the reverse operators are
+                # r⁺⁻ = D·r⁻⁺·D and t⁻⁻ = D·t⁺⁺·D, as in the forward kernel.
+                # Elementwise (D·X·D)ᵢⱼ = dᵢdⱼXᵢⱼ = d_sign·Xᵢⱼ, so the whole
+                # derivative takes the parity sign once.
+                ap_ṙ⁺⁻[i,j,n,iparam] = d_sign * val_r
+                ap_ṫ⁻⁻[i,j,n,iparam] = d_sign * val_t
             end
         end
     else

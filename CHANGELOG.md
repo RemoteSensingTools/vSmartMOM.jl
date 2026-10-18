@@ -85,6 +85,28 @@ review of General's sequential-version rule.
 - The positional linearized form `rt_run(RS_type, model, lin_model, NAer,
   NGas, NSurf, iBand)` accepts a one-element band vector and rejects several
   bands with a clear message (it solves one band per call).
+- Polarized Jacobians of layers that are not doubled (scattering optical
+  depth below `max(dτ_min_floor, dτ_max_threshold·μ_min)`) are corrected: the
+  phase-matrix term of the reverse operators r⁺⁻ and t⁻⁻ had the wrong sign in
+  the off-diagonal (I,Q)↔(U,V) blocks, so aerosol, size/profile and
+  surface-pressure columns of `Stokes_IQU`/`Stokes_IQUV` runs with such layers
+  were wrong (7.5% in the affected layers' columns in a 34-layer test); their
+  gas columns are unchanged. The same kernel also treated Q as a U/V row for
+  `Stokes_IQ`, which gave wrong I and Q Jacobians, gas columns included, in
+  both doubled and undoubled layers. `Stokes_I` Jacobians and all forward
+  radiances are unchanged.
+- `model_from_parameters(LinMode(), params)` no longer adds water-vapour line
+  absorption when the configuration has no `absorption` block; as documented
+  and as the forward constructor does, omitting the block means no gas
+  absorption (`q` still sets the dry-air column). Previously the linearized
+  model described a different atmosphere from the forward model.
+- `DefaultParameters.yaml` gives the aerosol pressure peak and width in hPa
+  (`p₀: 900`, `σp: 50`), the unit of the profile. They were given in Pa,
+  which placed the aerosol far below the surface: an exponential tail toward
+  the ground in Float64 and NaN optical depths in Float32. Aerosol results of
+  `default_parameters()` and of GEOS-Chem-generated configurations
+  (`geoschem_to_dict`, `GeosChemSource`), which start from these defaults,
+  change.
 - HITRAN, partition-sum, HAPI, CIA and MT_CKD references added to
   `CITATION.bib`, the References page and the README, with guidance on which
   HITRAN edition a calculation used.

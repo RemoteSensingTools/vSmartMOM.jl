@@ -209,12 +209,13 @@ function model_from_parameters(lin::LinMode,
             τ̇_rayl_psurf[i_band] .= totaldot * frac' .+ total * fracdot'
         end
 
-        (isnothing(abs_params) && isnothing(params.q)) && continue
+        # No absorption block means no gas absorption (H₂O included), as in
+        # the forward constructor; q still enters the dry-air column.
+        isnothing(abs_params) && continue
 
         if !isnothing(params.q) && any(!iszero, params.q)
             jac_idx = 1
-            h2o_setting = isnothing(abs_params) || isempty(abs_params.h2o_lut) ?
-                          nothing : abs_params.h2o_lut[i_band]
+            h2o_setting = isempty(abs_params.h2o_lut) ? nothing : abs_params.h2o_lut[i_band]
             if h2o_setting === :disabled
                 nothing
             elseif h2o_setting !== nothing
@@ -232,13 +233,10 @@ function model_from_parameters(lin::LinMode,
             else
                 @timeit "Read HITRAN" lines_h2o = _hitran_lines("H2O", FT)
                 @debug "Computing profile for water vapor (q-driven) in band #$(i_band)"
-                bf  = isnothing(abs_params) ? AtmosphericAbsorption.Voigt() : abs_params.broadening_function
-                cef = isnothing(abs_params) ? AtmosphericAbsorption.HumlicekWeideman32() : abs_params.CEF
-                wc  = isnothing(abs_params) ? 150 : abs_params.wing_cutoff
                 absorption_model = AtmosphericAbsorption.LineByLineModel(lines_h2o;
-                    profile = bf,
-                    wing_cutoff = wc,
-                    cpf = cef,
+                    profile = abs_params.broadening_function,
+                    wing_cutoff = abs_params.wing_cutoff,
+                    cpf = abs_params.CEF,
                     architecture = _to_aa_arch(params.architecture),
                     vmr = 0)
                 if compute_h2o_jacobians
