@@ -30,7 +30,7 @@ The `surface` vector must have **the same length as `spec_bands`**.
 | Constructor | Source | Use case |
 |---|---|---|
 | `rpvSurfaceScalar(ρ₀, ρ_c, k, Θ)` | Rahman-Pinty-Verstraete | Vegetation BRDF; common in canopy retrievals. |
-| `RossLiSurfaceScalar(fvol, fgeo, fiso)` | Roujean / Wanner | MODIS BRDF kernel decomposition. Three-parameter linear model.|
+| `RossLiSurfaceScalar(fvol, fgeo, fiso)` | Roujean / Wanner | MODIS BRDF kernel decomposition. Three-parameter linear model. Kernel zenith angles are capped at 80°, a vSmartMOM regularization of grazing nodes rather than MODIS practice.|
 
 ### Ocean (full Fourier + sun-glint; trait: `m_max = user_l_cap`)
 

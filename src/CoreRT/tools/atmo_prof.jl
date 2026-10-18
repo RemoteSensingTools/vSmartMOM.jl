@@ -546,7 +546,18 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}; binavg::Bool=fa
     return AtmosphericProfile(T, p_full, q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz_)
 end
 
-"Legacy bin-averaging profile reduction (opt-in via `reduce_profile(n, p; binavg=true)`)."
+"""
+    reduce_profile_binavg(n, profile)
+
+Legacy bin-averaging profile reduction (opt-in via
+`reduce_profile(n, p; binavg=true)`), retained unchanged for compatibility.
+Dry and H₂O columns are summed within each pressure bin, so `vmr_h2o` is
+column-weighted. Trace-gas VMR profiles, `T`, `q` and `p_full` are, however,
+unweighted arithmetic means of the source layers; for a vertically varying
+gas the reduced column `Σ VMR·N_dry` is generally not conserved. Prefer the
+default interpolating reduction; a corrected average would need
+column-conservation tests.
+"""
 function reduce_profile_binavg(n::Int, profile::AtmosphericProfile{FT}) where {FT}
 
     # Can only reduce the profile, not expand it
@@ -592,7 +603,8 @@ function reduce_profile_binavg(n::Int, profile::AtmosphericProfile{FT}) where {F
 
     new_vmr = Dict{String, Union{Real, Vector}}()
 
-    # TODO: This needs a VCD_dry weighted average!
+    # Unweighted legacy mean (see docstring); a VCD_dry-weighted average would
+    # conserve each gas column but changes established results.
     for molec_i in keys(vmr)
         if profile.vmr[molec_i] isa AbstractArray
             new_vmr[molec_i] = [mean(profile.vmr[molec_i][ind]) for ind in indices]

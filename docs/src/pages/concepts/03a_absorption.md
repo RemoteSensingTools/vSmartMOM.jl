@@ -127,7 +127,9 @@ uses this to enable backend-specific optimizations (constant-memory caching
 on CUDA, etc.). `@index(Global, Linear)` extracts the spectral index. The
 kernel runs **identically on CPU, CUDA, and Metal** via the same KA
 dispatch as the RT kernels. See [Concepts/07](07_architecture.md) for the
-backend story.
+backend story. Production absorption through AtmosphericAbsorption is,
+however, experimental and not yet supported on Metal; see the
+[GPU page](../gpu.md).
 
 The window `istart_arr[j] ... istop_arr[j]` is the wavenumber sub-range
 where line `j` contributes non-negligibly — pre-computed to avoid evaluating

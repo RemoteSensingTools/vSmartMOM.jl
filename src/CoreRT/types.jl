@@ -800,7 +800,8 @@ Ross-Li kernel-based BRDF (Lucht, Schaaf & Strahler, 2000).  Decomposes
 the surface reflectance into three semi-physical kernels: isotropic,
 RossThick (volumetric canopy scattering), and LiSparse (geometric
 mutual shadowing).  Standard MODIS/RAMI parameterization.  Scalar only
-(Stokes-I); no built-in linearization.
+(Stokes-I); no built-in linearization. Kernel zenith angles are capped at
+80°, a vSmartMOM regularization of grazing nodes rather than MODIS practice.
 
 # Fields
 $(DocStringExtensions.FIELDS)
