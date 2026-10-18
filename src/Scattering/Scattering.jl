@@ -52,7 +52,8 @@ include("compute_Z_matrices_lin.jl")
 export make_mie_model, reconstruct_phase, greek_coefficients,
        greek_coefficients_from_scattering_matrix, analytic_aerosol_optics,
        phase_matrix_first_column, scattering_matrix,
-       AbstractMolecularRayleighMethod, RefractiveIndexRayleigh,
+       AbstractMolecularRayleighMethod, UsingRefInd, UsingPolTen,
+       RefractiveIndexRayleigh,
        molecular_rayleigh_properties, molecular_rayleigh_cross_section_ratio,
        molecular_rayleigh_provenance
 

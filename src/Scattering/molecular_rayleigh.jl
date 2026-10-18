@@ -7,25 +7,41 @@ is an explicit argument so a
 refractive-index calculation can never be confused with a polarizability-
 tensor calculation in provenance records or calling code.
 
+Concrete methods:
+
+- [`UsingRefInd`](@ref): refractive index plus effective King factor
+  (`RefractiveIndexRayleigh` is a compatibility alias);
+- [`UsingPolTen`](@ref): mean polarizability and anisotropy of the molecular
+  polarizability tensor, taken from the `InelasticScattering` (Raman) module
+  constants.
+
 This abstraction is deliberately part of `Scattering`, not `Inelastic`: the
-HWO calculation must not alter or depend on the RRS molecular state.
+HWO calculation must not alter or depend on the RRS molecular state. The
+`UsingPolTen` method only *reads* freshly constructed Raman-module constants;
+it never mutates shared Raman state.
 """
 abstract type AbstractMolecularRayleighMethod end
 
 """
+    UsingRefInd()
     RefractiveIndexRayleigh()
 
 Select the conventional refractive-index plus effective-King-factor Rayleigh
 formulation without constructing frequency-shifted Raman branches.
 The HWO A--D experiment uses this explicit method for the newly required Ar
-and CO₂ cross sections.  A future polarizability-tensor implementation must
-use a different dispatch type; it must not silently replace this method.
+and CO₂ cross sections.  `RefractiveIndexRayleigh` is a compatibility alias
+(`RefractiveIndexRayleigh === UsingRefInd`) kept so existing calling code,
+e.g. ExoOptics, continues to work unchanged. The polarizability-tensor
+implementation uses the distinct dispatch type [`UsingPolTen`](@ref); it never
+silently replaces this method.
 """
-struct RefractiveIndexRayleigh <: AbstractMolecularRayleighMethod end
+struct UsingRefInd <: AbstractMolecularRayleighMethod end
+
+# Compatibility alias: `RefractiveIndexRayleigh()` constructs `UsingRefInd()`.
+const RefractiveIndexRayleigh = UsingRefInd
 
 """
-    molecular_rayleigh_properties(::RefractiveIndexRayleigh,
-                                   species, wavelength_nm)
+    molecular_rayleigh_properties(::UsingRefInd, species, wavelength_nm)
     molecular_rayleigh_properties(species, wavelength_nm)
 
 Return no-frequency-redistribution Rayleigh properties for a pure gas at
@@ -72,7 +88,7 @@ species-specific rotational or vibrational Raman redistribution is built.
 - He et al. (2021), *Atmospheric Chemistry and Physics* 21, 14927--14940,
   https://doi.org/10.5194/acp-21-14927-2021.
 """
-function molecular_rayleigh_properties(::RefractiveIndexRayleigh,
+function molecular_rayleigh_properties(::UsingRefInd,
                                         species, wavelength_nm::Real)
     gas = _canonical_rayleigh_species(species)
     λ = float(wavelength_nm)
@@ -111,20 +127,25 @@ function molecular_rayleigh_properties(::RefractiveIndexRayleigh,
 end
 
 molecular_rayleigh_properties(species, wavelength_nm::Real) =
-    molecular_rayleigh_properties(RefractiveIndexRayleigh(), species,
-                                  wavelength_nm)
+    molecular_rayleigh_properties(UsingRefInd(), species, wavelength_nm)
 
 """
-    molecular_rayleigh_cross_section_ratio(::RefractiveIndexRayleigh,
+    molecular_rayleigh_cross_section_ratio(method::AbstractMolecularRayleighMethod,
                                             species, wavelength_nm,
                                             reference_nm)
+    molecular_rayleigh_cross_section_ratio(::UsingPolTen, species,
+                                            wavelength_nm, reference_nm;
+                                            temperature_K = 288.15)
     molecular_rayleigh_cross_section_ratio(species, wavelength_nm, reference_nm)
 
 Return ``sigma_R(wavelength_nm) / sigma_R(reference_nm)`` for a pure gas.
 This ratio is the appropriate scaling when a comparison fixes the Rayleigh
 optical depth at one reference wavelength and varies molecular identity.
+For [`UsingPolTen`](@ref) both cross sections are evaluated at the same
+`temperature_K`; the number density cancels. The three-argument form uses
+[`UsingRefInd`](@ref).
 """
-function molecular_rayleigh_cross_section_ratio(method::RefractiveIndexRayleigh,
+function molecular_rayleigh_cross_section_ratio(method::AbstractMolecularRayleighMethod,
                                                  species,
                                                  wavelength_nm::Real,
                                                  reference_nm::Real)
@@ -137,11 +158,11 @@ end
 
 molecular_rayleigh_cross_section_ratio(species, wavelength_nm::Real,
                                        reference_nm::Real) =
-    molecular_rayleigh_cross_section_ratio(RefractiveIndexRayleigh(), species,
+    molecular_rayleigh_cross_section_ratio(UsingRefInd(), species,
                                            wavelength_nm, reference_nm)
 
 """
-    molecular_rayleigh_provenance(::RefractiveIndexRayleigh, species)
+    molecular_rayleigh_provenance(::UsingRefInd, species)
 
 Return the coefficient provenance and separate evidence intervals for the HWO
 refractive-index/King-factor additions Ar and CO₂. The primary RI measurement
@@ -159,7 +180,7 @@ and He et al. (2021) provide a continuous 307--725 nm direct check for CO₂.
 This provenance API is intentionally limited to Ar and CO₂ because those are
 the only newly required RI cross sections in the initial HWO A--D campaign.
 """
-function molecular_rayleigh_provenance(::RefractiveIndexRayleigh, species)
+function molecular_rayleigh_provenance(::UsingRefInd, species)
     gas = _canonical_rayleigh_species(species)
     gas in (:Ar, :CO2) || throw(ArgumentError(
         "HWO RI provenance is available only for Ar and CO2; got $species"))
@@ -405,4 +426,168 @@ function _rayleigh_king_factor(gas::Symbol, ν)
         return oftype(ν, 1.1364) + oftype(ν, 2.53e-11) * ν²
     end
     error("unreachable Rayleigh species $gas")
+end
+
+# ---------------------------------------------------------------------------
+# Polarizability-tensor method
+# ---------------------------------------------------------------------------
+
+"""
+    UsingPolTen()
+
+Select the polarizability-tensor Rayleigh formulation. The molecular mean
+polarizability ``\\bar\\alpha`` and anisotropy ``\\gamma`` are read from the
+existing `InelasticScattering` (Raman-module) constants, via the same
+functions the RT model uses to derive its default (`depol: -1`) molecular
+depolarization: `getMolecularConstants`, `compute_effective_coefficents!`
+and `compute_σ_Rayl_coeff!`. Available species: `:N2`, `:O2`, `:H2`
+(Unicode aliases such as `:N₂` are accepted). No new spectroscopic constants
+are introduced by this method.
+
+See [`molecular_rayleigh_properties`](@ref) for the formulation.
+"""
+struct UsingPolTen <: AbstractMolecularRayleighMethod end
+
+# Reference number density (molecule cm⁻³) at 288.15 K and 1013.25 hPa, the
+# same standard density used by the RI fits for He, Ar, N2 and CO2.
+const _POLTEN_DEFAULT_NUMBER_DENSITY_CM3 = 2.546899e19
+const _POLTEN_DEFAULT_TEMPERATURE_K = 288.15
+
+"""
+    _poltensor_rayleigh_coefficients(gas::Symbol, ν_cm1::Float64, T_K::Float64)
+
+Internal hook implemented in `InelasticScattering`
+(`src/Inelastic/molecular_rayleigh_poltensor.jl`). It returns the effective
+Raman-module coefficients `(α̅, γ̅, γ_C, ρ, σ_coeff)` for canonical species
+`gas ∈ (:N2, :O2, :H2)` at wavenumber `ν_cm1` (cm⁻¹) and temperature `T_K`.
+The function is declared here so that `Scattering` does not need to load the
+Raman module at definition time.
+"""
+function _poltensor_rayleigh_coefficients end
+
+"""
+    molecular_rayleigh_properties(::UsingPolTen, species, wavelength_nm;
+                                  temperature_K = 288.15,
+                                  number_density_cm3 = 2.546899e19)
+
+Polarizability-tensor variant. Species: `:N2`, `:O2`, `:H2`. For any other
+species an `ArgumentError` is thrown that names the species and suggests
+`UsingRefInd()`.
+
+Quantities taken from the tensor (Raman-module constants of
+`getMolecularConstants(::N₂/::O₂/::H₂, vmr)`):
+
+- mean polarizability, with the Buldakov et al. single-pole dispersion and
+  temperature dependence implemented in `compute_effective_coefficents!`,
+  ``\\bar\\alpha(\\nu, T) = \\bar\\alpha_{00}(1 + \\alpha_b T + \\alpha_c T^2)
+  / (1 - (2\\pi c \\nu/\\omega_0)^2)``, evaluated exactly at
+  ``\\nu = 10^7/\\lambda`` cm⁻¹ and `temperature_K`;
+- anisotropy ``\\gamma = \\bar\\gamma_{00}``, which in the Raman-module
+  constants is **independent of wavelength and temperature**.
+
+Derived quantities (no further inputs):
+
+- `depolarization` ``\\rho = 6\\gamma^2/(45\\bar\\alpha^2 + 7\\gamma^2)``
+  (the module's `rho_depol_Rayl`, the same convention as the RI method and
+  [`get_greek_rayleigh`](@ref));
+- `king_factor` ``F_K = 1 + 2\\gamma^2/(9\\bar\\alpha^2)
+  = (6+3\\rho)/(6-7\\rho)``;
+- `cross_section_cm2`
+  ``\\sigma = \\tfrac{128}{3}\\pi^5\\nu^4\\bar\\alpha^2 F_K``, i.e. the
+  module's `σ_Rayl_coeff · ν⁴` (cm² molecule⁻¹, ``\\bar\\alpha`` in cm³,
+  ``\\nu`` in cm⁻¹). This is the total (Cabannes plus rotational Raman)
+  molecular Rayleigh cross section, as for the RI method;
+- `refractive_index`: the Lorentz--Lorenz equivalent
+  ``(n^2-1)/(n^2+2) = 4\\pi N\\bar\\alpha/3`` at `number_density_cm3`
+  (default 2.546899e19 molecule cm⁻³, 288.15 K and 1013.25 hPa). Pass
+  `number_density_cm3 = nothing` to return `refractive_index = nothing`.
+  The cross section, depolarization and King factor are per molecule and do
+  not depend on `number_density_cm3`.
+
+The default `temperature_K = 288.15` and `number_density_cm3` match the
+reference state of the He, Ar, N₂ and CO₂ RI fits; the O₂ RI fit instead uses
+273.15 K and 2.68678e19 molecule cm⁻³, so compare O₂ refractive indices at
+that density. The RT model's own molecular-depolarization path instead uses the column-weighted
+mean temperature of the profile at the band-centre wavenumber. Calling this
+function does not change any model default.
+
+The internal evaluation is in `Float64` (``\\bar\\alpha^2 \\sim 10^{-48}``
+underflows `Float32`); results are returned in the floating-point type of
+`float(wavelength_nm)`. The polarizability constants and their temperature
+coefficients come from the Raman module (Buldakov et al.; Asawaroengchai &
+Rosenblatt (1980) for the O₂ and H₂ anisotropies, per the source comments).
+No separate validation interval is attached to them here.
+"""
+function molecular_rayleigh_properties(::UsingPolTen, species,
+                                        wavelength_nm::Real;
+                                        temperature_K::Real =
+                                            _POLTEN_DEFAULT_TEMPERATURE_K,
+                                        number_density_cm3::Union{Nothing,Real} =
+                                            _POLTEN_DEFAULT_NUMBER_DENSITY_CM3)
+    gas = _canonical_poltensor_species(species)
+    λ = float(wavelength_nm)
+    isfinite(λ) && λ > zero(λ) ||
+        throw(ArgumentError("wavelength_nm must be finite and positive; got $wavelength_nm"))
+    T = Float64(temperature_K)
+    isfinite(T) && T > 0 ||
+        throw(ArgumentError("temperature_K must be finite and positive; got $temperature_K"))
+    if number_density_cm3 !== nothing
+        N = Float64(number_density_cm3)
+        isfinite(N) && N > 0 ||
+            throw(ArgumentError("number_density_cm3 must be finite and positive or nothing; got $number_density_cm3"))
+    end
+
+    FT = typeof(λ)
+    ν = 1.0e7 / Float64(λ)
+    c = _poltensor_rayleigh_coefficients(gas, ν, T)
+    c.α̅ > 0 || throw(DomainError(c.α̅,
+        "mean polarizability must be positive; wavelength $(λ) nm is at or beyond the dispersion pole of the $gas tensor constants"))
+
+    king_factor = 3 * (1 + 2 * c.γ_C) / (3 - 4 * c.γ_C)
+    cross_section_cm2 = c.σ_coeff * ν^4
+
+    refractive_index = if number_density_cm3 === nothing
+        nothing
+    else
+        # Lorentz–Lorenz: L = (n² - 1)/(n² + 2) = 4πNα̅/3, so
+        # n² - 1 = 3L/(1 - L) and n - 1 = (n² - 1)/(n + 1).
+        L = 4π * Float64(number_density_cm3) * c.α̅ / 3
+        L < 1 || throw(DomainError(L, "Lorentz–Lorenz factor must be below one"))
+        n²_minus_one = 3L / (1 - L)
+        FT(1 + n²_minus_one / (sqrt(1 + n²_minus_one) + 1))
+    end
+
+    return (
+        species = gas,
+        wavelength_nm = λ,
+        refractive_index = refractive_index,
+        king_factor = FT(king_factor),
+        depolarization = FT(c.ρ),
+        cross_section_cm2 = FT(cross_section_cm2),
+    )
+end
+
+function molecular_rayleigh_cross_section_ratio(method::UsingPolTen, species,
+                                                 wavelength_nm::Real,
+                                                 reference_nm::Real;
+                                                 temperature_K::Real =
+                                                     _POLTEN_DEFAULT_TEMPERATURE_K)
+    σ = molecular_rayleigh_properties(method, species, wavelength_nm;
+                                      temperature_K = temperature_K,
+                                      number_density_cm3 = nothing).cross_section_cm2
+    σ_ref = molecular_rayleigh_properties(method, species, reference_nm;
+                                          temperature_K = temperature_K,
+                                          number_density_cm3 = nothing).cross_section_cm2
+    return σ / σ_ref
+end
+
+function _canonical_poltensor_species(species)
+    key = species isa Symbol ? species : Symbol(species)
+    key in (:N2, :N₂, :nitrogen, :Nitrogen) && return :N2
+    key in (:O2, :O₂, :oxygen, :Oxygen) && return :O2
+    key in (:H2, :H₂, :hydrogen, :Hydrogen) && return :H2
+    throw(ArgumentError(
+        "UsingPolTen(): no polarizability tensor is available for species " *
+        "$species; tensors exist only for N2, O2 and H2. Use UsingRefInd() " *
+        "(refractive index + King factor) for He, Ar, N2, O2 or CO2."))
 end

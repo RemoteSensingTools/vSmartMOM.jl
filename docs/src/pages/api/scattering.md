@@ -86,7 +86,8 @@ for the physics and provenance.
 
 ```@docs
 vSmartMOM.Scattering.AbstractMolecularRayleighMethod
-vSmartMOM.Scattering.RefractiveIndexRayleigh
+vSmartMOM.Scattering.UsingRefInd
+vSmartMOM.Scattering.UsingPolTen
 vSmartMOM.Scattering.molecular_rayleigh_properties
 vSmartMOM.Scattering.molecular_rayleigh_cross_section_ratio
 vSmartMOM.Scattering.molecular_rayleigh_provenance
