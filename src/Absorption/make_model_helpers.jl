@@ -194,8 +194,8 @@ temperature grids. Uses the ABSCO format (ν, p, T) for the lookup table.
 
 # Arguments
 - `absco::AbscoTable`: ABSCO table with cross-sections σ(ν, p, T)
-- `wave_grid`: uniform wavenumber grid [cm⁻¹] (`wavelength_flag=true` is rejected; see
-  the HITRAN method)
+- `wave_grid`: uniform wavenumber grid in cm⁻¹; `wavelength_flag=true` is rejected
+  (see the HITRAN method)
 - `p_grid`: Pressure grid (hPa)
 - `t_grid`: Temperature grid (K)
 

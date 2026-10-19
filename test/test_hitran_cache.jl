@@ -315,6 +315,43 @@ end
     @test vSmartMOM._hitran_cache_status("CO2", edition, CO2_IDS, 6000, 6400)[1]
 end
 
+# Windows cannot delete an open file, so a rejected download must not leave its
+# handle open (`eachline(path)` does when an error ends the loop early). Only
+# descriptors pointing at the fixture are counted, and GC stays off so that a
+# finalizer can neither close a leaked handle nor change the count.
+@testset "rejected downloads close the downloaded file (reproduction)" begin
+    if isdir("/proc/self/fd")
+        mktempdir() do dir
+            path = realpath(dir) * "/rejected.par"
+            open_on(path) = count(readdir("/proc/self/fd"; join=true)) do fd
+                target = try readlink(fd) catch; "" end
+                target == path
+            end
+            for (body, reason) in (
+                    (hitran_file(hitran_record(1, 1, 6200.0)), "was not requested"),
+                    (hitran_file(hitran_record(2, 1, 7000.0)), "outside the requested range"),
+                    (CO2_NARROW[1:end-20], "HITRAN record has"))
+                write(path, body)
+                gc_was_enabled = GC.enable(false)
+                try
+                    err = try
+                        vSmartMOM._validate_hitran_download(path, CO2_IDS, 6000, 6400)
+                        nothing
+                    catch e
+                        e
+                    end
+                    @test err isa ErrorException && occursin(reason, err.msg)
+                    @test open_on(path) == 0
+                finally
+                    GC.enable(gc_was_enabled)
+                end
+            end
+        end
+    else
+        @test_skip "open file descriptors are not listed here"
+    end
+end
+
 @testset "transport errors: only hitran.org's newline shortfall is accepted" begin
     check = vSmartMOM._check_hitran_response
     body = LIVE_O2_BODY

@@ -383,30 +383,35 @@ function _validate_hitran_download(path::AbstractString, iso_ids::AbstractVector
     filesize(path) > 0 || error("HITRAN download produced an empty file. Check your query parameters (numin=$numin, numax=$numax).")
     A = Absorption
     requested = Set(iso_ids)
-    nrecords = 0
-    for (n, record) in enumerate(eachline(path))
-        # `read_hitran` tolerates trailing bytes; a download must not, since
-        # two records joined without a newline would otherwise pass as one.
-        ncodeunits(record) == A._HITRAN_RECORD_LENGTH ||
-            error("$path:$n: HITRAN record has $(ncodeunits(record)) bytes; " *
-                  "expected exactly $(A._HITRAN_RECORD_LENGTH)")
-        fields = A._hitran_fields(record, path, n)
-        mol = A._parse_hitran_number(Int, fields[1], path, n, "molec_id")
-        iso = A._parse_hitran_isotopologue(fields[2], path, n)
-        ν = A._parse_hitran_number(Float64, fields[3], path, n, "nu")
-        for (i, field) in zip(4:10, ("sw", "a", "gamma_air", "gamma_self",
-                                     "elower", "n_air", "delta_air"))
-            A._parse_hitran_number(Float64, fields[i], path, n, field)
-        end
-        A._parse_hitran_number(Float64, fields[18], path, n, "gp"; blank_is_zero=true)
-        A._parse_hitran_number(Float64, fields[19], path, n, "gpp"; blank_is_zero=true)
+    # Read through an explicit handle: an `eachline(path)` left by an error
+    # keeps the file open, and Windows cannot then delete the download.
+    nrecords = open(path) do io
+        nread = 0
+        for (n, record) in enumerate(eachline(io))
+            # `read_hitran` tolerates trailing bytes; a download must not, since
+            # two records joined without a newline would otherwise pass as one.
+            ncodeunits(record) == A._HITRAN_RECORD_LENGTH ||
+                error("$path:$n: HITRAN record has $(ncodeunits(record)) bytes; " *
+                      "expected exactly $(A._HITRAN_RECORD_LENGTH)")
+            fields = A._hitran_fields(record, path, n)
+            mol = A._parse_hitran_number(Int, fields[1], path, n, "molec_id")
+            iso = A._parse_hitran_isotopologue(fields[2], path, n)
+            ν = A._parse_hitran_number(Float64, fields[3], path, n, "nu")
+            for (i, field) in zip(4:10, ("sw", "a", "gamma_air", "gamma_self",
+                                         "elower", "n_air", "delta_air"))
+                A._parse_hitran_number(Float64, fields[i], path, n, field)
+            end
+            A._parse_hitran_number(Float64, fields[18], path, n, "gp"; blank_is_zero=true)
+            A._parse_hitran_number(Float64, fields[19], path, n, "gpp"; blank_is_zero=true)
 
-        gid = checkbounds(Bool, A.global_ids, mol, iso) ? Int(A.global_ids[mol, iso]) : -1
-        gid in requested || error("$path:$n: line of molecule $mol, isotopologue $iso " *
-                                  "was not requested (global IDs $(join(iso_ids, ",")))")
-        numin <= ν <= numax || error("$path:$n: line at $ν cm⁻¹ is outside the " *
-                                     "requested range [$numin, $numax] cm⁻¹")
-        nrecords += 1
+            gid = checkbounds(Bool, A.global_ids, mol, iso) ? Int(A.global_ids[mol, iso]) : -1
+            gid in requested || error("$path:$n: line of molecule $mol, isotopologue $iso " *
+                                      "was not requested (global IDs $(join(iso_ids, ",")))")
+            numin <= ν <= numax || error("$path:$n: line at $ν cm⁻¹ is outside the " *
+                                         "requested range [$numin, $numax] cm⁻¹")
+            nread += 1
+        end
+        nread
     end
     nrecords > 0 || error("HITRAN download contains no line records.")
     return nrecords
@@ -526,17 +531,20 @@ end
 
 function _read_meta_toml(path::AbstractString)
     meta = Dict{String,Any}()
-    for line in eachline(path)
-        line = strip(line)
-        (isempty(line) || startswith(line, '#')) && continue
-        if occursin(" = ", line)
-            key, val = split(line, " = "; limit=2)
-            # Strip quotes from string values
-            if startswith(val, '"') && endswith(val, '"')
-                meta[strip(key)] = val[2:end-1]
-            else
-                # Try numeric parse
-                meta[strip(key)] = tryparse(Float64, val) !== nothing ? tryparse(Float64, val) : val
+    # Explicit handle, as in `_validate_hitran_download`: closed on errors too.
+    open(path) do io
+        for line in eachline(io)
+            line = strip(line)
+            (isempty(line) || startswith(line, '#')) && continue
+            if occursin(" = ", line)
+                key, val = split(line, " = "; limit=2)
+                # Strip quotes from string values
+                if length(val) >= 2 && startswith(val, '"') && endswith(val, '"')
+                    meta[strip(key)] = chop(val; head=1, tail=1)
+                else
+                    # Try numeric parse
+                    meta[strip(key)] = tryparse(Float64, val) !== nothing ? tryparse(Float64, val) : val
+                end
             end
         end
     end

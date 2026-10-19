@@ -35,7 +35,7 @@ cd test && julia --project=. -e 'using Pkg; Pkg.test()'
 
 TOML lint/format checks use Taplo 0.10.0 via `tools/install_taplo.sh`.
 Run `taplo lint` and `taplo format --check` from the repository root.
-Julia compatibility: 1.10-1.12; no automatic Julia source formatter is required.
+Julia compatibility: 1.10-1.13; no automatic Julia source formatter is required.
 
 ## Architecture
 

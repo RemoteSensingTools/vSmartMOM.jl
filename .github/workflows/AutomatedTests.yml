@@ -3,7 +3,7 @@ name: AutomatedTests
 on: [push, pull_request]
 
 # One active run per ref: a superseded push cancels the in-flight matrix
-# (9 jobs) instead of queueing a duplicate — reduces runner contention,
+# (12 jobs) instead of queueing a duplicate — reduces runner contention,
 # which has evicted long jobs mid-run ("runner received a shutdown signal").
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        julia-version: ['1.10', '1.11', '1.12']
+        julia-version: ['1.10', '1.11', '1.12', '1.13']
         os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:

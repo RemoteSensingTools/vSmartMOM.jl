@@ -127,11 +127,11 @@ mutable struct BatchContext
     type); every consumer converts with `FT(...)` at the point of use so no
     Float64 temporaries leak into FT arithmetic."""
     k_ref::Vector{Float64}
-    "Current unreduced temperature profile [K] (FT-converted)"
+    "Current unreduced temperature profile in K (FT-converted)"
     current_T::Vector
-    "Current unreduced half-level pressures [hPa] (FT-converted)"
+    "Current unreduced half-level pressures in hPa (FT-converted)"
     current_p_half::Vector
-    "Current unreduced specific humidity [kg/kg] (FT-converted)"
+    "Current unreduced specific humidity in kg/kg (FT-converted)"
     current_q::Vector
     "Current trace-gas VMR overrides (merged over params.absorption_params.vmr)"
     current_vmr::Dict{String, Any}

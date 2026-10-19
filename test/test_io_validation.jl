@@ -88,6 +88,21 @@ end
         @test params.T == [240.0, 280.0]
         @test params.q == [0.001, 0.01]
         @test params.absorption_params.vmr["CO2"] == [4.0e-4, 4.2e-4]
+
+        # A failed unit check closes the file (Windows cannot delete an open one).
+        NCDataset(ds -> (ds["Met_T"].attrib["units"] = "degC"), path, "a")
+        gc_was_enabled = GC.enable(false)
+        try
+            @test_throws ArgumentError vSmartMOM.IO.geoschem_to_dict(src)
+            if isdir("/proc/self/fd")
+                target = realpath(path)
+                @test count(readdir("/proc/self/fd"; join=true)) do fd
+                    (try readlink(fd) catch; "" end) == target
+                end == 0
+            end
+        finally
+            GC.enable(gc_was_enabled)
+        end
     end
 end
 

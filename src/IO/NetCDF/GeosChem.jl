@@ -52,56 +52,58 @@ config_dict = geoschem_to_dict(src)
 function geoschem_to_dict(src::GeosChemSource)
     idx, idy, idf = src.idx, src.idy, src.idf
     
-    # Read the NetCDF file
-    ds = NCDataset(src.path)
-    
-    # Extract location information
-    lat = ds["lats"][idx, idy, idf]
-    lon = ds["lons"][idx, idy, idf]
-    time = ds["time"][1]
-    
-    @info "Reading GEOSChem scene at lat=$(lat)°, lon=$(lon)°, time=$(time)"
-    
-    # Build pressure grid (73 levels from surface pressure + layer thicknesses)
-    # Met_DELP: pressure thickness of each layer [hPa]
-    # Met_PS2WET: surface pressure [hPa]
-    dp = ds["Met_DELP"].var[idx, idy, idf, :, 1]
-    sp = ds["Met_PS2WET"].var[idx, idy, idf, 1]
-    
-    # Pressure at half-levels (boundaries): [TOA, ..., Surface]
-    # GCHP stores bottom-to-top, we flip to top-to-bottom
-    pressure_half = reverse([sp; sp .+ cumsum(-dp)])
-    
-    # Temperature profile [K] - flip from BOA→TOA to TOA→BOA
-    _require_geoschem(ds["Met_T"].attrib["units"] == "K", "Expected temperature in Kelvin")
-    temperature = reverse(ds["Met_T"].var[idx, idy, idf, :, 1])
-    
-    # Specific humidity is stored in g/kg. Convert to the kg/kg mass fraction
-    # used by compute_atmos_profile_fields, then flip BOA→TOA to TOA→BOA.
-    _require_geoschem(ds["Met_SPHU"].attrib["units"] == "g kg-1", "Expected specific humidity in g/kg")
-    q = reverse(_geoschem_specific_humidity(
-        ds["Met_SPHU"].var[idx, idy, idf, :, 1]))
-    
-    # Read volume mixing ratios for trace gases
-    vmr = Dict{String, Union{Float64, Vector{Float64}}}()
-    
-    # Define molecules to extract (all available in GEOSChem)
-    # H2O is intentionally omitted: vSmartMOM derives it from Met_SPHU (`q`)
-    # and rejects a second H2O entry in the absorption molecule list.
-    molecules_to_read = ["N2O", "CH4", "C2H6", "CO2", "CO"]
-    molecules_available = String[]
-    
-    for molecule in molecules_to_read
-        var_name = "SpeciesConcVV_$(molecule)"
-        if haskey(ds, var_name)
-            _require_geoschem(ds[var_name].attrib["units"] == "mol mol-1 dry", "Expected VMR in mol/mol")
-            # Flip from BOA→TOA to TOA→BOA
-            vmr[molecule] = reverse(Float64.(ds[var_name].var[idx, idy, idf, :, 1]))
-            push!(molecules_available, molecule)
+    # Read the NetCDF file; the do block closes it on every exit, including
+    # failed unit checks.
+    (; lat, lon, time, pressure_half, temperature, q, vmr, molecules_available) =
+        NCDataset(src.path) do ds
+            # Extract location information
+            lat = ds["lats"][idx, idy, idf]
+            lon = ds["lons"][idx, idy, idf]
+            time = ds["time"][1]
+
+            @info "Reading GEOSChem scene at lat=$(lat)°, lon=$(lon)°, time=$(time)"
+
+            # Build pressure grid (73 levels from surface pressure + layer thicknesses)
+            # Met_DELP: pressure thickness of each layer [hPa]
+            # Met_PS2WET: surface pressure [hPa]
+            dp = ds["Met_DELP"].var[idx, idy, idf, :, 1]
+            sp = ds["Met_PS2WET"].var[idx, idy, idf, 1]
+
+            # Pressure at half-levels (boundaries): [TOA, ..., Surface]
+            # GCHP stores bottom-to-top, we flip to top-to-bottom
+            pressure_half = reverse([sp; sp .+ cumsum(-dp)])
+
+            # Temperature profile [K] - flip from BOA→TOA to TOA→BOA
+            _require_geoschem(ds["Met_T"].attrib["units"] == "K", "Expected temperature in Kelvin")
+            temperature = reverse(ds["Met_T"].var[idx, idy, idf, :, 1])
+
+            # Specific humidity is stored in g/kg. Convert to the kg/kg mass fraction
+            # used by compute_atmos_profile_fields, then flip BOA→TOA to TOA→BOA.
+            _require_geoschem(ds["Met_SPHU"].attrib["units"] == "g kg-1", "Expected specific humidity in g/kg")
+            q = reverse(_geoschem_specific_humidity(
+                ds["Met_SPHU"].var[idx, idy, idf, :, 1]))
+
+            # Read volume mixing ratios for trace gases
+            vmr = Dict{String, Union{Float64, Vector{Float64}}}()
+
+            # Define molecules to extract (all available in GEOSChem)
+            # H2O is intentionally omitted: vSmartMOM derives it from Met_SPHU (`q`)
+            # and rejects a second H2O entry in the absorption molecule list.
+            molecules_to_read = ["N2O", "CH4", "C2H6", "CO2", "CO"]
+            molecules_available = String[]
+
+            for molecule in molecules_to_read
+                var_name = "SpeciesConcVV_$(molecule)"
+                if haskey(ds, var_name)
+                    _require_geoschem(ds[var_name].attrib["units"] == "mol mol-1 dry", "Expected VMR in mol/mol")
+                    # Flip from BOA→TOA to TOA→BOA
+                    vmr[molecule] = reverse(Float64.(ds[var_name].var[idx, idy, idf, :, 1]))
+                    push!(molecules_available, molecule)
+                end
+            end
+
+            (; lat, lon, time, pressure_half, temperature, q, vmr, molecules_available)
         end
-    end
-    
-    close(ds)
     
     # Start from the package's complete one-band defaults so the returned
     # dictionary is immediately consumable by `parameters_from_source`. Users

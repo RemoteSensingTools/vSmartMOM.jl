@@ -35,7 +35,7 @@ Read TOMAS-15 aerosol data from NetCDF file including NK (number) and species.
 
 # Data Structure
 NK variables: SpeciesConcVV_NK01 through NK15 (1000 × particles/mol_air)
-Species variables: SpeciesConcVV_[SPECIES][BIN] (mol/mol dry air)
+Species variables: `SpeciesConcVV_[SPECIES][BIN]` (mol/mol dry air)
 Meteorology: Met_AD (kg), Met_AIRVOL (m³)
 
 # NK Unit Convention

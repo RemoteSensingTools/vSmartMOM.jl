@@ -52,7 +52,7 @@ const JET_TARGET_MODULES = (vSmartMOM.CoreRT, vSmartMOM.Scattering)
         @test n <= JET_BASELINE
     else
         # Advisory by default: JET report counts are not stable across the supported
-        # JET (0.9–0.11) / Julia versions, so a fixed baseline would cause spurious
+        # JET (0.9–0.12) / Julia versions, so a fixed baseline would cause spurious
         # failures. Surface new reports as a warning and keep CI green; set
         # VSMARTMOM_JET_STRICT=1 to gate hard (e.g. on a pinned env).
         if n > JET_BASELINE

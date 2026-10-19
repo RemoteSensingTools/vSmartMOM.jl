@@ -264,6 +264,13 @@ review of General's sequential-version rule.
   hardware is functional.
 - Taplo 0.10.0 is pinned and checksum-verified; CI checks maintained TOML
   formatting, scene schemas, and negative configuration cases.
+- Julia 1.13 is supported (`julia = "1.10, 1.11, 1.12, 1.13"`; `SHA` compat
+  admits the 1.x standard library shipped with 1.13) and tested in CI.
+- A HITRAN download rejected by validation no longer leaves its temporary file
+  in the cache directory on Windows: the validator held the file open after
+  the error, so it could not be deleted. The HITRAN metadata reader and
+  `geoschem_to_dict` likewise close their files when reading fails, and
+  quoted non-ASCII metadata values no longer raise a `StringIndexError`.
 - Fourier convergence options are represented in the schema. Unknown numerics
   keys and convergence thresholds supplied with `all` now raise errors.
 - Documentation distinguishes supported elastic Jacobians, forward Raman,
