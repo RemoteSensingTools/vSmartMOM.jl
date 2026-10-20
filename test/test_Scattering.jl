@@ -172,7 +172,15 @@ end
     λ = 0.55   # Incident wavelength
     polarization_type = Stokes_IQUV()
     truncation_type = δBGE(10)
-    model_NAI2 = make_mie_model(NAI2(), aero, λ, polarization_type, truncation_type, r_max, nquad_radius)
+    # The saved PCW reference was computed on the radius nodes of the former
+    # distribution-dependent lower bound, the 1e-8 quantile. Since the radius
+    # grid is fixed (default r_min = 1e-3 µm, v2.2 decision 11), pass that
+    # bound explicitly: NAI2 and PCW are then compared on identical nodes.
+    # (On the default grid k moves by -2.4e-5 relative, ω̃ by -6.3e-7 and the
+    # Greek coefficients by up to 1.4e-3 — radius-quadrature error at 2500 nodes.)
+    r_min_reference = max(quantile(size_distribution, 1e-8), 1e-6 * r_max)
+    model_NAI2 = make_mie_model(NAI2(), aero, λ, polarization_type, truncation_type, r_max, nquad_radius;
+                                r_min = r_min_reference)
 
     # STEP 3: Perform the Mie Calculations and compare against saved PCW reference
 

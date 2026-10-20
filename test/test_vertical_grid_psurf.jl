@@ -209,6 +209,12 @@ end
         # dispersive anisotropy (decision 13c), which moves τ_rayl at
         # 1613 nm by -0.4 %. Select the formulation of the golden values.
         params.rayleigh_anisotropy = ConstantAnisotropy()
+        # 7acab570 started the radius quadrature at the size distribution's 1e-8
+        # quantile (both fixture aerosols share μ = 0.15, σ = 1.4). The grid is
+        # now fixed (default r_min = 1e-3 µm, v2.2 decision 11); pin the
+        # generating bound so this convention test keeps comparing bit for bit.
+        # (On the default grid TOA moves by up to 1.6e-5 relative.)
+        params.scattering_params.r_min = quantile(LogNormal(log(0.15), log(1.4)), 1e-8)
         model, implicit = model_from_parameters(LinMode(), params;
             compute_aerosol_microphysics_jacobians=false,
             abundance_jacobians=:frozen_cross_section)

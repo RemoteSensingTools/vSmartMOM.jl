@@ -108,7 +108,7 @@ end
     # We test directly at the compute_mie_ab! level to avoid a pre-existing
     # DimensionMismatch bug in phase_function_autodiff.jl's JacobianResult
     # preallocator (it uses gauleg/r_max directly while compute_NAI2 uses
-    # gauleg_log with r_min from quantile, giving a different n_max).
+    # gauleg_log on [r_min, r_max], giving a different n_max).
 
     params = parameters_from_yaml(YAML_FAST)
     rt_aer = params.scattering_params.rt_aerosols[1]
@@ -154,9 +154,9 @@ end
     # NOTE: compute_aerosol_optical_properties(model; autodiff=true) has a
     # pre-existing DimensionMismatch bug in phase_function_autodiff.jl:
     # JacobianResult is preallocated using get_n_max(2π*r_max/λ), but
-    # compute_NAI2 uses gauleg_log with r_min=max(quantile(...,1e-8),1e-6*r_max),
-    # so maximum(x_size_param) < 2π*r_max/λ when run in Float64 but the Dual
-    # path may give a different n_max. Fix requires editing
+    # compute_NAI2 uses gauleg_log on [r_min, r_max] (interior Gauss nodes),
+    # so maximum(x_size_param) < 2π*r_max/λ and the Greek series can be shorter
+    # than the preallocated one. Fix requires editing
     # src/Scattering/phase_function_autodiff.jl (outside the scope of Bug B).
 end
 

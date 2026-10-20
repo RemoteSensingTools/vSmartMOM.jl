@@ -94,6 +94,7 @@ CPU; they do not add cases.
 | `test_molecular_rayleigh.jl` | active | Molecular Rayleigh optical properties; N₂/O₂ NIR dispersion fits, dispersive tensor, H₂ refractivity check |
 | `test_rayleigh_anisotropy.jl` | active | `rayleigh_anisotropy` parsing; `depol: -1` Rayleigh depolarization in the forward, linearized and batch builders |
 | `test_multisensor_heights.jl` | active | Observer heights and interior levels |
+| `test_nai2_fixed_radius_grid.jl` | active | Fixed radius grid of the log-normal Mie paths: nodes independent of μ/σ, size tangents vs central differences (optical properties and TOA radiance at the JacobianTestFast radius settings), `scattering.r_min`, PCW on the same nodes |
 | `test_nonscattering_layers.jl` | active | Layers with zero scattering optical depth: equality with vanishing scattering and with the merged column at TOA and BOA, and with vanishing scattering at interior levels (IQU, albedo 0 and 0.3), the pure-absorber thermal closed form, Float32/Float64 thermal parity, and linearized parity |
 | `test_parameters_parser.jl` | active | Parameter parser regressions |
 | `test_performance.jl` | benchmark | Forward vs linearized timing report (no `@testset`) |

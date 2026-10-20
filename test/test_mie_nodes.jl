@@ -62,9 +62,11 @@ const _nquad = 300
     model = make_mie_model(NAI2(), aero, _lam, pol, NoTruncation(), _r_max, _nquad)
     ref = compute_aerosol_optical_properties(model)   # raw/untruncated, ft=1
 
-    # Reconstruct the EXACT internal nodes the log-normal path used.
-    r_min = max(quantile(dist, 1e-8), 1e-6 * _r_max)
-    r, wr = vSmartMOM.Scattering.gauleg_log(_nquad, r_min, _r_max; norm=false)
+    # Reconstruct the EXACT internal nodes the log-normal path used (fixed
+    # [r_min, r_max] interval, independent of the size distribution).
+    r, wr = vSmartMOM.Scattering.radius_quadrature(model)
+    @test r == first(vSmartMOM.Scattering.gauleg_log(
+        _nquad, vSmartMOM.Scattering.DEFAULT_R_MIN, _r_max; norm=false))
     wx = vSmartMOM.Scattering.compute_wₓ(dist, wr, r, _r_max)
 
     nodes = compute_aerosol_optical_properties_nodes(r, wx, _nr, _ni, _lam, pol, NoTruncation())

@@ -34,8 +34,9 @@ end
             cfg["geometry"]["vaz"] = [0.0, 37.0]
             scat = cfg["scattering"]
             scat["r_max"] = 3.0
-            # Converge radius quadrature before comparing size derivatives:
-            # finite differences also move the distribution-dependent nodes.
+            # The radius nodes are fixed (independent of μ, σ), so finite
+            # differences and size tangents share one quadrature; see
+            # test_nai2_fixed_radius_grid.jl for the unconverged case.
             scat["nquad_radius"] = 300
             aerosol = only(scat["aerosols"])
             aerosol["μ"] = 0.15

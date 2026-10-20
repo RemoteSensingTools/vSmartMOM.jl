@@ -166,6 +166,11 @@ end
     base.scattering_params.rt_aerosols[1].aerosol =
         Aerosol(LogNormal(log(1.0), log(1.6)), 1.45, 0.001)
     base.scattering_params.rt_aerosols[1].τ_ref = 0.3
+    # Resolve this coarse mode's radius integral (the YAML's 100 nodes on the
+    # fixed [r_min, r_max] = [1e-3, 50] µm grid do not): the ordering below is a
+    # property of the TMS correction, not of a radius-quadrature error. With
+    # 100 nodes gap_on/gap_off is 1.01; with 400 or 1000 nodes 0.87–0.88.
+    base.scattering_params.nquad_radius = 400
 
     function run_at(l_tr, sc)
         p = deepcopy(base)

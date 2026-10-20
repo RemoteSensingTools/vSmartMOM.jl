@@ -67,6 +67,7 @@ end
 @testset "Blocked Jacobians" begin include("test_jacobian_blocked.jl") end
 @testset "Phase interpolation" begin include("test_phase_interpolation.jl") end
 @testset "Aerosol reference" begin include("test_aerosol_reference.jl") end
+@testset "NAI2 fixed radius grid" begin include("test_nai2_fixed_radius_grid.jl") end
 @testset "Local optical Jacobians" begin include("test_local_jacobian.jl") end
 @testset "Source adding Jacobians" begin include("test_source_adding.jl") end
 @testset "Source adding SIF Jacobians" begin include("test_source_adding_sif.jl") end
