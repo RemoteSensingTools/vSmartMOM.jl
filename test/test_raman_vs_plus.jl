@@ -1,8 +1,8 @@
 # Vibrational Raman over concatenated bands (VS_0to1_plus, VS_1to0_plus).
 #
 # One incident wavelength (band 1) and its N₂/O₂ vibrational target bands, pure
-# Rayleigh, one layer, flat F₀. Covers the forward run and the source-band
-# depletion (decision 7, R5).
+# Rayleigh, one layer, flat F₀. Covers the forward run, the source-band
+# depletion (decision 7, R5) and the model builder (decision 8).
 
 module RamanVSPlusTests
 
@@ -86,6 +86,60 @@ end
     depletion = 1 - rs.ϖ_Cabannes[1]
     raman = sum(rs.ϖ_λ₁λ₀) + sum(rs.ϖ_λ₁λ₀_VS_n2) + sum(rs.ϖ_λ₁λ₀_VS_o2)
     @test 0 < depletion - raman < 1e-4 * depletion
+end
+
+@testset "VS plus builder: resolved depolarization, caller's params untouched" begin
+    # Decision 8: the builder uses the depolarization resolved as in the
+    # standard model_from_parameters (depol: -1 → molecular constants) for
+    # τ_Rayleigh and the Rayleigh/Cabannes Greek coefficients, and works on a
+    # copy of the parameters.
+    for depol in (-1.0, 0.0)
+        p = _vs_params()
+        p.spec_bands = p.spec_bands[1:1]
+        p.brdf = p.brdf[1:1]
+        p.depol = depol
+        spec_before = deepcopy(p.spec_bands)
+        brdf_before = p.brdf
+        rs, model, _ = _vs_model(IS.VS_0to1_plus; params = p)
+        @test p.spec_bands == spec_before
+        @test p.brdf === brdf_before && length(p.brdf) == 1
+        @test length(CoreRT.get_spec_bands(model)) == 3
+
+        # Band 1 is the incident wavelength alone; the standard builder on that
+        # one point gives the reference Rayleigh optics.
+        q = _vs_params()
+        q.spec_bands = [collect(rs.grid_in[1])]
+        q.brdf = q.brdf[1:1]
+        q.depol = depol
+        ref = model_from_parameters(q)
+        @test model.τ_rayl[1] ≈ ref.τ_rayl[1] rtol = 1e-12
+        @test model.greek_rayleigh[1].β ≈ ref.greek_rayleigh[1].β rtol = 1e-12
+        @test model.greek_rayleigh[1].δ ≈ ref.greek_rayleigh[1].δ rtol = 1e-12
+        @test model.greek_cabannes[1].β ≈ ref.greek_cabannes[1].β rtol = 1e-12
+        @test model.ϖ_Cabannes[1] ≈ ref.ϖ_Cabannes[1] rtol = 1e-12
+    end
+
+    # Float32 model (builder only).
+    p = _vs_params()
+    p.float_type = Float32
+    n2, o2 = IS.getRamanAtmoConstants(1e7 / λ_INC, 300.0)
+    rs32 = IS.VS_0to1_plus{Float32}(n2 = n2, o2 = o2)
+    model32 = model_from_parameters(rs32, λ_INC, p)
+    @test eltype(model32.τ_rayl[1]) == Float32
+    @test model32.greek_rayleigh[1] isa vSmartMOM.Scattering.GreekCoefs{Float32}
+    @test model32.greek_cabannes[1] isa vSmartMOM.Scattering.GreekCoefs{Float32}
+    @test model32.τ_rayl[1] ≈ model_from_parameters(
+        IS.VS_0to1_plus{FT}(n2 = n2, o2 = o2), λ_INC, _vs_params()).τ_rayl[1] rtol = 1e-5
+
+    # With gas absorption (O₂ line-by-line from the HITRAN artifact): the
+    # builder reads the lines in the model float type.
+    p = _vs_params()
+    p_abs = parameters_from_yaml(joinpath(@__DIR__, "test_parameters", "O2ABandParamsVS.yaml"))
+    p.absorption_params = p_abs.absorption_params
+    n2, o2 = IS.getRamanAtmoConstants(1e7 / 765.0, 300.0)
+    rs = IS.VS_0to1_plus{FT}(n2 = n2, o2 = o2)
+    model = model_from_parameters(rs, 765.0, p)
+    @test all(isfinite, model.τ_abs[1]) && sum(model.τ_abs[1]) > 0
 end
 
 end # module

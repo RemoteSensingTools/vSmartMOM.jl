@@ -796,11 +796,22 @@ Modified version for vibrational Raman scattering
 =#
 
 
-"Take the parameters specified in the vSmartMOM_Parameters struct, and calculate derived attributes into an RTModel"
+"""
+    model_from_parameters(rs::Union{VS_0to1_plus, VS_1to0_plus}, λ₀, params; sources)
+
+Fill the vibrational Raman state of `rs` for the incident wavelength `λ₀`
+(nm) and build the `RTModel` on its bands (the incident wavelength and the
+N₂/O₂ target bands). Rayleigh and Cabannes depolarizations follow the
+standard `model_from_parameters` (`depol: -1` takes them from the molecular
+constants). `params` is not modified.
+"""
 function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                     λ₀,
                     params::vSmartMOM_Parameters;
                     sources::AbstractSource = SolarBeam())
+    # Work on a copy: the bands and surfaces expanded below must not leak into
+    # the caller's parameters (loaded absorption tables are shared read-only).
+    params = copy_parameters(params; share_luts = true)
     # Number of total bands and aerosols (for convenience)
     n_bands = 3 #length(params.spec_bands)
     n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
@@ -834,19 +845,20 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     # Compute N2 and O2
     RS_type.n2, RS_type.o2 =
         InelasticScattering.getRamanAtmoConstants(1.e7/λ₀,effT);
-    # VS-plus signature: getRamanSSProp!(RS, depol, λ_inc) — the depol
-    # arg sets the Rayleigh/Raman cross-section ratio per Hovenier convention.
+    # VS-plus signature: getRamanSSProp!(RS, depol, λ_inc); `depol` is not
+    # used there.
     InelasticScattering.getRamanSSProp!(RS_type, params.depol, λ₀);
     n_bands = length(RS_type.iBand)
     params.spec_bands = RS_type.grid_in
 
-    # Rayleigh optical properties calculation
-    greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
-    τ_rayl = [zeros(params.float_type,1, length(profile.p_full)) for i=1:n_bands];
-
-    # Per-band Cabannes / Rayleigh depolarization (for inelastic scattering support)
+    # Rayleigh optical depth (at each band centre) and per-band Rayleigh and
+    # Cabannes greek coefficients. Same depolarization rule as the standard
+    # `model_from_parameters`: depol < 0 ("auto") takes both depolarizations
+    # from the N₂/O₂ molecular constants, depol ≥ 0 uses it for both.
     FT_vrs = params.float_type
-    greek_cabannes = typeof(greek_rayleigh)[]
+    τ_rayl = [zeros(FT_vrs, 1, length(profile.p_full)) for i=1:n_bands];
+    greek_rayleigh = Vector{Scattering.GreekCoefs{FT_vrs}}()
+    greek_cabannes = Vector{Scattering.GreekCoefs{FT_vrs}}()
     ϖ_Cabannes = zeros(FT_vrs, n_bands)
     l_max_aer = zeros(Int, max(n_aer, 1), n_bands)
 
@@ -865,14 +877,19 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         _n2, _o2 = InelasticScattering.getRamanAtmoConstants(1.0e7 / λₘ, effT)
         ϖ_Cab = InelasticScattering.compute_ϖ_Cabannes(λₘ, _n2, _o2)
         γ_air_Cab, _ = InelasticScattering.compute_γ_air_Cabannes!(λₘ, _n2, _o2)
+        γ_air_Ray, _ = InelasticScattering.compute_γ_air_Rayleigh!(λₘ, _n2, _o2)
         ϖ_Cabannes[i_band] = FT_vrs(ϖ_Cab)
         depol_air_Cab = 2γ_air_Cab / (1 + γ_air_Cab)
-        push!(greek_cabannes, Scattering.get_greek_rayleigh(FT_vrs(depol_air_Cab)))
+        depol_air_Ray = 2γ_air_Ray / (1 + γ_air_Ray)
+        depol_use_Cab = params.depol < 0 ? FT_vrs(depol_air_Cab) : FT_vrs(params.depol)
+        depol_use_Ray = params.depol < 0 ? FT_vrs(depol_air_Ray) : FT_vrs(params.depol)
+        push!(greek_cabannes, Scattering.get_greek_rayleigh(depol_use_Cab))
+        push!(greek_rayleigh, Scattering.get_greek_rayleigh(depol_use_Ray))
 
         # Compute Rayleigh properties per layer for `i_band` band center
         τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
-                            (maximum(curr_band_λ) + minimum(curr_band_λ))/2, 
-                            params.depol, profile.vcd_dry);
+                            FT_vrs((maximum(curr_band_λ) + minimum(curr_band_λ))/2), 
+                            depol_use_Ray, profile.vcd_dry);
 
         # If no absorption, continue to next band
         isnothing(params.absorption_params) && continue
@@ -883,7 +900,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         all_species = vcat(ap.fixed_molecules[i_band], ap.variable_molecules[i_band])
         for (molec_i, mol_name) in enumerate(all_species)
             if isempty(ap.luts)
-                @timeit "Read HITRAN" lines = _hitran_lines(mol_name, FT)
+                @timeit "Read HITRAN" lines = _hitran_lines(mol_name, FT_vrs)
                 @debug "Computing profile for $(mol_name) with vmr $(profile.vmr[mol_name]) for band #$(i_band)"
                 absorption_model = AtmosphericAbsorption.LineByLineModel(lines;
                     profile = ap.broadening_function,
@@ -911,7 +928,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                     τ_abs[i_band], ap.h2o_lut[i_band],
                     params.spec_bands[i_band], profile)
             else
-                @timeit "Read HITRAN H2O" lines_h2o = _hitran_lines("H2O", FT)
+                @timeit "Read HITRAN H2O" lines_h2o = _hitran_lines("H2O", FT_vrs)
                 @debug "Computing profile for H2O (q-driven) for band #$(i_band)"
                 h2o_model = AtmosphericAbsorption.LineByLineModel(lines_h2o;
                     profile = ap.broadening_function,

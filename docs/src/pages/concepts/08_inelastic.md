@@ -21,8 +21,10 @@ aerosol over ocean) use `noRS` — the inelastic correction is small there. UV/V
 retrievals (Ring effect, O₂ A-band line shapes, ozone DOAS) need RRS.
 Vibrational Raman runs use the `_plus` variants, whose state and model are
 built by `model_from_parameters(rs, λ₀, params)` for one incident wavelength
-`λ₀`; `VS_0to1` and `VS_1to0` are kept as types only (they have no state
-builder and do not run in `rt_run`).
+`λ₀` (same depolarization rule as the standard builder, `depol: -1` taking it
+from the molecular constants; `params` is not modified); `VS_0to1` and
+`VS_1to0` are kept as types only (they have no state builder and do not run
+in `rt_run`).
 
 ## When to enable it
 
