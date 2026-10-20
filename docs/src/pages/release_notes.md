@@ -63,13 +63,15 @@ the repository's `CITATION.bib`, with their original publication author order.
 - **Breaking for some linearized callers:** gas-abundance Jacobian columns are
   the native partial ∂τ/∂VMR = σ·N_dry, with cross sections, CIA and MT_CKD
   held fixed. A solve or Jacobian plan that requests a column whose forward
-  absorption also responds to that abundance (for H₂O: self broadening,
-  multi-node ABSCO H₂O-broadener axes, MT_CKD and CIA; for a variable gas: CIA
-  pairs with it as a collider) now raises an `ArgumentError` naming the omitted
-  terms. Pass `abundance_jacobians=:frozen_cross_section` to the linearized
-  constructor to accept the partial (values are unchanged); fixed humidity
-  (`compute_h2o_jacobians=false`), `fixed_molecules` and fixed-broadener tables
-  need no change.
+  absorption also responds to that abundance (for H₂O: line-by-line self
+  broadening, MT_CKD and CIA; for a variable gas: CIA pairs with it as a
+  collider) now raises an `ArgumentError` naming the omitted terms. Pass
+  `abundance_jacobians=:frozen_cross_section` to the linearized constructor to
+  accept the partial; fixed humidity (`compute_h2o_jacobians=false`),
+  `fixed_molecules` and fixed-broadener tables need no change.
+- The q-driven H₂O Jacobian columns include the exact response of ABSCO
+  tables with a multi-node H₂O-broadener axis (linear VMR interpolation),
+  under both `abundance_jacobians` settings.
 - `model_from_parameters(LinMode(), params)` no longer adds water-vapour line
   absorption when the configuration has no `absorption` block: as in the
   forward constructor, omitting the block means no gas absorption.

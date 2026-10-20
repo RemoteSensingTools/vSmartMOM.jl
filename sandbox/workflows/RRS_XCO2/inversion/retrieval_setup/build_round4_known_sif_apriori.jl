@@ -49,13 +49,15 @@ const ROUND4_ON_ACTIVE_TO_CORE = vcat(collect(1:28), 30)
 const ROUND4_MODEL =
     "round4_known_sif759_acos_mapped_tapered_vertical_correlation"
 const REQUIRED_CO2_MODEL = "acos_mapped_tapered_vertical_correlation"
-const DEFAULT_SOURCE_PRIOR = normpath(joinpath(
-    @__DIR__, "..", "..", "bottom_layer_XCO2_retrievals",
-    "retrieval_setup",
-    "apriori_states_acos_mapped_tapered_vertical_correlation.nc"))
-const DEFAULT_OUTPUT_DIRECTORY = normpath(joinpath(
-    @__DIR__, "..", "..", "bottom_layer_XCO2_retrievals",
-    "round4_known_sif759", "retrieval_setup"))
+# Campaign data live below RRS_XCO2_DATA_ROOT (default: this workflow tree).
+const RRS_ROOT = normpath(get(
+    ENV, "RRS_XCO2_DATA_ROOT", joinpath(@__DIR__, "..", "..")))
+const DEFAULT_SOURCE_PRIOR = joinpath(
+    RRS_ROOT, "bottom_layer_XCO2_retrievals", "retrieval_setup",
+    "apriori_states_acos_mapped_tapered_vertical_correlation.nc")
+const DEFAULT_OUTPUT_DIRECTORY = joinpath(
+    RRS_ROOT, "bottom_layer_XCO2_retrievals",
+    "round4_known_sif759", "retrieval_setup")
 
 default_output_directory() = DEFAULT_OUTPUT_DIRECTORY
 

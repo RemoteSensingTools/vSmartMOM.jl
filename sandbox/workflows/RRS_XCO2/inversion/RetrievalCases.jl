@@ -182,7 +182,7 @@ function require_sif_release_barrier(
         _required_receipt_hash(values, "input_set_sha256", receipt)
         full_truth_root = abspath(get(
             ENV, "FULL_COLUMN_TRUTH_ROOT",
-            joinpath(@__DIR__, "..", "truth_map")))
+            joinpath(RRS_ROOT, "truth_map")))
         full_marker = joinpath(full_truth_root, FULL_SIF_RELEASE_MARKER)
         ispath(full_marker) && error(
             "full-column corrected-SIF publication is in progress: $full_marker")

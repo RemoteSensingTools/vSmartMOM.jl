@@ -28,7 +28,7 @@ export workflow_root,
        print_raman_air_summary
 
 workflow_root() = normpath(joinpath(@__DIR__, ".."))
-repo_root() = normpath(joinpath(workflow_root(), "..", ".."))
+repo_root() = normpath(joinpath(workflow_root(), "..", "..", ".."))
 output_root() = get(ENV, "OCORAMAN_OUTPUT_ROOT", joinpath(workflow_root(), "output"))
 figures_root() = get(ENV, "OCORAMAN_FIGURES_ROOT", joinpath(workflow_root(), "figures"))
 

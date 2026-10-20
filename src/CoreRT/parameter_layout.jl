@@ -16,7 +16,8 @@ Convert to derivatives with respect to those YAML values by dividing the native
 columns by the median radius and geometric width, respectively.
 Gas columns are flattened species-major: all TOA-to-BOA layers for gas 1,
 then all layers for gas 2, and so on. Each is the native partial
-`∂τ/∂VMR = σ·N_dry` described by [`AbundanceTangentContract`](@ref).
+`∂τ/∂VMR = σ·N_dry`, plus ABSCO H₂O-broadener responses in the q-driven H₂O
+columns, as described by [`AbundanceTangentContract`](@ref).
 Surface parameters are followed by the
 optional two-column SIF block `[SIF760, mSIF]` (`[SIF755, slope]` for the
 legacy `SurfaceSIF` interface), then canopy parameters.

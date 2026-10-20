@@ -8,7 +8,7 @@ set -euo pipefail
 #   WAIT_PID=12345 \
 #   WAIT_LOG=/path/to/o2singlet_raman_lut_psurf1000_nadir_TIMESTAMP.log \
 #   CUDA_DEVICE=1 \
-#   nohup workflows/OCORaman/scripts/run_o2singlet_nadir_sequence.sh \
+#   nohup sandbox/workflows/OCORaman/scripts/run_o2singlet_nadir_sequence.sh \
 #     > /path/to/logs/o2singlet_nadir_sequence.out 2>&1 &
 
 WAIT_PID="${WAIT_PID:-}"
@@ -17,7 +17,7 @@ POLL_SECONDS="${POLL_SECONDS:-60}"
 CUDA_DEVICE="${CUDA_DEVICE:-1}"
 PSURF_SEQUENCE="${PSURF_SEQUENCE:-750 500}"
 OUTDIR="${OUTDIR:-/home/sanghavi/data/RamanSIFgrid/O2Singlet}"
-LAUNCHER="workflows/OCORaman/scripts/run_o2singlet_nadir_psurf.sh"
+LAUNCHER="sandbox/workflows/OCORaman/scripts/run_o2singlet_nadir_psurf.sh"
 
 [[ -n "${WAIT_PID}" ]] || { echo "ERROR: WAIT_PID is required" >&2; exit 2; }
 [[ "${WAIT_PID}" =~ ^[0-9]+$ ]] || { echo "ERROR: WAIT_PID must be numeric" >&2; exit 2; }

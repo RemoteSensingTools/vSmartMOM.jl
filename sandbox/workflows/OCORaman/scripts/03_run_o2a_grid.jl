@@ -16,7 +16,7 @@ end
 sza_list = parse_float_list(get(ENV, "OCORAMAN_SZA_LIST", "0,30,50,70"))
 albedo_list = parse_float_list(get(ENV, "OCORAMAN_ALBEDO_LIST", "0.0,0.1,0.3,0.5"))
 yaml = get(ENV, "GRID_YAML",
-    joinpath(repo_root(), "test", "test_parameters", "O2_parameters2_SIF_grid.yaml"))
+    joinpath(repo_root(), "test", "local", "test_parameters", "O2_parameters2_SIF_grid.yaml"))
 batch_id = get(ENV, "OCORAMAN_RUN_ID", run_id("o2a_grid"))
 batch_dir = get(ENV, "OCORAMAN_BATCH_DIR", joinpath(output_root(), batch_id))
 dry_run = get(ENV, "DRY_RUN", "1") != "0"

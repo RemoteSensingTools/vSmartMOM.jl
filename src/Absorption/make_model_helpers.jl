@@ -190,10 +190,13 @@ end
 Create an InterpolationModel from ABSCO tabulated cross-section data.
 
 Linearly interpolates the pre-computed cross-sections onto the specified pressure and
-temperature grids. Uses the ABSCO format (ν, p, T) for the lookup table.
+temperature grids. Uses the ABSCO table layout σ(ν, broadener VMR, T, p).
+Only the first broadener slice (`σ[:, 1, :, :]`, H₂O VMR = 0 in OCO-2 ABSCO
+tables) is used, so the result has no H₂O broadening. Listing the original
+`.hdf` file in `absorption.LUTfiles` keeps the H₂O-broadener axis instead.
 
 # Arguments
-- `absco::AbscoTable`: ABSCO table with cross-sections σ(ν, p, T)
+- `absco::AbscoTable`: ABSCO table with cross-sections σ(ν, broadener VMR, T, p)
 - `wave_grid`: uniform wavenumber grid in cm⁻¹; `wavelength_flag=true` is rejected
   (see the HITRAN method)
 - `p_grid`: Pressure grid (hPa)

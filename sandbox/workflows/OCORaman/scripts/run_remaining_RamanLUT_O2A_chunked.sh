@@ -24,7 +24,7 @@ set -euo pipefail
 #   TEE_CHUNK_LOGS=0
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 cd "${REPO_ROOT}"
 
 : "${PSURF:?Set PSURF, e.g. PSURF=1000 or PSURF=750}"
@@ -96,7 +96,7 @@ for sza_idx in $(seq "${START_SZA_IDX}" "${END_SZA_IDX}"); do
           SZA_IDX="${sza_idx}" \
           ALBEDO_IDXS="${requested_albedos}" \
           OUTDIR="${OUTDIR}" \
-          "${JULIA_BIN}" "${JULIA_FLAGS_ARRAY[@]}" --project=. workflows/OCORaman/scripts/priority_missing_RamanLUT_O2A.jl
+          "${JULIA_BIN}" "${JULIA_FLAGS_ARRAY[@]}" --project=. sandbox/workflows/OCORaman/scripts/priority_missing_RamanLUT_O2A.jl
       )"
       requested_albedos="$(printf '%s' "${requested_albedos}" | tail -n 1)"
     fi
@@ -131,7 +131,7 @@ for sza_idx in $(seq "${START_SZA_IDX}" "${END_SZA_IDX}"); do
         OUTDIR="${OUTDIR}" \
         OUT_NC="${out_nc}" \
         "${resume_flag[@]}" \
-        "${JULIA_BIN}" "${JULIA_FLAGS_ARRAY[@]}" --project=. workflows/OCORaman/scripts/chunked_createRamanLUT_O2A.jl \
+        "${JULIA_BIN}" "${JULIA_FLAGS_ARRAY[@]}" --project=. sandbox/workflows/OCORaman/scripts/chunked_createRamanLUT_O2A.jl \
         2>&1 | tee -a "${log_file}"
     else
       env \
@@ -143,7 +143,7 @@ for sza_idx in $(seq "${START_SZA_IDX}" "${END_SZA_IDX}"); do
         OUTDIR="${OUTDIR}" \
         OUT_NC="${out_nc}" \
         "${resume_flag[@]}" \
-        "${JULIA_BIN}" "${JULIA_FLAGS_ARRAY[@]}" --project=. workflows/OCORaman/scripts/chunked_createRamanLUT_O2A.jl \
+        "${JULIA_BIN}" "${JULIA_FLAGS_ARRAY[@]}" --project=. sandbox/workflows/OCORaman/scripts/chunked_createRamanLUT_O2A.jl \
         >> "${log_file}" 2>&1
     fi
 

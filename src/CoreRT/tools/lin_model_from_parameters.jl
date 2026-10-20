@@ -68,13 +68,22 @@ function _omit_abundance_term!(omitted, i_band, slot, term)
 end
 
 # ABSCO tables of every gas read the profile's H₂O broadener (line-by-line
-# models of other gases take none; see `_default_broadener`).
-function _omit_profile_broadener!(omitted, i_band, absorber, mol_name, profile)
+# models of other gases take none; see `_default_broadener`). The q-driven H₂O
+# columns receive that axis's exact response in both abundance modes; a model
+# that reads the broadener without a tangent records the term as omitted.
+function _profile_broadener_tangent!(τ̇_abs, omitted, i_band, absorber, mol_name,
+                                     grid, vmr, profile)
     (_default_broadener(absorber, profile, 1) === nothing ||
      !_cross_section_uses_broadener(absorber)) && return nothing
-    return _omit_abundance_term!(omitted, i_band, 1,
-        "H₂O-broadener axis of the $(mol_name) ABSCO table")
+    _has_broadener_tangent(absorber) || return _omit_abundance_term!(
+        omitted, i_band, 1, "H₂O-broadener response of the $(mol_name) cross section")
+    return _accumulate_broadener_tangent!(τ̇_abs, 1, absorber, grid, vmr, profile)
 end
+
+# H₂O's own broadener response is in its tangent only for ABSCO tables;
+# line-by-line self broadening is the omitted term.
+_omits_h2o_broadener(model) =
+    _cross_section_uses_broadener(model) && !_has_broadener_tangent(model)
 
 # A CIA pair responds to its collider abundances on this band grid wherever a
 # selected panel tabulates a nonzero cross section, even if a collider's
@@ -174,12 +183,15 @@ This is the **linearized** counterpart of `model_from_parameters(params)`. It co
 - Without an `absorption` block the model has no gas absorption, as in the
   forward constructor (`q` still sets the dry-air column).
 - Native gas columns are the partial `∂τ/∂VMR = σ·N_dry`: line cross
-  sections and the CIA and MT_CKD optical depths are held fixed. Where the
-  forward absorption also responds to that abundance (H₂O self broadening,
-  ABSCO H₂O-broadener axes, MT_CKD, CIA colliders), the default
+  sections and the CIA and MT_CKD optical depths are held fixed. The one
+  exception is ABSCO tables with an H₂O-broadener axis: the q-driven H₂O
+  columns include every such table's response to the H₂O abundance (exact
+  for the linear interpolation in the tabulated VMR). Where the forward
+  absorption responds to an abundance in another way (line-by-line H₂O self
+  broadening, MT_CKD, CIA colliders), the default
   `abundance_jacobians=:complete` rejects solves or plans requesting those
-  columns. Pass `abundance_jacobians=:frozen_cross_section` to accept the
-  native partial explicitly; tangent values are identical in both settings.
+  columns. Pass `abundance_jacobians=:frozen_cross_section` to accept these
+  omissions explicitly; tangent values are identical in both settings.
 - Set `compute_pressure_jacobians=false` for a retrieval with fixed pressure.
   Pressure tangent fields are then `nothing`, not zero sensitivities; use a
   `PlannedRTModelLin` whose layout omits pressure. Full-layout solves reject
@@ -336,7 +348,7 @@ function model_from_parameters(lin::LinMode,
             if h2o_setting === :disabled
                 nothing
             elseif h2o_setting !== nothing
-                h2o_tangent && _cross_section_uses_broadener(h2o_setting) &&
+                h2o_tangent && _omits_h2o_broadener(h2o_setting) &&
                     _omit_abundance_term!(omitted, i_band, 1, _H2O_SELF_BROADENING)
                 if compute_h2o_jacobians
                     @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
@@ -358,7 +370,7 @@ function model_from_parameters(lin::LinMode,
                     cpf = abs_params.CEF,
                     architecture = _to_aa_arch(params.architecture),
                     vmr = 0)
-                h2o_tangent && _cross_section_uses_broadener(absorption_model) &&
+                h2o_tangent && _omits_h2o_broadener(absorption_model) &&
                     _omit_abundance_term!(omitted, i_band, 1, _H2O_SELF_BROADENING)
                 if compute_h2o_jacobians
                     @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
@@ -400,8 +412,9 @@ function model_from_parameters(lin::LinMode,
                             params.spec_bands[i_band],
                             profile.vmr[mol_name],
                             profile; pressure_tangent, vertical_grid)
-                        h2o_tangent && _omit_profile_broadener!(omitted, i_band,
-                            abs_params.luts[i_band][molec_i], mol_name, profile)
+                        h2o_tangent && _profile_broadener_tangent!(τ̇_abs[i_band],
+                            omitted, i_band, abs_params.luts[i_band][molec_i], mol_name,
+                            params.spec_bands[i_band], profile.vmr[mol_name], profile)
                     end
                 end
             end
@@ -439,9 +452,10 @@ function model_from_parameters(lin::LinMode,
                             params.spec_bands[i_band],
                             profile.vmr[mol_name],
                             profile; pressure_tangent, vertical_grid)
-                        h2o_tangent && _omit_profile_broadener!(omitted, i_band,
-                            abs_params.luts[i_band][lut_offset + molec_i],
-                            mol_name, profile)
+                        h2o_tangent && _profile_broadener_tangent!(τ̇_abs[i_band],
+                            omitted, i_band, abs_params.luts[i_band][lut_offset + molec_i],
+                            mol_name, params.spec_bands[i_band], profile.vmr[mol_name],
+                            profile)
                     end
                 end
             end

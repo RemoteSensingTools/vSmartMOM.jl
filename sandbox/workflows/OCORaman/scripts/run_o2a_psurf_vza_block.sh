@@ -10,10 +10,10 @@ set -euo pipefail
 #
 # Typical:
 #   CUDA_DEVICE=1 PSURF=750 VZA_IDXS=1 \
-#     workflows/OCORaman/scripts/run_o2a_psurf_vza_block.sh
+#     sandbox/workflows/OCORaman/scripts/run_o2a_psurf_vza_block.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 cd "${REPO_ROOT}"
 
 : "${PSURF:?Set PSURF, e.g. PSURF=750 or PSURF=1000}"
@@ -146,7 +146,7 @@ export OUTDIR
 export LOGDIR
 export JULIA_FLAGS
 
-workflows/OCORaman/scripts/run_remaining_RamanLUT_O2A_chunked.sh
+sandbox/workflows/OCORaman/scripts/run_remaining_RamanLUT_O2A_chunked.sh
 
 printf '\n[%s] Finished psurf=%s VZA block %s\n' \
   "$(date '+%Y-%m-%d %H:%M:%S %Z')" "${PSURF}" "${TAG}"

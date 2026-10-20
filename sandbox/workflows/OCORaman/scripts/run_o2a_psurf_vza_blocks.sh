@@ -9,10 +9,10 @@ set -euo pipefail
 #
 # Typical:
 #   CUDA_DEVICE=1 PSURF=750 VZA_BLOCKS="$(seq -s ' ' 1 14)" \
-#     workflows/OCORaman/scripts/run_o2a_psurf_vza_blocks.sh
+#     sandbox/workflows/OCORaman/scripts/run_o2a_psurf_vza_blocks.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 cd "${REPO_ROOT}"
 
 : "${PSURF:?Set PSURF, e.g. PSURF=750 or PSURF=1000}"
@@ -46,7 +46,7 @@ for block in ${VZA_BLOCKS}; do
     CHUNK_ALBEDOS="${CHUNK_ALBEDOS}" \
     JULIA_FLAGS="${JULIA_FLAGS}" \
     TEE_CHUNK_LOGS="${TEE_CHUNK_LOGS}" \
-    workflows/OCORaman/scripts/run_o2a_psurf_vza_block.sh
+    sandbox/workflows/OCORaman/scripts/run_o2a_psurf_vza_block.sh
   printf '[%s] Finished psurf=%s VZA block %s on CUDA device %s\n' \
     "$(date '+%Y-%m-%d %H:%M:%S %Z')" "${PSURF}" "${block}" "${CUDA_DEVICE}"
 done

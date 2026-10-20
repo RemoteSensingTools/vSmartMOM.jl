@@ -31,8 +31,10 @@ using .RetrievalCases
 include(joinpath(@__DIR__, "RetrievalState.jl"))
 using .RetrievalState
 
-const DEFAULT_CAMPAIGN_ROOT = normpath(joinpath(
-    @__DIR__, "..", "bottom_layer_XCO2_retrievals"))
+# Campaign data live below RRS_XCO2_DATA_ROOT (default: this workflow tree).
+const DEFAULT_CAMPAIGN_ROOT = joinpath(
+    normpath(get(ENV, "RRS_XCO2_DATA_ROOT", joinpath(@__DIR__, ".."))),
+    "bottom_layer_XCO2_retrievals")
 const ACTIVE_LOG_AOD_INDICES = 14:16
 const REQUIRED_LOG_AOD_VARIANCE = 0.75^2
 const ACTIVE_LOG_AOD_NAMES = [

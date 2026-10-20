@@ -961,7 +961,8 @@ The species list per band is the union of `fixed_molecules` (no Jacobian) and
 `atmospheric_profile.q` is provided, line absorption is computed from
 `profile.vmr_h2o` using `h2o_lut` (if present) or HITRAN-on-the-fly otherwise,
 and is automatically treated as variable in the linearised path. Native gas
-tangents hold cross sections, CIA and MT_CKD fixed; see
+tangents hold cross sections, CIA and MT_CKD fixed (the q-driven H₂O tangent
+includes ABSCO H₂O-broadener axes); see
 [`AbundanceTangentContract`](@ref) for the requests this rejects.
 """
 mutable struct AbsorptionParameters{FM,VM,V,BF,CE,LT,HL}

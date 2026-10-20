@@ -519,8 +519,10 @@ R, T, dR, dT = rt_run(model, lin_model, NAer, NGas, NSurf)
 (Note: the linearized path is pure-elastic — Raman is not linearized.)
 
 Gas-abundance columns are the partial `∂τ/∂VMR = σ·N_dry` with cross sections,
-CIA and MT_CKD held fixed. When the forward absorption also responds to an
-abundance (for the `q`-driven H₂O of Level 3: self broadening, plus MT_CKD and
+CIA and MT_CKD held fixed. The exception is an ABSCO table with an H₂O-broadener
+axis: its exact response to the H₂O abundance is included in the `q`-driven H₂O
+columns. When the forward absorption responds to an abundance in another way
+(for the `q`-driven H₂O of Level 3: line-by-line self broadening, plus MT_CKD and
 CIA when configured), a solve requesting that column raises an
 `ArgumentError` under the default `abundance_jacobians=:complete`. Hold the
 abundance fixed (`compute_h2o_jacobians=false`, or list the gas in

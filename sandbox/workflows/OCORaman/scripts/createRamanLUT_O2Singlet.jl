@@ -8,11 +8,11 @@
 #
 # Dry-run example:
 #   CUDA_DEVICE=1 DRY_RUN=1 julia --project=. \
-#       workflows/OCORaman/scripts/createRamanLUT_O2Singlet.jl
+#       sandbox/workflows/OCORaman/scripts/createRamanLUT_O2Singlet.jl
 #
 # One pressure slice example:
 #   CUDA_DEVICE=1 PSURFS=1000 \
-#       julia --project=. workflows/OCORaman/scripts/createRamanLUT_O2Singlet.jl
+#       julia --project=. sandbox/workflows/OCORaman/scripts/createRamanLUT_O2Singlet.jl
 
 function set_default_env!(key::AbstractString, value::AbstractString)
     haskey(ENV, key) || (ENV[key] = value)
@@ -20,7 +20,7 @@ function set_default_env!(key::AbstractString, value::AbstractString)
 end
 
 const _SCRIPT_DIR = @__DIR__
-const _REPO_ROOT = normpath(joinpath(_SCRIPT_DIR, "..", "..", ".."))
+const _REPO_ROOT = normpath(joinpath(_SCRIPT_DIR, "..", "..", "..", ".."))
 const _HITRAN_LUT_DIR = set_default_env!(
     "VSMARTMOM_HITRAN_LUT_DIR", "/home/sanghavi/data/HITRAN_LUTs")
 
@@ -29,7 +29,7 @@ set_default_env!("BAND_TAG", "O2Singlet")
 set_default_env!("BAND_TITLE", "O2 1.27 micron singlet band (1265-1275 nm)")
 set_default_env!("BAND_OUTPUT_PREFIX", "RamanLUT_O2Singlet_float32_gpu")
 set_default_env!("PARAM_YAML", joinpath(
-    _REPO_ROOT, "workflows", "OCORaman", "config", "paramsRamanLUT_O2Singlet.yaml"))
+    _REPO_ROOT, "sandbox", "workflows", "OCORaman", "config", "paramsRamanLUT_O2Singlet.yaml"))
 set_default_env!("WL_EDGES_NM", "1275,1265")
 set_default_env!("OUTDIR", joinpath(homedir(), "data", "RamanSIFgrid", "O2Singlet"))
 set_default_env!("FULL_VZAS", "0.0")

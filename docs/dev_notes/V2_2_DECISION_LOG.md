@@ -123,6 +123,40 @@ removed or rewritten.
 - Review gate before every commit: focused tests → independent Claude review
   → Codex review (`gpt-6.1-sol`, xhigh) → fixes → re-review.
 
+### 1.8 Decisions of 2026-10-19 (open items of §3 and §3.1)
+
+Taken one by one by Suniti; implementation status is tracked in §3/§3.1.
+
+| # | Item | Decision |
+|---|---|---|
+| 1 | ABSCO 4-D H₂O-broadener axis in the q Jacobian | Implement the exact ∂σ/∂VMR_H₂O term (linear in the tabulated VMR). |
+| 2 | Archived RRS_XCO2 products (dry ABSCO LUTs) | The 4-D tables apply to new campaigns; archives stay, labelled "ABSCO v5.2, dry broadener". |
+| 3a | Aerosols under `FixedAltitudeGrid` | Altitude-defined aerosols stay fixed in altitude (as in the pilot). |
+| 3b | Re-running earlier rounds | Re-run all rounds on v2.2, with 4-D ABSCO and truth maps regenerated with the 4-D tables. |
+| 3c | Desert solves at the 7-iteration limit | Raise the limit for the reruns and repeat the five solves. |
+| 3d | "Release adds dσ/dp" wording | Correct it: dσ/dp is in the core since `36e7d1e0`; only Round 4 and Round 3 SIF-on lacked it. |
+| 4 | R1: RRS band without rotational lines | Raise an `ArgumentError`. |
+| 5 | R2: VS Q-branch Placzek–Teller factor | Check the reference derivation first, then decide. |
+| 6 | R3: VS elastic phase matrix vs SSA | Make them consistent (Cabannes in both). |
+| 7 | R4–R8 | Fix all as cleanup. |
+| 8 | VS `_plus` builder | Use the resolved depolarization; do not mutate `params`. |
+| 9 | Cox–Munk water refractive index | Segelstein (1981), interpolated per spectral point; a vector `n_water` is used element-wise. |
+| 10 | Ross–Li 80° zenith cap | Make it a parameter, default 80°; off reproduces MODIS/VLIDORT. |
+| 11 | NAI2 size-parameter Jacobians | Fixed radius grid (nodes independent of the distribution parameters). |
+| 12 | p_surf tangent of `depol: -1` | Document as neglected (~1e-5 relative). |
+| 13a | O₂ King factor | Keep 1.09 (He et al. 2021). |
+| 13b | Refractive-index fits beyond 468/546 nm | Switch to fits valid through the NIR where the current ones are extrapolated. |
+| 13c | Anisotropy γ | Add the wavelength dependence (N₂, O₂). |
+| 13d | `UsingPolTen` default T | Keep 288.15 K. |
+| 13e | H₂ refractive-index check | Add a test. |
+| 14a | Solar F₀ precedence | Keep kwarg > preset > `model.sources`; a `sources=` call no longer overwrites the preset. |
+| 14b | `rt_run_ss` `hem_T` | Keep diffuse-only. |
+| 14c | Interior upwelling glint | Keep the Fourier-truncated glint; document that the exact glint is TOA-only. |
+| 14d | Canopy BHR-down | Keep (no direct beam); document. |
+| 14e | 1/(μᵢ − μ₀) cancellation | Implement a limit form in the elemental kernels. |
+| 15 | Sign of ε in B_l | Check against Sanghavi (2014) Eq. 16 before choosing the wording. |
+| 16 | Q-sign wording in `conventions.md` §1 | Confirmed. |
+
 ## 2. Explanations kept for later decisions
 
 ### 2.1 Why the Round 6/7 runners are pinned to commit `7acab570`
@@ -245,6 +279,24 @@ decided after comparing the pilot with Round 7 (§3.1).
   variance, B2 shadowing, B3 polarization) are stale, e.g. the outputs of
   `sandbox/workflows/RRS_XCO2/scripts/generate_truth_map_land_glint.jl`;
   regenerate before use.
+- [x] **ABSCO H₂O-broadener tangent (decision 1, §1.8).** The q-driven H₂O
+  columns include `N_dry·VMR·∂σ/∂b·db/dr` for every ABSCO table with a
+  multi-node broadener axis (`_accumulate_broadener_tangent!`) under both
+  `abundance_jacobians` settings, so `:complete` accepts these models and
+  `:frozen_cross_section` changes no values. Checked against central differences on the real v5.2 tables
+  (≤ 4e-8 relative). Note: the forward call passes `r = N_H2O/N_dry` to the
+  O₂/CO₂ tables but the moist mole fraction `r/(1+r)` to the H₂O table; which
+  one the ABSCO `Broadener_01_VMR` axis means is still to be confirmed.
+- [ ] **4-D ABSCO in RRS_XCO2 (decisions 2 and 3b; scope decided by Suniti
+  2026-10-19).** The workflow default stays the dry `.jld2` tables, so
+  existing and archived products never mix with 4-D ones. The 4-D tables enter
+  through the v2.2 rerun campaign: a fresh data root with its own pinned
+  environment that fixes and hashes the five table paths, as
+  `round7_altgrd_environment.sh` does. A generic per-data-root marker and
+  provenance system was drafted and reviewed three times, but left out because
+  each review found new mixing paths (overrides, resumes, concurrency,
+  launchers); the draft is saved in
+  `vsmartmom-release-evidence/2026-10-19/absco_round3_full_WIP.patch`.
 
 ### 3.1 Added by the 2026-10-17 bug audit (results-changing; need Suniti)
 

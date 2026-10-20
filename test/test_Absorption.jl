@@ -502,6 +502,33 @@ end
     @test from_hdf.σ == σ
     @test from_hdf.vmr == h2o_vmr
 
+    # The legacy `loadAbsco` route (used to build `.jld2` interpolation tables)
+    # keeps the table 4-D; reading it with `[:]` used to flatten it.
+    NCDataset(hdf_path, "a") do ds
+        defDim(ds, "one", 1)
+        defVar(ds, "Gas_Index", ["02"], ("one",))
+    end
+    legacy = vSmartMOM.CoreRT.loadAbsco(hdf_path; scale=0.5)
+    @test legacy isa vSmartMOM.Absorption.AbscoTable{FT}
+    @test legacy.mol == 2
+    @test legacy.σ == FT(0.5) .* σ
+    @test legacy.T == T
+    @test legacy.p == p
+    @test legacy.ν == ν
+    # A temperature grid that does not match σ's temperature axis is refused.
+    bad_path = joinpath(tempdir, "co2_bad_temperature.hdf")
+    NCDataset(bad_path, "c") do ds
+        defDim(ds, "nu", length(ν)); defDim(ds, "b", length(h2o_vmr))
+        defDim(ds, "t", size(T, 1)); defDim(ds, "t3", 3); defDim(ds, "p", length(p))
+        defDim(ds, "one", 1)
+        defVar(ds, "Gas_Index", ["02"], ("one",))
+        defVar(ds, "Wavenumber", Float64.(ν), ("nu",))
+        defVar(ds, "Pressure", Float64.(p .* 100), ("p",))
+        defVar(ds, "Temperature", fill(250.0, 3, length(p)), ("t3", "p"))
+        defVar(ds, "Gas_02_Absorption", σ, ("nu", "b", "t", "p"))
+    end
+    @test_throws DimensionMismatch vSmartMOM.CoreRT.loadAbsco(bad_path)
+
     lut_path = joinpath(tempdir, "co2_fixture.absco")
     AtmosphericAbsorption.save_absco_lut(lut_path, lut)
     from_lut = vSmartMOM.IO._load_absorption_lut(lut_path, ν, FT, CPU())

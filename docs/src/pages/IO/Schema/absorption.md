@@ -134,9 +134,10 @@ wing_cutoff = 25
 ```
 
 Set `ENV["ABSCO_ROOT"]` before reading the file. The O₂/CO₂ absorber abundance still multiplies
-optical depth separately. For every ABSCO gas LUT, `profile.vmr_h2o` is automatically passed to the
-table's broadener axis; the H₂O absorber LUT is additionally multiplied by the profile's H₂O VMR.
-H₂O Jacobians do not include this broadener response; see
+optical depth separately. The broadener axis of the O₂/CO₂ tables receives the H₂O ratio
+`r = profile.vmr_h2o`; the H₂O table receives the moist mole fraction `r/(1+r)`, and its optical
+depth is additionally multiplied by `r`.
+The q-driven H₂O Jacobians include this broadener response; see
 [Gas-abundance columns](../../jacobians.md#Gas-abundance-columns).
 
 ## HITRAN edition

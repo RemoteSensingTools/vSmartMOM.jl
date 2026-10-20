@@ -33,15 +33,15 @@
 # Examples:
 #   # Inspect axes, spectral sizes, and timing estimate only:
 #   CUDA_DEVICE=1 DRY_RUN=1 julia --project=. \
-#       workflows/OCORaman/scripts/createRamanLUT_O2A.jl
+#       sandbox/workflows/OCORaman/scripts/createRamanLUT_O2A.jl
 #
 #   # Suggested distributed runs:
 #   CUDA_DEVICE=1 PSURFS=1000 OUT_NC=/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_psurf1000.nc \
-#       julia --project=. workflows/OCORaman/scripts/createRamanLUT_O2A.jl
+#       julia --project=. sandbox/workflows/OCORaman/scripts/createRamanLUT_O2A.jl
 #   CUDA_DEVICE=1 PSURFS=750 OUT_NC=/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_psurf750.nc \
-#       julia --project=. workflows/OCORaman/scripts/createRamanLUT_O2A.jl
+#       julia --project=. sandbox/workflows/OCORaman/scripts/createRamanLUT_O2A.jl
 #   CUDA_DEVICE=1 PSURFS=500 OUT_NC=/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_psurf0500.nc \
-#       julia --project=. workflows/OCORaman/scripts/createRamanLUT_O2A.jl
+#       julia --project=. sandbox/workflows/OCORaman/scripts/createRamanLUT_O2A.jl
 
 using Dates
 using Interpolations
@@ -95,7 +95,7 @@ const CUDA_DEVICE = parse(Int, get(ENV, "CUDA_DEVICE", "1"))
 FORCE && RESUME && error("Use either FORCE=1 or RESUME=1, not both.")
 
 const PARAM_YAML = get(ENV, "PARAM_YAML",
-    joinpath(REPO_ROOT, "workflows", "OCORaman", "config", "paramsRamanLUT_O2A.yaml"))
+    joinpath(REPO_ROOT, "sandbox", "workflows", "OCORaman", "config", "paramsRamanLUT_O2A.yaml"))
 const PROFILE_SOURCE_NOTE =
     "atmospheric_profile.p/T/q copied from ParamsEMIT_MODTRANcomp_newLUT.yaml; " *
     "AFGL 1986 Midlatitude Winter, model/table 1c, on the EMIT/MODTRAN " *

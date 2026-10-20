@@ -333,9 +333,9 @@ dT_dgas1_bottom = dT[:, :, :, gas1_bottom]
 
 ### Gas-abundance columns
 
-Each gas column is the native partial `∂τ/∂VMR = σ·N_dry`. Temperature,
-pressure, the dry-air column, every line cross section, and the CIA and
-MT_CKD optical depths are held fixed. For q-driven H₂O the coordinate is the
+Each gas column is the native partial `∂τ/∂VMR = σ·N_dry` (with the ABSCO
+exception below). Temperature, pressure, the dry-air column, every line cross
+section, and the CIA and MT_CKD optical depths are held fixed. For q-driven H₂O the coordinate is the
 dry-air molar ratio `r = N_H2O/N_dry` at fixed dry column, not `q`.
 
 This partial is the complete derivative of the forward absorption only when
@@ -344,7 +344,7 @@ the exceptions:
 
 | Abundance | Forward response omitted by the native column |
 |:--|:--|
-| q-driven H₂O | self broadening of line-by-line or ABSCO H₂O cross sections; multi-node H₂O-broadener axes of other gases' ABSCO tables; MT_CKD continuum; every CIA pair (through the dry-air number density) |
+| q-driven H₂O | self broadening of line-by-line H₂O cross sections; MT_CKD continuum; every CIA pair (through the dry-air number density) |
 | variable gas | CIA pairs with that gas as a collider, including at zero VMR |
 
 A full-layout solve, or a Jacobian plan, that requests such a column throws
@@ -357,9 +357,17 @@ model, lin_model = model_from_parameters(LinMode(), params;
     abundance_jacobians=:frozen_cross_section)
 ```
 
-The keyword changes no derivative values. Legacy interpolation tables carry a
-fixed broadener abundance, so a q-driven H₂O column computed from them is
-complete with respect to that forward model (unless ABSCO tables, MT_CKD or
+ABSCO tables with a multi-node H₂O-broadener axis (O₂, CO₂ and H₂O itself)
+are the exception to the native partial: the q-driven H₂O columns add each
+table's response `N_dry·VMR·∂σ/∂b·db/dr`, where `b` is the broadener
+abundance passed to the table (`r` for other gases, the moist mole fraction
+`r/(1+r)` for H₂O). It is exact for the table's linear interpolation in the
+tabulated VMR (the slope of the bracketing node interval; zero outside the
+table). It is included under both `abundance_jacobians` settings, so
+`:frozen_cross_section` only accepts the omissions listed in the table above
+and never changes derivative values. Legacy interpolation
+tables carry a fixed broadener abundance, so a q-driven H₂O column computed
+from them is complete with respect to that forward model (unless MT_CKD or
 CIA are also configured in the band); the forward model itself then ignores
 humidity-dependent broadening. When `q ≡ 0`, H₂O absorption is not evaluated
 and the H₂O columns are structural zeros, not derivatives; Jacobian plans may

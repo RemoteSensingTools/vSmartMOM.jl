@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-REPO="${REPO:-/home/sanghavi/code/github/uni_vSmartMOM}"
+REPO="${REPO:-$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../../../.." && pwd)}"
 PSURF="${PSURF:-750}"
 CUDA_DEVICE="${CUDA_DEVICE:-1}"
 OUT_NC="${OUT_NC:-/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_psurf${PSURF}.nc}"
@@ -54,7 +54,7 @@ lut_complete() {
 start_resume() {
     local run_log="$LOGDIR/o2a_raman_lut_${TAG}_resume_$(date '+%Y%m%d_%H%M%S').log"
     log "Starting RESUME=1 PSURFS=$PSURF CUDA_DEVICE=$CUDA_DEVICE OUT_NC=$OUT_NC"
-    setsid bash -lc "cd '$REPO' && exec env RESUME=1 CUDA_DEVICE='$CUDA_DEVICE' PSURFS='$PSURF' OUT_NC='$OUT_NC' julia --project=. workflows/OCORaman/scripts/createRamanLUT_O2A.jl" \
+    setsid bash -lc "cd '$REPO' && exec env RESUME=1 CUDA_DEVICE='$CUDA_DEVICE' PSURFS='$PSURF' OUT_NC='$OUT_NC' julia --project=. sandbox/workflows/OCORaman/scripts/createRamanLUT_O2A.jl" \
         > "$run_log" 2>&1 < /dev/null &
     local pid="$!"
     log "Started PID=$pid log=$run_log"

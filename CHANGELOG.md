@@ -146,17 +146,27 @@ review of General's sequential-version rule.
   non-fatal.
 - **Breaking for some linearized callers:** gas-abundance Jacobian columns
   are the native partial ∂τ/∂VMR = σ·N_dry
-  with cross sections, CIA and MT_CKD held fixed. Solves and Jacobian plans
+  with cross sections, CIA and MT_CKD held fixed (except the ABSCO
+  H₂O-broadener term below). Solves and Jacobian plans
   that request a column whose forward absorption also responds to that
   abundance now raise an `ArgumentError` naming the omitted terms (for H₂O:
-  self broadening, multi-node ABSCO H₂O-broadener axes, MT_CKD and CIA; for
-  a variable gas: CIA pairs with it as a collider). Pass
-  `abundance_jacobians=:frozen_cross_section` to accept the partial (values
-  are unchanged); fixed humidity (`compute_h2o_jacobians=false`),
-  `fixed_molecules` and fixed-broadener tables need no change. Plans may not
-  select q-driven H₂O columns when q ≡ 0. In one HITRAN2016 check the native
-  H₂O column differed from the complete response by 4.4% (q = 0.0125) and
-  8.1% (q = 0.025).
+  line-by-line self broadening, MT_CKD and CIA; for a variable gas: CIA pairs
+  with it as a collider). Pass `abundance_jacobians=:frozen_cross_section` to
+  accept the partial (values are unchanged); fixed humidity
+  (`compute_h2o_jacobians=false`), `fixed_molecules` and fixed-broadener
+  tables need no change. Plans may not select q-driven H₂O columns when
+  q ≡ 0. In one HITRAN2016 check the native H₂O column differed from the
+  complete response by 4.4% (q = 0.0125) and 8.1% (q = 0.025).
+- The q-driven H₂O Jacobian columns include the exact response of every
+  ABSCO table with a multi-node H₂O-broadener axis (O₂, CO₂ and H₂O itself)
+  under both `abundance_jacobians` settings, so these tables are accepted
+  under `:complete`. In one check on the ABSCO v5.2 tables (RRS_XCO2
+  16-layer profile), the term's share of the q-driven H₂O column, at its
+  largest over the layers, reached 99 % (O₂ A), 15 % (weak CO₂) and 5 %
+  (strong CO₂).
+- `CoreRT.loadAbsco` reads the full 4-D ABSCO table again (NCDatasets 0.14
+  flattens a variable read with `[:]`) and checks its dimensions; the `.jld2` tables built
+  from it by `make_interpolation_model` hold only the H₂O VMR = 0 slice.
 - A nonzero `radiative_transfer.Δ_angle` (the retired δBGE exclusion cone)
   is still accepted but is now stored as 0 with a one-time warning, so the
   parsed parameters and their display match what the fit uses.
@@ -192,6 +202,13 @@ review of General's sequential-version rule.
   bottom boundary moves) remains the default and is unchanged. The Round
   7_altgrd pilot campaign and its report are under
   `sandbox/workflows/RRS_XCO2/inversion/`.
+- RRS_XCO2 workflow: six scripts that assumed data next to the code (the
+  Round 4/5 prior builders and their tests, `validate_bottom_layer_retrievals`,
+  and the `RetrievalCases` `FULL_COLUMN_TRUTH_ROOT` fallback) now resolve it
+  below `RRS_XCO2_DATA_ROOT`, and the OCORaman workflow project and scripts find the
+  repository from `sandbox/workflows/OCORaman`. The workflow keeps the
+  converted dry ABSCO `.jld2` tables as its default; the original 4-D tables
+  enter through the v2.2 rerun campaign's own pinned environment.
 - TOML configurations accept arrays that mix integers and floats (e.g.
   `vza = [60, 45.5]`), as YAML already did; `${ENV:NAME}` markers in
   `cia_files` and `mtckd_file` now resolve like those in `LUTfiles`; surplus

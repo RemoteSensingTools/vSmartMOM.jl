@@ -4,7 +4,7 @@ set -euo pipefail
 # Run one nadir-only O2 singlet Raman LUT pressure slice.
 #
 # Required/typical environment:
-#   PSURF=1000 CUDA_DEVICE=1 workflows/OCORaman/scripts/run_o2singlet_nadir_psurf.sh
+#   PSURF=1000 CUDA_DEVICE=1 sandbox/workflows/OCORaman/scripts/run_o2singlet_nadir_psurf.sh
 #
 # Optional:
 #   OUTDIR=/home/sanghavi/data/RamanSIFgrid/O2Singlet
@@ -65,5 +65,5 @@ env \
   FULL_VZAS="0.0" \
   VZA_IDXS="1" \
   RAZS="0.0" \
-  julia ${JULIA_FLAGS} --project=. workflows/OCORaman/scripts/createRamanLUT_O2Singlet.jl \
+  julia ${JULIA_FLAGS} --project=. sandbox/workflows/OCORaman/scripts/createRamanLUT_O2Singlet.jl \
   2>&1 | tee "${LOG}"

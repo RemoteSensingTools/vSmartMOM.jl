@@ -214,6 +214,24 @@ end
         @test same(implicit.τ̇_abs_psurf[1], golden["$(kind)_tau_abs_psurf"])
         @test same(implicit.τ̇_rayl_psurf[1], golden["$(kind)_tau_rayl_psurf"])
         @test same(implicit.τ̇_aer_psurf[1], golden["$(kind)_tau_aer_psurf"])
+        if kind === :absco
+            # 7acab570 had no ABSCO H₂O-broadener term in the q-driven H₂O
+            # columns; removing exactly that term must restore its Jacobian.
+            profile, grid = model.profile, params.spec_bands[1]
+            broadener = zero(implicit.τ̇_abs[1])
+            absorber = params.absorption_params.luts[1][1]
+            for gas in ("CO2", "CH4")
+                CoreRT._accumulate_broadener_tangent!(
+                    broadener, 1, absorber, grid, profile.vmr[gas], profile)
+            end
+            r = profile.vmr_h2o
+            CoreRT._accumulate_broadener_tangent!(
+                broadener, 1, params.absorption_params.h2o_lut[1], grid, r, profile;
+                broadener=r ./ (1 .+ r), dbroadener_dr=inv.((1 .+ r) .^ 2))
+            @test any(!iszero, broadener)
+            implicit = deepcopy(implicit)
+            implicit.τ̇_abs[1] .-= broadener
+        end
         result = rt_run(model, implicit, 2, size(implicit.τ̇_abs[1], 1), 1)
         @test Array(result.toa) ≈ golden["$(kind)_toa"] rtol=1e-13
         @test Array(result.toa_jacobian) ≈ golden["$(kind)_toa_jacobian"] rtol=1e-12

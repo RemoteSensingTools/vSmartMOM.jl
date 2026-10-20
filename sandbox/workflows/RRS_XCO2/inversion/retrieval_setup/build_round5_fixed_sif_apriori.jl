@@ -48,13 +48,15 @@ const ROUND5_ACTIVE_TO_CORE = collect(1:28)
 const STRATOSPHERIC_SIGMA_SCALE = 0.1
 const ROUND5_MODEL =
     "round5_fixed_sif759_msif_tight_utls_acos_mapped_tapered_vertical_correlation"
-const DEFAULT_SOURCE_PRIOR = normpath(joinpath(
-    @__DIR__, "..", "..", "bottom_layer_XCO2_retrievals",
-    "retrieval_setup",
-    "apriori_states_acos_mapped_tapered_vertical_correlation.nc"))
-const DEFAULT_OUTPUT_DIRECTORY = normpath(joinpath(
-    @__DIR__, "..", "..", "bottom_layer_XCO2_retrievals",
-    "round5_fixed_sif", "retrieval_setup"))
+# Campaign data live below RRS_XCO2_DATA_ROOT (default: this workflow tree).
+const RRS_ROOT = normpath(get(
+    ENV, "RRS_XCO2_DATA_ROOT", joinpath(@__DIR__, "..", "..")))
+const DEFAULT_SOURCE_PRIOR = joinpath(
+    RRS_ROOT, "bottom_layer_XCO2_retrievals", "retrieval_setup",
+    "apriori_states_acos_mapped_tapered_vertical_correlation.nc")
+const DEFAULT_OUTPUT_DIRECTORY = joinpath(
+    RRS_ROOT, "bottom_layer_XCO2_retrievals",
+    "round5_fixed_sif", "retrieval_setup")
 const EXPECTED_SOURCE_ACTIVE = vcat(1, collect(6:34))
 const EXPECTED_SOURCE_CO2_MODEL =
     "acos_mapped_tapered_vertical_correlation"

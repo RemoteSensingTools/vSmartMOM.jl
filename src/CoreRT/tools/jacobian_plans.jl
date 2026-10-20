@@ -271,7 +271,8 @@ function _require_complete_abundance_tangents(contract::AbundanceTangentContract
                                  "list $species in fixed_molecules"
         throw(ArgumentError(
             "band $i_band requests $species abundance Jacobians, but the native " *
-            "tangent ∂τ/∂VMR = σ·N_dry omits the forward response of: " *
+            "tangent ∂τ/∂VMR = σ·N_dry (plus, for q-driven H₂O, the response " *
+            "of ABSCO H₂O-broadener axes) omits the forward response of: " *
             join(terms, "; ") * ". Hold the abundance fixed ($hold_fixed), " *
             "omit its columns from the Jacobian plan, or build the model with " *
             "abundance_jacobians=:frozen_cross_section to accept this partial derivative"))

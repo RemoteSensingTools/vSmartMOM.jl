@@ -15,14 +15,14 @@ set -uo pipefail
 #
 # Typical:
 #   PSURF=750 CUDA_HOME=/usr/local/cuda CUDA_DEVICE=1 \
-#   nohup workflows/OCORaman/scripts/watch_priority_RamanLUT.sh \
+#   nohup sandbox/workflows/OCORaman/scripts/watch_priority_RamanLUT.sh \
 #     > /home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_priority_psurf0750_rgb/logs/watchdog.out 2>&1 &
 #
 #   PSURF=1000 CUDA_HOME=/usr/local/cuda CUDA_DEVICE=1 \
-#   nohup workflows/OCORaman/scripts/watch_priority_RamanLUT.sh \
+#   nohup sandbox/workflows/OCORaman/scripts/watch_priority_RamanLUT.sh \
 #     > /home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_priority_psurf1000_rgb/logs/watchdog.out 2>&1 &
 
-REPO="${REPO:-/home/sanghavi/code/github/uni_vSmartMOM}"
+REPO="${REPO:-$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../../../.." && pwd)}"
 PSURF="${PSURF:-750}"
 CUDA_DEVICE="${CUDA_DEVICE:-1}"
 CUDA_HOME="${CUDA_HOME:-/usr/local/cuda}"
@@ -42,7 +42,7 @@ EVENT_CSV="${EVENT_CSV:-${LOGDIR}/priority_psurf${PSURF_TAG}_rt_scene_timings.cs
 PIDFILE="${PIDFILE:-${LOGDIR}/priority_psurf${PSURF_TAG}_watchdog.pid}"
 LOCKFILE="${LOCKFILE:-${LOGDIR}/priority_psurf${PSURF_TAG}_watchdog.lock}"
 NOHUP_DRIVER_LOG="${NOHUP_DRIVER_LOG:-${LOGDIR}/nohup_driver.log}"
-WRAPPER="${WRAPPER:-workflows/OCORaman/scripts/run_priority_o2a_psurf${PSURF_WRAPPER_TAG}_rgb.sh}"
+WRAPPER="${WRAPPER:-sandbox/workflows/OCORaman/scripts/run_priority_o2a_psurf${PSURF_WRAPPER_TAG}_rgb.sh}"
 
 mkdir -p "${LOGDIR}" "${OUTDIR}"
 
@@ -86,7 +86,7 @@ run_complete() {
                 SZA_IDX="${sza_idx}" \
                 ALBEDO_IDXS="${PRIORITY_ALBEDO_IDXS}" \
                 OUTDIR="${OUTDIR}" \
-                "${JULIA_BIN}" ${JULIA_FLAGS} --project=. workflows/OCORaman/scripts/priority_missing_RamanLUT_O2A.jl \
+                "${JULIA_BIN}" ${JULIA_FLAGS} --project=. sandbox/workflows/OCORaman/scripts/priority_missing_RamanLUT_O2A.jl \
                 2>/dev/null | tail -n 1
         )"
         [[ -n "${missing}" ]] && return 1

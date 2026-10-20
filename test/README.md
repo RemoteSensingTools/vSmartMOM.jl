@@ -44,7 +44,7 @@ CPU; they do not add cases.
 | `test_absorption_batched.jl` | optional | Batched vs per-layer absorption on a real ABSCO table; activates the package environment, needs an AtmosphericAbsorption API newer than the pinned 0.1.2, and exits 0 without testing when that API or the table is absent |
 | `test_absorption_column_integration.jl` | active | Column-exact CIA and MT_CKD integration; external-file cases are `@test_skip` when `VSMARTMOM_TEST_O2_O2_CIA` / `VSMARTMOM_TEST_MTCKD` files are absent |
 | `test_absorption_pressure.jl` | active + flagged | Pressure derivatives of line/LUT cross sections; CUDA arm under `CUDA` |
-| `test_abundance_jacobian_contract.jl` | active | Gas-abundance Jacobian contract: columns whose forward absorption also responds to the abundance (self broadening, ABSCO broadener axes, MT_CKD, CIA) are rejected unless `abundance_jacobians=:frozen_cross_section` |
+| `test_abundance_jacobian_contract.jl` | active | Gas-abundance Jacobian contract: columns whose forward absorption also responds to the abundance (line-by-line self broadening, MT_CKD, CIA) are rejected unless `abundance_jacobians=:frozen_cross_section`; exact ABSCO H₂O-broadener term (FD-checked) |
 | `test_aerosol_reference.jl` | active | Normalized size-distribution tangents |
 | `test_aqua.jl` | active | Aqua package health |
 | `test_batched_kernels.jl` | active + flagged | Batched solve/inverse mutation contract; smoke arm under `Metal` |

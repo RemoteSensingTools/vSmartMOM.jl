@@ -222,13 +222,16 @@ end
 Records what the native gas-abundance tangents `τ̇_abs` omit. Each native gas
 column is the partial `∂τ/∂VMR = σ·N_dry`: it differentiates the explicit
 abundance factor of line/LUT absorption with every cross section, CIA and
-MT_CKD optical depth held fixed. `omitted[i_band][igas]` lists the forward
+MT_CKD optical depth held fixed. The q-driven H₂O columns also include the
+exact response of ABSCO H₂O-broadener axes, which is therefore never listed
+as omitted. `omitted[i_band][igas]` lists the forward
 terms of band `i_band` that nevertheless respond to native gas slot `igas`
 (slot 1 is q-driven H₂O, slot `1+i` is `variable_molecules[i_band][i]`).
 
 With `abundance_jacobians == :complete` (the default), a solve or Jacobian
 plan that requests a slot with omitted terms is rejected. `:frozen_cross_section`
-accepts the documented native partial explicitly. When `q ≡ 0`, H₂O absorption
+accepts those omissions explicitly; the tangent values are identical in both
+settings. When `q ≡ 0`, H₂O absorption
 is not evaluated and the q-driven H₂O columns are structural zeros rather than
 derivatives; Jacobian plans may not select them.
 

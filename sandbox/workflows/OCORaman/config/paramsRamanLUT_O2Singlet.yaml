@@ -1,11 +1,11 @@
 # =================================================================
 # paramsRamanLUT_O2Singlet.yaml
 #
-# Dedicated input template for workflows/OCORaman/scripts/createRamanLUT_O2Singlet.jl.
+# Dedicated input template for sandbox/workflows/OCORaman/scripts/createRamanLUT_O2Singlet.jl.
 #
 # Atmospheric profile provenance for manuscript notes:
 #   The p/T/q values below were copied from
-#   test/test_parameters/ParamsEMIT_MODTRANcomp_newLUT.yaml. They trace to
+#   test/local/test_parameters/ParamsEMIT_MODTRANcomp_newLUT.yaml. They trace to
 #   AFGL 1986 Midlatitude Winter, model/table 1c, carried through the
 #   EMIT/MODTRAN comparison workflow on a 20 hPa grid from 20.01 to
 #   1080.01 hPa. T and specific humidity q are layer-mid values; H2O VMR is

@@ -383,7 +383,10 @@ end
                                     absorption_model, grid, profile)
 
 Linearized H₂O line-absorption accumulation using the same layerwise moist
-H₂O mole fraction for self broadening as the forward path.
+H₂O mole fraction for self broadening as the forward path. An ABSCO table's
+H₂O-broadener response is added to the H₂O column (see
+`_accumulate_broadener_tangent!`); line-by-line self broadening is not
+differentiated.
 """
 function compute_h2o_absorption_profile!(τ_abs::Array{FT,2},
                                          τ̇_abs::Array{FT,3},
@@ -394,7 +397,85 @@ function compute_h2o_absorption_profile!(τ_abs::Array{FT,2},
                                          pressure_tangent=nothing,
                                          vertical_grid::AbstractVerticalGridConvention=FixedPressureGrid()) where FT
     x_h2o = _h2o_moist_mole_fraction.(profile.vmr_h2o)
-    return compute_absorption_profile!(
+    compute_absorption_profile!(
         τ_abs, τ̇_abs, jac_idx, absorption_model, grid,
         profile.vmr_h2o, profile; self_broadener_vmr=x_h2o, pressure_tangent, vertical_grid)
+    # The broadener is x = r/(1+r) of the H₂O ratio r, so dx/dr = 1/(1+r)².
+    # The call above assigns the H₂O rows (`=`) and every broadener response
+    # is added to them (`.+=`), so each band's H₂O block must run before the
+    # other gases' (as in `model_from_parameters(::LinMode, ...)`).
+    _accumulate_broadener_tangent!(
+        τ̇_abs, jac_idx, absorption_model, grid, profile.vmr_h2o, profile;
+        broadener=x_h2o, dbroadener_dr=inv.((1 .+ profile.vmr_h2o) .^ 2))
+    return nothing
 end
+
+"""
+    _absorption_broadener_derivative(model, grid, p, T, broadener)
+
+Cross-section derivative with respect to the H₂O broadener abundance at fixed
+pressure and temperature, for tables that tabulate that abundance.
+"""
+function _absorption_broadener_derivative end
+
+# ABSCO interpolates linearly in its broadener VMR, so dσ/dvmr is the slope of
+# the bracketing interval at the layer's (p, T). Evaluating the two nodes
+# through the public API keeps the pressure, temperature and spectral rules of
+# the forward call, as `_absorption_pressure_derivative` does for pressure.
+# The interval is AA's own bracket: the right one at an interior node, and the
+# first one at the lower node, which is the physical bound VMR = 0. Outside the
+# table the forward query clamps, so the derivative is zero.
+function _absorption_broadener_derivative(model::AtmosphericAbsorption.AbscoLUT{FT},
+                                          grid, p, T, broadener) where FT
+    nodes = model.vmr
+    b = FT(broadener)
+    if length(nodes) < 2 || b < first(nodes) || b > last(nodes)
+        return zeros(FT, length(grid))
+    end
+    lo = clamp(searchsortedlast(nodes, b), 1, length(nodes) - 1)
+    hi = lo + 1
+    σlo = _layer_absorption_cross_section(model, grid, p, T, nodes[lo])
+    σhi = _layer_absorption_cross_section(model, grid, p, T, nodes[hi])
+    return Array((σhi .- σlo) ./ (nodes[hi] - nodes[lo]))
+end
+
+"""
+    _accumulate_broadener_tangent!(τ̇_abs, h2o_idx, model, grid, vmr, profile;
+                                   broadener=nothing, dbroadener_dr=nothing)
+
+Add an absorber's H₂O-broadener response, `N_dry·vmr·(∂σ/∂b)·(db/dr)`, to the
+q-driven H₂O columns (gas slot `h2o_idx`) of `τ̇_abs`, where `r` is the H₂O
+ratio `profile.vmr_h2o`. `broadener` is the per-layer abundance `b` that the
+forward call passed (`nothing`: the model's default, `b = r` for ABSCO) and
+`dbroadener_dr` its derivative (`nothing`: 1). A no-op for models whose cross
+section does not interpolate a broadener axis.
+"""
+_accumulate_broadener_tangent!(τ̇_abs, h2o_idx, model, grid, vmr, profile;
+                               broadener=nothing, dbroadener_dr=nothing) = nothing
+
+function _accumulate_broadener_tangent!(τ̇_abs, h2o_idx,
+                                        model::AtmosphericAbsorption.AbscoLUT,
+                                        grid, vmr, profile;
+                                        broadener=nothing, dbroadener_dr=nothing)
+    _cross_section_uses_broadener(model) || return nothing
+    Nz = length(profile.p_full)
+    for iz in 1:Nz
+        abundance = vmr isa AbstractArray ? vmr[iz] : vmr
+        iszero(abundance) && continue
+        b = broadener === nothing ? _default_broadener(model, profile, iz) :
+            broadener isa AbstractArray ? broadener[iz] : broadener
+        db = dbroadener_dr === nothing ? one(abundance) :
+             dbroadener_dr isa AbstractArray ? dbroadener_dr[iz] : dbroadener_dr
+        σb = _absorption_broadener_derivative(
+            model, grid, profile.p_full[iz], profile.T[iz], b)
+        # Species-major flattened ordering, as in compute_absorption_profile!.
+        gas_layer_idx = (h2o_idx - 1) * Nz + iz
+        view(τ̇_abs, gas_layer_idx, :, iz) .+= σb .* (profile.vcd_dry[iz] * abundance * db)
+    end
+    return nothing
+end
+
+# Whether `_accumulate_broadener_tangent!` differentiates the model's
+# broadener response (ABSCO axes); line-by-line self broadening is omitted.
+_has_broadener_tangent(model) = false
+_has_broadener_tangent(::AtmosphericAbsorption.AbscoLUT) = true

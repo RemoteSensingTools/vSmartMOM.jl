@@ -1057,17 +1057,26 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 end
 
 function loadAbsco(file; scale=(1.0))
-    absco = Dataset(file)
-    mol = absco["Gas_Index"][1]
-    
-    cs_name = "Gas_"* mol * "_Absorption"
-    # Loading cross sections:
-    σ = Float32(scale)*absco[cs_name][:]
-    # Temperature
-    T = absco["Temperature"][:]
-    p = absco["Pressure"][:]/100
-    ν = absco["Wavenumber"][:]
-    return Absorption.AbscoTable(parse(Int,mol), -1, ν, σ, p, T )
+    # Index every dimension: NCDatasets flattens an N-D variable read with `[:]`.
+    Dataset(file) do absco
+        mol = absco["Gas_Index"][1]
+
+        cs_name = "Gas_"* mol * "_Absorption"
+        # Loading cross sections σ(ν, broadener (H₂O) VMR, T, p):
+        σ = absco[cs_name][:, :, :, :]
+        σ .*= Float32(scale)
+        # Temperature (T, p); grids take σ's float type, as `AbscoTable{FT}` requires
+        FT = eltype(σ)
+        T = FT.(absco["Temperature"][:, :])
+        p = FT.(absco["Pressure"][:])/100
+        ν = absco["Wavenumber"][:]
+        size(σ, 1) == length(ν) && size(T) == (size(σ, 3), length(p)) &&
+            size(σ, 4) == length(p) || throw(DimensionMismatch(
+            "$file: $cs_name has size $(size(σ)); expected (ν, broadener, T, p) = " *
+            "($(length(ν)), :, $(size(T, 1)), $(length(p))) from Wavenumber, " *
+            "Temperature $(size(T)) and Pressure"))
+        return Absorption.AbscoTable(parse(Int,mol), -1, ν, σ, p, T )
+    end
 end
 "Linear interpolation weights on the native wavenumber coordinate."
 @inline _spectral_weight(ν, ν₀, ν₁) = (ν - ν₀) / (ν₁ - ν₀)

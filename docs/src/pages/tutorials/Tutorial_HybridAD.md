@@ -231,7 +231,7 @@ The hybrid AD architecture gives you flexibility:
 | Mie optics | Hand-linearized `LinMode()` | Supported production path |
 | Surface albedo | Analytic (trivial) | Simple scalar derivative |
 | Surface pressure | Profile/column plus line/LUT pressure response | Default `FixedPressureGrid()` moves only the bottom interface; `FixedAltitudeGrid()` is opt-in via `vertical_grid`; see the Jacobian guide |
-| Gas VMR | Analytic native partial ∂τ_abs/∂VMR = σ·N_dry, cross sections held fixed | Simple scaling; see [Gas-abundance columns](../jacobians.md#Gas-abundance-columns) |
+| Gas VMR | Analytic native partial ∂τ_abs/∂VMR = σ·N_dry, cross sections held fixed (q-driven H₂O also includes the exact ABSCO H₂O-broadener response) | Simple scaling; see [Gas-abundance columns](../jacobians.md#Gas-abundance-columns) |
 | Aerosol profiles | Analytic | Already validated in atmo_prof_lin.jl |
 
 The `ParameterLayout` struct generalizes the index arithmetic, and

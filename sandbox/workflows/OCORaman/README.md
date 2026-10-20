@@ -13,14 +13,14 @@ turning research products into package internals.
 From the repository root:
 
 ```bash
-julia --project=workflows/OCORaman -e 'using Pkg; Pkg.instantiate()'
+julia --project=sandbox/workflows/OCORaman -e 'using Pkg; Pkg.instantiate()'
 ```
 
 The workflow project uses the local checkout through:
 
 ```toml
 [sources]
-vSmartMOM = {path = "../.."}
+vSmartMOM = {path = "../../.."}
 ```
 
 Optional packages from the old `OCORaman/src/OCOPlots` layer, such as
@@ -32,19 +32,19 @@ GPU output generation are not blocked by old plotting dependencies.
 ## 1. Cabannes/Rayleigh Sanity Numbers
 
 ```bash
-julia --project=workflows/OCORaman \
-  workflows/OCORaman/scripts/01_cabannes_sanity.jl
+julia --project=sandbox/workflows/OCORaman \
+  sandbox/workflows/OCORaman/scripts/01_cabannes_sanity.jl
 ```
 
 Useful overrides:
 
 ```bash
 WAVELENGTH_NM_LIST=760,765 TEMPERATURE_K=296 \
-  julia --project=workflows/OCORaman \
-  workflows/OCORaman/scripts/01_cabannes_sanity.jl
+  julia --project=sandbox/workflows/OCORaman \
+  sandbox/workflows/OCORaman/scripts/01_cabannes_sanity.jl
 ```
 
-Outputs go under `workflows/OCORaman/output/` by default, or under
+Outputs go under `sandbox/workflows/OCORaman/output/` by default, or under
 `OCORAMAN_OUTPUT_ROOT` when set.
 
 ## 2. One O2 A-Band GPU Smoke Output
@@ -54,10 +54,10 @@ This wraps the current unified driver:
 `test/benchmarks/creategrid_O2Aband_RamanSIF.jl`
 
 ```bash
-GRID_YAML=test/test_parameters/O2_parameters2_SIF_grid.yaml \
+GRID_YAML=test/local/test_parameters/O2_parameters2_SIF_grid.yaml \
 SZA=19 ALBEDO=0.0 SIF_ON=1 \
-julia --project=workflows/OCORaman \
-  workflows/OCORaman/scripts/02_o2a_smoke_output.jl
+julia --project=sandbox/workflows/OCORaman \
+  sandbox/workflows/OCORaman/scripts/02_o2a_smoke_output.jl
 ```
 
 The default `O2_parameters2_SIF_grid.yaml` is configured for
@@ -71,8 +71,8 @@ large jobs.
 ```bash
 OCORAMAN_SZA_LIST=0,30,50,70 \
 OCORAMAN_ALBEDO_LIST=0.0,0.1,0.3,0.5 \
-julia --project=workflows/OCORaman \
-  workflows/OCORaman/scripts/03_run_o2a_grid.jl
+julia --project=sandbox/workflows/OCORaman \
+  sandbox/workflows/OCORaman/scripts/03_run_o2a_grid.jl
 ```
 
 Launch the cases explicitly:
@@ -81,24 +81,24 @@ Launch the cases explicitly:
 DRY_RUN=0 \
 OCORAMAN_SZA_LIST=0,30,50,70 \
 OCORAMAN_ALBEDO_LIST=0.0,0.1,0.3,0.5 \
-julia --project=workflows/OCORaman \
-  workflows/OCORaman/scripts/03_run_o2a_grid.jl
+julia --project=sandbox/workflows/OCORaman \
+  sandbox/workflows/OCORaman/scripts/03_run_o2a_grid.jl
 ```
 
 ## 4. Quicklook Plot
 
 ```bash
 GRID_FILE=/path/to/rrs_grid_sza19p0_alb0p0_sifon.jld2 \
-julia --project=workflows/OCORaman \
-  workflows/OCORaman/scripts/04_plot_grid_quicklook.jl
+julia --project=sandbox/workflows/OCORaman \
+  sandbox/workflows/OCORaman/scripts/04_plot_grid_quicklook.jl
 ```
 
 or:
 
 ```bash
 GRID_OUTDIR=/path/to/grid/output \
-julia --project=workflows/OCORaman \
-  workflows/OCORaman/scripts/04_plot_grid_quicklook.jl
+julia --project=sandbox/workflows/OCORaman \
+  sandbox/workflows/OCORaman/scripts/04_plot_grid_quicklook.jl
 ```
 
 ## 5. Full O2 A-Band Float32 NetCDF LuT
@@ -107,15 +107,15 @@ The current replacement for hand-edited `O2_parameters2_SIF_grid.yaml` runs is:
 
 ```bash
 CUDA_DEVICE=1 DRY_RUN=1 julia --project=. \
-  workflows/OCORaman/scripts/createRamanLUT_O2A.jl
+  sandbox/workflows/OCORaman/scripts/createRamanLUT_O2A.jl
 ```
 
 It generates two broad O2 A-band chunks with 250 cm^-1 Raman shoulders, writes
 only the unshouldered 740-785 nm output, uses `Float32`, and stores
 Rayleigh/Cabannes/RRS Stokes `{I,Q,U}`, `F0`, zero `SIF0`, `tau_rayl`,
 `tau_abs`, and the generated `p/T/q` profiles in NetCDF. The dedicated input
-template is `workflows/OCORaman/config/paramsRamanLUT_O2A.yaml`, whose `p/T/q`
-values were copied from `test/test_parameters/ParamsEMIT_MODTRANcomp_newLUT.yaml`
+template is `sandbox/workflows/OCORaman/config/paramsRamanLUT_O2A.yaml`, whose `p/T/q`
+values were copied from `test/local/test_parameters/ParamsEMIT_MODTRANcomp_newLUT.yaml`
 and trace to the AFGL 1986 Midlatitude Winter profile used by the EMIT/MODTRAN
 comparison workflow. O2 absorption uses ABSCO; q-driven H2O absorption uses the
 rebuilt HITRAN H2O LUT.
@@ -124,13 +124,13 @@ Suggested distributed pressure slices:
 
 ```bash
 CUDA_DEVICE=1 PSURFS=1000 OUT_NC=/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_psurf1000.nc \
-  julia --project=. workflows/OCORaman/scripts/createRamanLUT_O2A.jl
+  julia --project=. sandbox/workflows/OCORaman/scripts/createRamanLUT_O2A.jl
 
 CUDA_DEVICE=1 PSURFS=750 OUT_NC=/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_psurf750.nc \
-  julia --project=. workflows/OCORaman/scripts/createRamanLUT_O2A.jl
+  julia --project=. sandbox/workflows/OCORaman/scripts/createRamanLUT_O2A.jl
 
 CUDA_DEVICE=1 PSURFS=500 OUT_NC=/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_psurf0500.nc \
-  julia --project=. workflows/OCORaman/scripts/createRamanLUT_O2A.jl
+  julia --project=. sandbox/workflows/OCORaman/scripts/createRamanLUT_O2A.jl
 ```
 
 Run `DRY_RUN=1` first: the full default grid is very large

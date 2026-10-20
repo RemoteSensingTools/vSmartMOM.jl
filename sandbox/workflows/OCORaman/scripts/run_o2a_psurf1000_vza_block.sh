@@ -11,11 +11,11 @@ set -euo pipefail
 #   VZA_IDXS=2:3          # one-based indices into FULL_VZAS
 #
 # Typical:
-#   CUDA_DEVICE=0 nohup workflows/OCORaman/scripts/run_o2a_psurf1000_vza_block.sh \
+#   CUDA_DEVICE=0 nohup sandbox/workflows/OCORaman/scripts/run_o2a_psurf1000_vza_block.sh \
 #       > /home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_vza_psurf1000/vza002-003/logs/nohup.out 2>&1 &
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 cd "${REPO_ROOT}"
 
 : "${VZA_IDXS:?Set VZA_IDXS, e.g. VZA_IDXS=2:3}"
@@ -119,7 +119,7 @@ env \
   OUTDIR="${OUTDIR}" \
   LOGDIR="${LOGDIR}" \
   JULIA_FLAGS="${JULIA_FLAGS}" \
-  workflows/OCORaman/scripts/run_remaining_RamanLUT_O2A_chunked.sh
+  sandbox/workflows/OCORaman/scripts/run_remaining_RamanLUT_O2A_chunked.sh
 
 printf '\n[%s] Finished VZA block %s\n' "$(date '+%Y-%m-%d %H:%M:%S %Z')" "${TAG}"
 printf '  memory log: %s\n' "${MONLOG}"

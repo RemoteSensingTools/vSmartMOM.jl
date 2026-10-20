@@ -12,7 +12,8 @@ include(joinpath(@__DIR__, "RetrievalState.jl"))
 using .RetrievalState: load_retrieval_prior
 
 const SOURCE_PRIOR = joinpath(
-    @__DIR__, "..", "bottom_layer_XCO2_retrievals", "retrieval_setup",
+    normpath(get(ENV, "RRS_XCO2_DATA_ROOT", joinpath(@__DIR__, ".."))),
+    "bottom_layer_XCO2_retrievals", "retrieval_setup",
     "apriori_states_acos_mapped_tapered_vertical_correlation.nc")
 
 @testset "round-5 fixed-SIF and tight-UTLS prior" begin

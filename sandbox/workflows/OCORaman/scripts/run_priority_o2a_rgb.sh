@@ -10,11 +10,11 @@ set -euo pipefail
 #
 # Typical launch via psurf-specific thin wrappers:
 #   CUDA_HOME=/usr/local/cuda CUDA_DEVICE=1 \
-#   nohup workflows/OCORaman/scripts/run_priority_o2a_psurf1000_rgb.sh \
+#   nohup sandbox/workflows/OCORaman/scripts/run_priority_o2a_psurf1000_rgb.sh \
 #     > /home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_priority_psurf1000_rgb/logs/nohup_driver.log 2>&1 &
 #
 #   CUDA_HOME=/usr/local/cuda CUDA_DEVICE=1 \
-#   nohup workflows/OCORaman/scripts/run_priority_o2a_psurf750_rgb.sh \
+#   nohup sandbox/workflows/OCORaman/scripts/run_priority_o2a_psurf750_rgb.sh \
 #     > /home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_priority_psurf0750_rgb/logs/nohup_driver.log 2>&1 &
 #
 # Optional environment:
@@ -29,7 +29,7 @@ set -euo pipefail
 #   DRY_RUN=1
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 cd "${REPO_ROOT}"
 
 PSURF="${PSURF:-1000}"
@@ -80,7 +80,7 @@ for sza_idx in $(seq "${START_SZA_IDX}" "${END_SZA_IDX}"); do
         SZA_IDX="${sza_idx}" \
         ALBEDO_IDXS="${ALBEDO_IDXS}" \
         OUTDIR="${OUTDIR}" \
-        "${JULIA_BIN}" "${JULIA_FLAGS_ARRAY[@]}" --project=. workflows/OCORaman/scripts/priority_missing_RamanLUT_O2A.jl
+        "${JULIA_BIN}" "${JULIA_FLAGS_ARRAY[@]}" --project=. sandbox/workflows/OCORaman/scripts/priority_missing_RamanLUT_O2A.jl
     )"
     requested_albedos="$(printf '%s' "${requested_albedos}" | tail -n 1)"
   fi
@@ -114,7 +114,7 @@ for sza_idx in $(seq "${START_SZA_IDX}" "${END_SZA_IDX}"); do
     OUT_NC="${out_nc}" \
     DRY_RUN="${DRY_RUN}" \
     "${resume_flag[@]}" \
-    "${JULIA_BIN}" "${JULIA_FLAGS_ARRAY[@]}" --project=. workflows/OCORaman/scripts/chunked_createRamanLUT_O2A.jl \
+    "${JULIA_BIN}" "${JULIA_FLAGS_ARRAY[@]}" --project=. sandbox/workflows/OCORaman/scripts/chunked_createRamanLUT_O2A.jl \
     2>&1 | tee -a "${log_file}"
 done
 

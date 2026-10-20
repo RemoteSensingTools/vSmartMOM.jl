@@ -42,15 +42,15 @@
 # Examples:
 #   # Inspect axes, spectral sizes, and timing estimate only:
 #   CUDA_DEVICE=1 DRY_RUN=1 julia --project=. \
-#       workflows/OCORaman/scripts/chunked_createRamanLUT_O2A.jl
+#       sandbox/workflows/OCORaman/scripts/chunked_createRamanLUT_O2A.jl
 #
 #   # Example SZA chunks for one pressure slice:
 #   CUDA_DEVICE=1 PSURFS=1000 SZA_IDXS=1:4 ALBEDO_IDXS=all \
-#       julia --project=. workflows/OCORaman/scripts/chunked_createRamanLUT_O2A.jl
+#       julia --project=. sandbox/workflows/OCORaman/scripts/chunked_createRamanLUT_O2A.jl
 #   CUDA_DEVICE=1 PSURFS=1000 SZA_IDXS=5:9 ALBEDO_IDXS=all \
-#       julia --project=. workflows/OCORaman/scripts/chunked_createRamanLUT_O2A.jl
+#       julia --project=. sandbox/workflows/OCORaman/scripts/chunked_createRamanLUT_O2A.jl
 #   CUDA_DEVICE=1 PSURFS=1000 SZA_IDXS=10:14 ALBEDO_IDXS=all \
-#       julia --project=. workflows/OCORaman/scripts/chunked_createRamanLUT_O2A.jl
+#       julia --project=. sandbox/workflows/OCORaman/scripts/chunked_createRamanLUT_O2A.jl
 
 using Dates
 using Interpolations
@@ -185,7 +185,7 @@ const BAND_OUTPUT_PREFIX = get(ENV, "BAND_OUTPUT_PREFIX",
     "RamanLUT_$(BAND_TAG)_float32_gpu")
 
 const PARAM_YAML = get(ENV, "PARAM_YAML",
-    joinpath(REPO_ROOT, "workflows", "OCORaman", "config", "paramsRamanLUT_O2A.yaml"))
+    joinpath(REPO_ROOT, "sandbox", "workflows", "OCORaman", "config", "paramsRamanLUT_O2A.yaml"))
 const PROFILE_SOURCE_NOTE =
     "atmospheric_profile.p/T/q copied from ParamsEMIT_MODTRANcomp_newLUT.yaml; " *
     "AFGL 1986 Midlatitude Winter, model/table 1c, on the EMIT/MODTRAN " *

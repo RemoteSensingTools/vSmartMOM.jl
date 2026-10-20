@@ -3,7 +3,7 @@ using OCORamanWorkflow
 run = get(ENV, "OCORAMAN_RUN_ID", run_id("o2a_smoke"))
 outdir = get(ENV, "GRID_OUTDIR", joinpath(output_root(), run, "grid_O2A"))
 yaml = get(ENV, "GRID_YAML",
-    joinpath(repo_root(), "test", "test_parameters", "O2_parameters2_SIF_grid.yaml"))
+    joinpath(repo_root(), "test", "local", "test_parameters", "O2_parameters2_SIF_grid.yaml"))
 
 ENV["GRID_YAML"] = yaml
 ENV["GRID_OUTDIR"] = outdir
