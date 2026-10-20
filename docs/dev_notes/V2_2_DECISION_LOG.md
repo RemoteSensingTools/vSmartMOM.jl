@@ -134,7 +134,7 @@ Taken one by one by Suniti; implementation status is tracked in §3/§3.1.
 | 3a | Aerosols under `FixedAltitudeGrid` | Altitude-defined aerosols stay fixed in altitude (as in the pilot). |
 | 3b | Re-running earlier rounds | Re-run all rounds on v2.2, with 4-D ABSCO and truth maps regenerated with the 4-D tables. |
 | 3c | Desert solves at the 7-iteration limit | Raise the limit for the reruns and repeat the five solves. |
-| 3d | "Release adds dσ/dp" wording | Correct it: dσ/dp is in the core since `36e7d1e0`; only Round 4 and Round 3 SIF-on lacked it. |
+| 3d | "Release adds dσ/dp" wording | Correct it: dσ/dp is in the core since `36e7d1e0`; it is confirmed absent in Round 4 and Round 3 SIF-on, and very likely absent in the unpinned earlier runs (done; the claim was only in the working notes). |
 | 4 | R1: RRS band without rotational lines | Raise an `ArgumentError`. |
 | 5 | R2: VS Q-branch Placzek–Teller factor | After the reference check: Placzek–Teller weight b_JJ to first power (applied; `raman_q_branch_placzek_teller.md`). |
 | 6 | R3: VS elastic phase matrix vs SSA | Make them consistent (Cabannes in both). |
@@ -143,7 +143,7 @@ Taken one by one by Suniti; implementation status is tracked in §3/§3.1.
 | 9 | Cox–Munk water refractive index | Segelstein (1981), interpolated per spectral point; a vector `n_water` is used element-wise. |
 | 10 | Ross–Li 80° zenith cap | Make it a parameter, default 80°; off reproduces MODIS/VLIDORT. |
 | 11 | NAI2 size-parameter Jacobians | Fixed radius grid (nodes independent of the distribution parameters). |
-| 12 | p_surf tangent of `depol: -1` | Document as neglected (~1e-5 relative). |
+| 12 | p_surf tangent of `depol: -1` | Document as neglected (~1e-5 relative) (done, `jacobians.md`). |
 | 13a | O₂ King factor | Keep 1.09 (He et al. 2021). |
 | 13b | Refractive-index fits beyond 468/546 nm | Switch to fits valid through the NIR where the current ones are extrapolated. |
 | 13c | Anisotropy γ | Add the wavelength dependence (N₂, O₂). |
@@ -201,10 +201,14 @@ model, `absorption_pressure.jl`). Without it, the Jacobian is not the
 derivative of the model's own forward calculation. The CIA and MT_CKD
 density factors were already present in the older core.
 
-Timeline: Round 4 outputs are dated 2026-09-07 and the Round 3-style
-`retrievals_acos_*` outputs 2026-09-05, i.e. before this term existed;
-Rounds 5–7 ran on `7acab570`, which includes it. (To be confirmed against
-each round's provenance — task in progress.)
+Provenance (`ROUND7_ALTGRD_PILOT_REPORT.md`). Confirmed from the outputs:
+Rounds 5–7 ran on `7acab570`, which includes the term. Round 4 (`cb90b83b`,
+`630c9190`) and Round 3 SIF-on (`cb90b83b`) ran from `suniti_multi_sensor`
+commits that never contained it, whatever their output dates. Inferred:
+Rounds 1–2 and Round 3 no-SIF record no commit (the reflog suggests Round 3
+no-SIF ran at `cb90b83b`); they finished before `36e7d1e0` existed, so the
+term is very unlikely there, and only uncommitted local code could change
+that.
 
 **Fixed-altitude grid (new):** for a fixed-height flux tower or a
 fixed-altitude airborne observer the layering must not move around the
@@ -328,6 +332,10 @@ results or definitions and wait for a decision.
   B_l with raw Siewert coefficients reproduces VLIDORT 2.8.3 without flips,
   and negating ε alone reverses V only. (Evidence:
   `vsmartmom-release-evidence/2026-10-19/greek_sign_flip_experiment.md`.)
+  `test/vlidort_baseline/extract_references.jl` emitted `SIEWERT_γ` without
+  the import flip that the committed `siewert2000_IIA_greek.jl` carries (the
+  file had been corrected by hand). The generator now emits that file byte
+  for byte, so a re-extraction keeps the flip.
 
 - [x] **MT_CKD density factor (approved by Suniti 2026-10-18, merged).**
   AER's `mt_ckd_h2o` scales both continuum terms with the number-density
@@ -376,9 +384,12 @@ results or definitions and wait for a decision.
   (`r_max = 50`, the JacobianTestFast settings); the optical-property
   derivatives agree to ≈1e-7 with 1600 nodes (`r_max = 5`). Fix the radius
   grid, differentiate it, or document a minimum `nquad_radius`.
-- [ ] **Surface-pressure Jacobian with `depol: -1`.** The automatic
-  depolarization depends on the column-mean temperature, which moves with
-  `p_surf`; that term (~1e-5 relative) has no tangent.
+- [x] **Surface-pressure Jacobian with `depol: -1` (decision 12).** The
+  automatic depolarization (Rayleigh Greek coefficients and, through the King
+  factor, τ_Rayleigh) depends on the column-mean temperature, which moves
+  with `p_surf` under `FixedPressureGrid()` (not under `FixedAltitudeGrid()`);
+  that term (~1e-5 relative) has no tangent. Documented as neglected in
+  `jacobians.md`.
 - [ ] **VS `_plus` builder** uses the raw `params.depol` (with `depol: -1`
   τ_Rayleigh ≈ 0.22× the correct value) and mutates `params.spec_bands` and
   `params.brdf` (probable, from reading the code).
@@ -390,4 +401,6 @@ results or definitions and wait for a decision.
   rounds/members to re-run, (3) the iteration limit, (4) reconcile the note
   that the release "adds the bottom-layer dσ/dp term" (among Rounds 4–7, only
   Round 4 lacked it; Round 3 SIF-on used `cb90b83b`, also without it, and
-  earlier unpinned runs have uncertain provenance).
+  earlier unpinned runs have uncertain provenance). Decided 2026-10-19
+  (decisions 3a–3d, §1.8); (4) is done. (1)–(3) are carried out by the v2.2
+  rerun campaign.

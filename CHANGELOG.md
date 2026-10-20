@@ -84,6 +84,13 @@ review of General's sequential-version rule.
   Stephens (2015, Eq. 22) in Siewert's form, which the vSmartMOM paper uses by
   reference (−ε at [3,4]), with the exact mapping to the code's stored γ and ε;
   no numerical change.
+- Documentation: the surface-pressure Jacobian page states that, under
+  `FixedPressureGrid()`, the temperature dependence of the automatic
+  (`depol: -1`) Rayleigh depolarization (Greek coefficients and τ_Rayleigh)
+  has no tangent (about 1e-5 relative, neglected by decision).
+- Tests: `test/vlidort_baseline/extract_references.jl` now emits the
+  committed `siewert2000_IIA_greek.jl` byte for byte, including the γ import
+  flip it previously left out.
 - HITRAN cache: `artifact(molecule)` under a downloaded edition now uses the
   cached file only if it is a verified full dataset (0–150000 cm⁻¹, all
   isotopologues, SHA-256 matching its metadata); otherwise it downloads the

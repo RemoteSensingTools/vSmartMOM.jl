@@ -316,6 +316,19 @@ CIA/MT_CKD include their pressure-scaling terms, but not their abundance
 response; see [Gas-abundance columns](#Gas-abundance-columns) and the
 [absorption contract](IO/Schema/absorption.md).
 
+With `depol: -1` (automatic depolarization), the Rayleigh depolarization is
+computed at the dry-column-weighted mean temperature of the profile. It sets
+the Rayleigh Greek coefficients and, through the King factor, τ_Rayleigh.
+Under `FixedPressureGrid()`, moving `p_surf` changes that weighting slightly,
+because only the bottom column changes. This dependence has no tangent, so the
+surface-pressure column omits it. By an order-of-magnitude estimate the
+omitted term is about 1e-5 of the Rayleigh contribution to the
+surface-pressure derivative; it is neglected by decision. Under
+`FixedAltitudeGrid()` every column scales with `p_surf`, the weighted mean
+does not change, and the term is zero. An explicit `depol ≥ 0` removes it.
+The Cabannes depolarization and ϖ_Cabannes use the same temperature but enter
+only Raman runs, which are not linearized.
+
 ```julia
 layout = result.layout
 Nz = length(model.profile.p_full)
