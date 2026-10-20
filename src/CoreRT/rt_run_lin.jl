@@ -48,6 +48,11 @@ physical parameters via the linearized Matrix Operator Method.
 - `NGas::Int`: Number of layer-resolved gas VMR parameters (`NGasSpecies×Nz`).
 - `NSurf::Int`: Number of surface parameters (typically 1 for Lambertian albedo).
 - `i_band::Integer=1`: Spectral band index.
+- `sources=nothing`: source set for this call; overrides `model.sources`.
+  With an explicit elastic mode object (`rt_run(rs::noRS, model, lin_model,
+  NAer, NGas, NSurf, i_band)`), the solar F₀ precedence is `sources=` >
+  a user preset `rs.F₀` > `model.sources`, and `sources=` applies to that
+  call only (`rs.F₀` is not overwritten).
 - `jacobian_adding=:matrix`: Use established matrix-tangent adding. Opt in to
   `:source` with a local basis for solar/Lambertian endpoint solves, including
   prescribed or retrievable surface SIF; atmospheric
@@ -167,7 +172,9 @@ function rt_run_test(RS_type::AbstractRamanType,
         iBand)
 end
 
-# Full multiple scattering
+# Full multiple scattering. Solar F₀ precedence (explicit `sources=` > user
+# preset `RS_type.F₀` > `model.sources`) and the call-only effect of
+# `sources=` are those of the forward `rt_run(RS_type, model, iBand)`.
 function rt_run(RS_type::AbstractRamanType,
                     model,
                     lin_model,
@@ -177,6 +184,21 @@ function rt_run(RS_type::AbstractRamanType,
                     active_layout::Union{Nothing,ActiveParameterLayout} = nothing,
                     jacobian_basis::Symbol = :auto,
                     jacobian_adding::Symbol = :matrix)
+    return _with_call_scoped_F₀(RS_type, sources) do
+        _rt_run_lin(RS_type, model, lin_model, NAer, NGas, NSurf, iBand;
+                    sources, active_layout, jacobian_basis, jacobian_adding)
+    end
+end
+
+function _rt_run_lin(RS_type::AbstractRamanType,
+                     model,
+                     lin_model,
+                     NAer::Int, NGas::Int, NSurf::Int,
+                     iBand;
+                     sources::Union{Nothing, AbstractSource},
+                     active_layout::Union{Nothing,ActiveParameterLayout},
+                     jacobian_basis::Symbol,
+                     jacobian_adding::Symbol)
     _require_rt_polarization(polarization_type(model))
     if InelasticScattering.has_inelastic(RS_type)
         throw(ArgumentError(

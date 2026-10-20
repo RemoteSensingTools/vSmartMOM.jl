@@ -49,6 +49,16 @@ model = model_from_parameters(params; sources = SolarBeam() + SurfaceSIF())
 The `sources=` kwarg on `rt_run` overrides `model.sources` for that
 specific solve; both flow through the same dispatch.
 
+Entry points that take an explicit mode object (`rt_run(rs, model, i_band)`,
+`rt_run_ss(rs, model, i_band)`, `rt_run_toa(rs::RRS, model)` and the linearized
+`rt_run(rs, model, lin_model, NAer, NGas, NSurf, i_band)`) also accept the
+legacy preset `rs.F₀ = F` (a nonzero `(nStokes, nSpec)` matrix). The solar
+F₀ of a solve is then, in order of precedence: the `SolarBeam` of an explicit
+`sources=` keyword, the preset `rs.F₀`, then `model.sources`. A `sources=`
+keyword applies to its own call only: `rs.F₀` is left as it was, so the next
+call without `sources=` uses the preset again (or `model.sources` when there
+is none).
+
 At solve time, an explicit `SolarBeam.sza` must match the model geometry.
 Change `params.sza` before construction or use `remake_geometry` to change
 the illumination angle. Multiple solar/blackbody beams throw `ArgumentError`;

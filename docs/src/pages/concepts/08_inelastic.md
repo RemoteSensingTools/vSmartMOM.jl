@@ -78,7 +78,9 @@ Architecturally:
   the inelastic correction `I₁ ≈ I₀ + (I'₁ − I'₀)` that makes the
   linear-in-inelastic approximation usable in absorbing bands. Not a
   debug helper; it's the *production* tool for fast O₂ A-band Raman
-  corrections.
+  corrections. Its hemispheric outputs `hem_R`/`hem_T` are diffuse fluxes:
+  `hem_T` excludes the unscattered direct beam for every quadrature scheme
+  (add ``\mu_0 F_0 e^{-\tau/\mu_0}`` for the total downwelling flux).
 - **An `RRS` band must hold rotational lines.** `getRamanSSProp!(rs, λ, ν)`
   measures the line shifts from the band grid point nearest `λ` (normally
   the band centre) and keeps only the lines inside the band; `rt_run` then

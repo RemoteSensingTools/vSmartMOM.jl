@@ -99,13 +99,17 @@ end
 
 Run TOA-only rotational Raman SFI with an external solar direction. Returns a
 named tuple `(elastic, inelastic)`; the latter sums the Raman-transition axis
-in the same manner as the full-column Raman postprocessor.
+in the same manner as the full-column Raman postprocessor. Solar F₀
+precedence and the call-only effect of `sources=` are as for
+[`rt_run`](@ref)`(RS_type, model, iBand)`.
 """
 function rt_run_toa(rs::RRS, model; i_band::Integer=1,
                     sources::Union{Nothing,AbstractSource}=nothing)
     model.quad_points.external_solar || throw(ArgumentError(
         "rt_run_toa(rs, model) requires QuadPoints.external_solar=true"))
-    return _rt_run_column(rs, model, [Int(i_band)]; sources, toa_only=true)
+    return _with_call_scoped_F₀(rs, sources) do
+        _rt_run_column(rs, model, [Int(i_band)]; sources, toa_only=true)
+    end
 end
 
 """
@@ -293,14 +297,19 @@ _interaction_workspace(::AbstractRamanType, composite_layer, added_layer, arch) 
 _use_staged_interaction(arch, composite_layer) = false
 
 # The kernels still read the solar irradiance from the legacy `RS_type.F₀`
-# carrier, which the drivers overwrite with the resolved `SolarBeam` F₀. A
-# nonzero, correctly shaped `RS_type.F₀` is honoured as a deliberate legacy
-# preset (`rs.F₀ = ...; rt_run(rs, model, ...)`), so the drivers must be able
-# to tell such a preset from their own earlier write: otherwise an RS object
-# reused after `rt_run(rs, model; sources=SolarBeam(F₀=2F))` would silently
-# keep the 2F beam in a later default call. The record is keyed by object
-# identity (weakly, so RS objects are not kept alive) and stores the written
-# array plus a snapshot, so a later in-place user edit still counts as a preset.
+# carrier, which the drivers overwrite with the resolved F₀. The solar F₀ of a
+# solve is, in order of precedence: an explicit `sources=` keyword, then a
+# user preset `RS_type.F₀` (nonzero, shaped `(nStokes, nSpec)`: the legacy
+# `rs.F₀ = ...; rt_run(rs, model, ...)` pattern), then `model.sources`.
+# An explicit `sources=` applies to its own call only: the public entry
+# points restore the carrier afterwards (`_with_call_scoped_F₀`), so a preset
+# survives such a call. Without `sources=` the drivers write the resolved
+# `model.sources` F₀ into the carrier and must be able to tell that write
+# from a preset in a later call (otherwise the RS object would keep an
+# outdated `model.sources` beam, or a `sources=` beam reached through an
+# internal path). The record is keyed by object identity (weakly, so RS
+# objects are not kept alive) and stores the written array plus a snapshot,
+# so a later in-place user edit still counts as a preset.
 const _DRIVER_WRITTEN_F₀ = WeakKeyDict{Any,Any}()
 
 "True when `RS_type.F₀` is a user preset rather than an earlier driver write."
@@ -349,7 +358,9 @@ Resolve the solar irradiance every driver feeds to the kernels and store it
 in the legacy `RS_type.F₀` carrier (host memory). Precedence: an explicit
 `sources=` keyword, then a user-preset `RS_type.F₀` (see
 [`_user_preset_F₀`](@ref)), then `model.sources` (already folded into
-`prepared_sources` by the caller).
+`prepared_sources` by the caller). The write of an explicit `sources=` beam
+is undone when the public entry point returns
+(`_with_call_scoped_F₀`).
 """
 function _resolve_solar_F₀!(RS_type, sources, prepared_sources,
                             ::Type{FT}, pol_n::Integer, nSpec::Integer,
@@ -360,6 +371,35 @@ function _resolve_solar_F₀!(RS_type, sources, prepared_sources,
     end
     _require_azimuth_even_F₀(RS_type.F₀)
     return RS_type.F₀
+end
+
+"""
+    _with_call_scoped_F₀(f, RS_type, sources)
+
+Call `f()`, the body of a solver entry point that receives the caller's
+`RS_type`. With an explicit `sources=` keyword (`sources !== nothing`) the
+solar F₀ it selects applies to this call only: the `RS_type.F₀` carrier and
+its driver-write record ([`_user_preset_F₀`](@ref)) are restored when `f`
+returns or throws. A user preset `RS_type.F₀` therefore survives the call,
+and a following call without `sources=` uses it again. Without `sources=`,
+`f()` runs unchanged (and may record a `model.sources` write as before).
+"""
+function _with_call_scoped_F₀(f, RS_type, sources)
+    sources === nothing && return f()
+    saved = RS_type.F₀
+    record = get(_DRIVER_WRITTEN_F₀, RS_type, nothing)
+    try
+        return f()
+    finally
+        RS_type.F₀ === saved || (RS_type.F₀ = saved)
+        if get(_DRIVER_WRITTEN_F₀, RS_type, nothing) !== record
+            if record === nothing
+                delete!(_DRIVER_WRITTEN_F₀, RS_type)
+            else
+                _DRIVER_WRITTEN_F₀[RS_type] = record
+            end
+        end
+    end
 end
 
 """
@@ -411,10 +451,13 @@ Returns the raw SFI tuple `(R, T, ieR, ieT, hdr, bhr_uw, bhr_dw)`
 
 # Keyword arguments
 - `sources::AbstractSource`: optional source-term set (v0.6 source-term
-  refactor, Phase 2). When `nothing`, the legacy F₀ default is preserved
-  bit-for-bit; when a [`SourceSet`](@ref) or single [`AbstractSource`](@ref)
-  is supplied, the F₀ carried by the first [`SolarBeam`](@ref) is routed
-  into `RS_type.F₀` ahead of the SFI kernel call.
+  refactor, Phase 2). The solar F₀ of the solve is, in order of precedence,
+  the F₀ of the first [`SolarBeam`](@ref) in `sources`, a user preset
+  `RS_type.F₀` (nonzero, shaped `(nStokes, nSpec)`), then `model.sources`;
+  it is routed into the `RS_type.F₀` carrier ahead of the SFI kernel call.
+  This core does not restore the carrier; the public entry points do
+  (`_with_call_scoped_F₀`), so an explicit `sources=` applies to
+  its call only.
 - `streams_callback`: fires with the per-moment stream state (used by
   [`rt_run_streams`](@ref)).
 - Atmosphere/surface-split hooks consumed by [`rt_run_atmosphere`](@ref):
@@ -544,7 +587,8 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
     # Resolve sources EARLY so the layer allocators can size per-source slots
     # (v0.7 Phase A.2a). Solar precedence (see `_resolve_solar_F₀!`):
     # explicit `sources=` kwarg > a user-preset `RS_type.F₀` (the historical
-    # `rs.F₀ = ...; rt_run(rs, model, ...)` pattern) > `model.sources`.
+    # `rs.F₀ = ...; rt_run(rs, model, ...)` pattern) > `model.sources`; an
+    # explicit `sources=` beam is not left in the carrier after the call.
     # Legacy `RS_type.SIF₀` is no longer consumed by rt_run; use SurfaceSIF.
     effective_sources = sources === nothing ? model.sources : sources
     validate_source_requests(effective_sources, model.geometry.sza, brdf)
@@ -1040,6 +1084,14 @@ Run height-aware forward RT with an explicit Raman type. The observer
 convention stored in `model.obs_geom` selects optional TOA/BOA endpoints and
 any exact interior interfaces. See [`ObserverRTResult`](@ref).
 
+Solar F₀, in order of precedence: the first [`SolarBeam`](@ref) of an
+explicit `sources=` keyword, a user preset `RS_type.F₀` (nonzero, shaped
+`(nStokes, nSpec)`), then `model.sources`. An explicit `sources=` applies to
+this call only: `RS_type.F₀` is left as it was before the call (a preset is
+not overwritten), so a following call without `sources=` uses the preset, or
+`model.sources` when there is none. Other `RS_type` fields are working
+state that every solve updates, with or without `sources=`.
+
 Advanced keywords:
 - `sources`, `streams_callback`: forwarded to the column core — see
   [`_rt_run_column`](@ref).
@@ -1058,6 +1110,19 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
                 stop_after_atmosphere::Bool = false,
                 m_max_override::Union{Nothing, Int} = nothing,
                 fourier_convergence_override::Union{Nothing, AbstractFourierConvergence} = nothing)
+    return _with_call_scoped_F₀(RS_type, sources) do
+        _rt_run_observers(RS_type, model, iBand; sources, streams_callback,
+                          atm_snapshot_callback, stop_after_atmosphere,
+                          m_max_override, fourier_convergence_override)
+    end
+end
+
+# Body of `rt_run(RS_type, model, iBand)`: observer routing to the column core
+# or the multisensor solver.
+function _rt_run_observers(RS_type::AbstractRamanType, model, iBand;
+                           sources, streams_callback, atm_snapshot_callback,
+                           stop_after_atmosphere, m_max_override,
+                           fourier_convergence_override)
     bands = iBand isa Integer ? [Int(iBand)] : collect(Int, iBand)
     # Reject before any path mutates RS_type.
     _require_rt_polarization(polarization_type(model))
@@ -1148,8 +1213,8 @@ Phase 1c).
 - `R_SFI`, `T_SFI`, `ieR_SFI`, `ieT_SFI`: shape `(nVza, nStokes, nSpec)` — same
   per-direction outputs as [`rt_run`](@ref).
 - `hem_R`, `hem_T`: hemispherically integrated single-scatter Stokes-I
-  *fluxes*, shape `(nSpec,)`: the diffuse upwelling flux at TOA and the
-  diffuse downwelling flux at BOA, in the units of `F₀` (they are not
+  *fluxes* (diffuse only), shape `(nSpec,)`: the diffuse upwelling flux at
+  TOA and the diffuse downwelling flux at BOA, in the units of `F₀` (they are not
   normalized by the incident flux `μ₀F₀`, so they are not reflectances or
   transmittances). Computed from the m=0 Fourier coefficient of the Stokes-I
   source function over the hemisphere (Σⱼ J₀[j, 1, λ] · μⱼ · wⱼ). The
@@ -1170,13 +1235,23 @@ function rt_run_test_ss(RS_type::AbstractRamanType, model, iBand; kwargs...)
 end
 
 """
-    rt_run_ss(RS_type, model::RTModel, iBand)
+    rt_run_ss(RS_type, model::RTModel, iBand; sources=nothing)
 
 Single-scatter approximation driver with explicit Raman type. See
-[`rt_run_ss`](@ref) for the user-facing entry point.
+[`rt_run_ss`](@ref) for the user-facing entry point and the outputs
+(`hem_T` is the diffuse downwelling flux only). Solar F₀ precedence and the
+call-only effect of `sources=` are as for
+[`rt_run`](@ref)`(RS_type, model, iBand)`.
 """
 function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
                    sources::Union{Nothing, AbstractSource} = nothing)
+    return _with_call_scoped_F₀(RS_type, sources) do
+        _rt_run_ss(RS_type, model, iBand; sources)
+    end
+end
+
+function _rt_run_ss(RS_type::AbstractRamanType, model, iBand;
+                    sources::Union{Nothing, AbstractSource})
     # Single scattering needs no U coupling, but this path uses the IQ phase
     # moments, which omit the T ζ T′ term; the RT-wide rejection applies.
     _require_rt_polarization(polarization_type(model))

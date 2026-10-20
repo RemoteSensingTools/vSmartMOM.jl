@@ -3,7 +3,8 @@
 # =========================================================================
 #
 # Regression tests for solve-boundary defects: a reused RS object keeping a
-# driver-written F₀; HDR/BHR (and rt_run_ss hem_T) double-counting the direct
+# driver-written F₀; a `sources=` call overwriting a preset F₀ (it now applies
+# to that call only, decision 14a); HDR/BHR (and rt_run_ss hem_T) double-counting the direct
 # beam when μ₀ is a weighted node; TMS with stream exports and with combined
 # bands; the Cox–Munk glint residual on multisensor TOA output; U/V-polarized
 # incident beams; ThermalEmission on paths that ignore it or with a wrong
@@ -156,6 +157,26 @@ end
     # Float32 weights of a reused object by an ulp.
     @test again.inelastic_toa ≈ ref.inelastic_toa rtol = 1e-6
 
+    # A preset survives a sources= call, embedded-μ₀ and external-solar TOA
+    # paths alike (decision 14a); Raman radiances are linear in F₀.
+    preset = 3 .* unit
+    rs = make_rrs(); rs.F₀ = preset
+    two = CoreRT.rt_run(rs, model, 1; sources = SolarBeam(F₀ = 2 .* unit))
+    @test two.toa ≈ 2 .* ref.toa rtol = 1e-5
+    @test two.inelastic_toa ≈ 2 .* ref.inelastic_toa rtol = 1e-5
+    @test rs.F₀ === preset && rs.F₀ == 3 .* unit
+    three = CoreRT.rt_run(rs, model, 1)
+    @test three.toa ≈ 3 .* ref.toa rtol = 1e-5
+    @test three.inelastic_toa ≈ 3 .* ref.inelastic_toa rtol = 1e-5
+    ext = model_from_parameters(p; external_solar = true)
+    toa_ref = CoreRT.rt_run_toa(make_rrs(), ext)
+    rs = make_rrs(); rs.F₀ = preset
+    toa_two = CoreRT.rt_run_toa(rs, ext; sources = SolarBeam(F₀ = 2 .* unit))
+    @test toa_two.elastic ≈ 2 .* toa_ref.elastic rtol = 1e-5
+    @test toa_two.inelastic ≈ 2 .* toa_ref.inelastic rtol = 1e-5
+    @test rs.F₀ === preset
+    @test CoreRT.rt_run_toa(rs, ext).inelastic ≈ 3 .* toa_ref.inelastic rtol = 1e-5
+
     # Thermal emission is not injected by the Raman kernels.
     th = ThermalEmission(B_layer = fill(1.0, _nlay(model), length(ν)))
     @test_throws ArgumentError CoreRT.rt_run(make_rrs(), model, 1;
@@ -170,6 +191,106 @@ end
     vs.F₀ = 3 .* unit
     CoreRT._prepare_multisensor_F₀!(vs, model, [1], nothing)
     @test vs.F₀ == 3 .* unit
+end
+
+@testset "sources= applies to its call only (decision 14a)" begin
+    # Precedence: sources= > preset RS_type.F₀ > model.sources. The sources=
+    # beam is used for its own call and is not left in the carrier.
+    model = _qs_model()
+    ref = CoreRT.rt_run(InelasticScattering.noRS{Float64}(), model, 1).toa
+    two = SolarBeam(F₀ = _beam(model, 2.0))
+
+    # A preset is neither overwritten nor replaced: same array, same values,
+    # and the following call without sources= uses it.
+    rs = InelasticScattering.noRS{Float64}()
+    preset = _beam(model, 3.0); rs.F₀ = preset
+    @test CoreRT.rt_run(rs, model, 1; sources = two).toa ≈ 2ref
+    @test rs.F₀ === preset && rs.F₀ == _beam(model, 3.0)
+    @test CoreRT.rt_run(rs, model, 1).toa ≈ 3ref
+
+    # Without a preset the placeholder is kept, no driver write is recorded,
+    # and model.sources follows.
+    rs = InelasticScattering.noRS{Float64}()
+    placeholder = rs.F₀
+    @test CoreRT.rt_run(rs, model, 1; sources = two).toa ≈ 2ref
+    @test rs.F₀ === placeholder
+    @test !haskey(CoreRT._DRIVER_WRITTEN_F₀, rs)
+    @test CoreRT.rt_run(rs, model, 1).toa == ref
+
+    # An earlier model.sources write and its record are left as they were, so
+    # the carrier still counts as a driver write, not a preset: a model with
+    # other sources is honoured afterwards.
+    rs = InelasticScattering.noRS{Float64}()
+    CoreRT.rt_run(rs, model, 1)
+    written = rs.F₀
+    record = CoreRT._DRIVER_WRITTEN_F₀[rs]
+    CoreRT.rt_run(rs, model, 1; sources = two)
+    @test rs.F₀ === written
+    @test CoreRT._DRIVER_WRITTEN_F₀[rs] === record
+    @test CoreRT.rt_run(rs, _qs_model(sources = two), 1).toa ≈ 2ref
+    @test CoreRT.rt_run(rs, model, 1).toa == ref
+    rs.F₀ .*= 4                                   # an in-place edit is a preset
+    @test CoreRT.rt_run(rs, model, 1).toa ≈ 4ref
+
+    # A sources= call that fails after the carrier was written (U-polarized
+    # beam) leaves a preset, or an earlier driver write and its record, in place.
+    modelU = _qs_model(pol = "Stokes_IQU()")
+    FU = _beam(modelU, 1.0); FU[3, :] .= 0.1
+    rs = InelasticScattering.noRS{Float64}()
+    presetU = _beam(modelU, 3.0); rs.F₀ = presetU
+    @test_throws ArgumentError CoreRT.rt_run(rs, modelU, 1; sources = SolarBeam(F₀ = FU))
+    @test rs.F₀ === presetU
+    @test !haskey(CoreRT._DRIVER_WRITTEN_F₀, rs)
+    rs = InelasticScattering.noRS{Float64}()
+    CoreRT.rt_run(rs, modelU, 1)
+    writtenU = rs.F₀
+    recordU = CoreRT._DRIVER_WRITTEN_F₀[rs]
+    @test_throws ArgumentError CoreRT.rt_run(rs, modelU, 1; sources = SolarBeam(F₀ = FU))
+    @test rs.F₀ === writtenU
+    @test CoreRT._DRIVER_WRITTEN_F₀[rs] === recordU
+
+    # Single-scatter driver.
+    ss_ref = CoreRT.rt_run_ss(InelasticScattering.noRS{Float64}(), model, 1)
+    rs = InelasticScattering.noRS{Float64}(); rs.F₀ = preset
+    ss_two = CoreRT.rt_run_ss(rs, model, 1; sources = two)
+    @test ss_two[1] ≈ 2 .* ss_ref[1]
+    @test ss_two[6] ≈ 2 .* ss_ref[6]
+    @test rs.F₀ === preset
+    @test CoreRT.rt_run_ss(rs, model, 1)[1] ≈ 3 .* ss_ref[1]
+
+    # Interior-height (multisensor) driver.
+    model_ms = _qs_model(obs_alt = [0, 5.0])
+    ms_ref = CoreRT.rt_run(InelasticScattering.noRS{Float64}(), model_ms, 1)
+    rs = InelasticScattering.noRS{Float64}(); rs.F₀ = preset
+    ms_two = CoreRT.rt_run(rs, model_ms, 1; sources = two)
+    @test ms_two.toa ≈ 2 .* ms_ref.toa
+    @test only(ms_two.levels).upwelling ≈ 2 .* only(ms_ref.levels).upwelling
+    @test rs.F₀ === preset
+    @test only(CoreRT.rt_run(rs, model_ms, 1).levels).upwelling ≈
+          3 .* only(ms_ref.levels).upwelling
+
+    # Linearized driver.
+    fwd, lin = model_from_parameters(LinMode(), _qs_params())
+    ngas = size(lin.τ̇_abs[1], 1)
+    lin_ref = rt_run(InelasticScattering.noRS{Float64}(), fwd, lin, 0, ngas, 1, 1)
+    rs = InelasticScattering.noRS{Float64}(); rs.F₀ = _beam(fwd, 3.0)
+    preset_lin = rs.F₀
+    lin_two = rt_run(rs, fwd, lin, 0, ngas, 1, 1;
+                     sources = SolarBeam(F₀ = _beam(fwd, 2.0)))
+    @test lin_two.toa ≈ 2 .* lin_ref.toa
+    @test lin_two.toa_jacobian ≈ 2 .* lin_ref.toa_jacobian
+    @test rs.F₀ === preset_lin
+    lin_three = rt_run(rs, fwd, lin, 0, ngas, 1, 1)
+    @test lin_three.toa ≈ 3 .* lin_ref.toa
+    @test lin_three.toa_jacobian ≈ 3 .* lin_ref.toa_jacobian
+
+    # Atmosphere/surface split with TMS: the cached exact single scattering
+    # uses the call's sources= beam, as the monolithic solve does.
+    aer = _qs_model(aerosol = true, sza = 40.0, ss_correction = TMSCorrection())
+    two_aer = SolarBeam(F₀ = _beam(aer, 2.0))
+    mono = rt_run(aer; sources = two_aer).toa
+    @test mono ≈ 2 .* rt_run(aer).toa rtol = 1e-12
+    @test rt_run_multi_surface(aer, aer.surfaces; sources = two_aer)[1][1] ≈ mono rtol = 1e-12
 end
 
 @testset "HDR/BHR count the direct beam once" begin

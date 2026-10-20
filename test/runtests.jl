@@ -248,7 +248,8 @@ end
 @testset "Sources (v0.6)" begin include("test_sources.jl") end
 @testset "Source request validation" begin include("test_source_validation.jl") end
 
-# Solve-boundary guards: reused RS objects do not keep a driver-written F₀;
+# Solve-boundary guards: reused RS objects do not keep a driver-written F₀,
+# and a sources= call does not overwrite a preset F₀ (decision 14a);
 # HDR/BHR/hem_T count the direct beam once at weighted μ₀ nodes; TMS with
 # stream exports / combined bands; multisensor Cox-Munk TOA; U/V incident
 # beams; ThermalEmission paths and layer count; linearized surface support.

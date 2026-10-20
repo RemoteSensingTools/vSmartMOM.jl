@@ -190,12 +190,15 @@ function rt_run_atmosphere(model;
     # surface-independent (pure atmospheric first order), so one array
     # serves every replayed BRDF and the Lambertian closure. Uses the same
     # tms_correction! the monolithic solver uses (single-definition policy),
-    # fed the run's own δ-scaled τ_sum_all captured in the snapshot.
+    # fed the run's own δ-scaled τ_sum_all captured in the snapshot. The
+    # solve's F₀ is taken from the captured `surface_F₀` (the same values,
+    # in the model precision): an explicit `sources=` beam is no longer in
+    # `c.RS_type.F₀` once `rt_run` has returned.
     tms_ss = if model.numerics.ss_correction isa TMSCorrection
         FTm = float_type(model)
         buf = zeros(FTm, length(c.vza), c.pol_type.n, c.nSpec)
         tms_correction!(buf, model, iBand, Array(c.τ_sum_all),
-                        Array(c.RS_type.F₀))
+                        Array(c.surface_F₀))
         buf
     else
         nothing
