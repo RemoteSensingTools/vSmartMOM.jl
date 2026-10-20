@@ -14,11 +14,15 @@ optical-property derivation see Sanghavi 2022 (Part I).
 vSmartMOM supports rotational Raman (RRS) and vibrational Raman (VRS,
 RVRS) inelastic scattering as a **parallel kernel path** next to the
 elastic one. Pass the configured mode object as `rt_run(RS_type, model, iBand)`: `noRS`
-(default; pure elastic), `RRS`, `VS_0to1`, `VS_1to0`, plus `_plus`
-variants for multi-band runs that share spectral structure. The bulk of
-retrievals (NIR shortwave for greenhouse gases, polarized aerosol over
-ocean) use `noRS` — the inelastic correction is small there. UV/Vis
+(default; pure elastic), `RRS`, or the vibrational `VS_0to1_plus` /
+`VS_1to0_plus` for runs over an incident wavelength and its Raman target
+bands. The bulk of retrievals (NIR shortwave for greenhouse gases, polarized
+aerosol over ocean) use `noRS` — the inelastic correction is small there. UV/Vis
 retrievals (Ring effect, O₂ A-band line shapes, ozone DOAS) need RRS.
+Vibrational Raman runs use the `_plus` variants, whose state and model are
+built by `model_from_parameters(rs, λ₀, params)` for one incident wavelength
+`λ₀`; `VS_0to1` and `VS_1to0` are kept as types only (they have no state
+builder and do not run in `rt_run`).
 
 ## When to enable it
 
@@ -26,7 +30,7 @@ retrievals (Ring effect, O₂ A-band line shapes, ozone DOAS) need RRS.
 |---|---|
 | Ring effect (hyperspectral UV/Vis trace gases) | `RRS` |
 | O₂ A-band line-shape correction at high precision | `RRS` (single-scatter approximation often suffices via `rt_run_ss`) |
-| Fraunhofer-line ghosting due to N₂/O₂ vibrational Raman | `VS_0to1` and/or `VS_1to0` |
+| Fraunhofer-line ghosting due to N₂/O₂ vibrational Raman | `VS_0to1_plus` and/or `VS_1to0_plus` |
 | NIR-only retrievals (XCO₂, XCH₄ from OCO-2/3, GOSAT) | `noRS` (default) |
 
 ## How it's wired

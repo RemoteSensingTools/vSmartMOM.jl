@@ -195,6 +195,12 @@ Also see Finding #5 — the `γ_C_Rayl` field that this function reads is not ac
 
 ## Finding #3 — MEDIUM — Inconsistent `i_λ₁λ₀` reversal between two `getRamanSSProp!(RRS, …)` overloads
 
+> **Resolved in v2.2 (decision 7, R6/R7).** The 4-argument method (which
+> swapped Stokes and anti-Stokes weights) was unused and is removed. The
+> 3-argument method now pairs each weight with its explicitly negated output
+> offset (`i_λ₁λ₀ = -offset`), measured from the band grid point nearest `λ`,
+> so the pairing no longer relies on a symmetric offset set.
+
 ### `src/Inelastic/raman_atmo_prop.jl:58-78` (4-arg, takes `depol`)
 
 ```julia

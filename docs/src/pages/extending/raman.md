@@ -57,7 +57,7 @@ If the mode has redistribution weights that require normalization, add a specifi
 
 ## Fill Mode State
 
-Add a `getRamanSSProp!` method that populates all arrays consumed by the RT kernels. Existing `RRS`, `VS_0to1`, `VS_1to0`, and `_plus` methods are the reference.
+Add a `getRamanSSProp!` method that populates all arrays consumed by the RT kernels. Existing `RRS` and `_plus` methods are the reference.
 
 The method usually computes:
 

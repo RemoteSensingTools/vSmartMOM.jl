@@ -11,32 +11,6 @@ function getRamanSSProp(RS_type::noRS, depol,  λ, grid_in)
     return nothing
 end
 
-"""
-    getRamanSSProp!(rs, args...)
-
-Populate Raman single-scattering properties on `rs` for the supplied reference
-wavelength and spectral grid.
-"""
-function getRamanSSProp!(RS_type::Union{VS_0to1,VS_1to0}, depol, λ, grid_in)
-    @unpack n2,o2 =  RS_type
-    #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
-    λ_scatt = 2.e7/(grid_in[1]+grid_in[end])
-    #determine Rayleigh scattering cross-section at mean scattered wavelength
-    atmo_σ_Rayl_scatt = compute_optical_Rayl(λ_scatt, n2, o2)
-    # determine Rayleigh scattering cross-section at incident wavelength λ
-    atmo_σ_Rayl = compute_optical_Rayl(λ, n2, o2)
-    # determine RRS cross-sections to λ₀ from nSpecRaman wavelengths around λ₀  
-    index_VRSgrid_out, atmo_σ_VRS, index_RVRSgrid_out, atmo_σ_RVRS = 
-        compute_optical_RS!(RS_type, grid_in, λ, n2, o2)
-    # declare ϖ_Raman to be a grid of length raman grid
-    RS_type.ϖ_VRS = atmo_σ_VRS/atmo_σ_Rayl
-    RS_type.i_VRS = index_VRSgrid_out
-    RS_type.ϖ_RVRS = atmo_σ_RVRS/atmo_σ_Rayl
-    RS_type.i_RVRS = index_RVRSgrid_out
-    RS_type.k_Rayl_scatt = atmo_σ_Rayl_scatt/atmo_σ_Rayl
-    RS_type.n_Raman = 1;
-    return nothing
-end
 #function getRamanLayerSSA(RS_type::VRS_1to0, T, λ, grid_in)
 #    @unpack n2,o2 =  RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
@@ -55,28 +29,15 @@ end
 
 
 
-function getRamanSSProp!(RS_type::RRS, depol, λ, grid_in) 
-    @unpack n2,o2 =  RS_type
-    #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
-    # determine Rayleigh scattering cross-section at central wavelength λ of the spectral band (assumed constant throughout the band)
-    atmo_σ_Rayl = compute_optical_Rayl(λ, n2, o2)
-    RS_type.greek_raman = get_greek_raman(RS_type, n2, o2)
-    #get_greek_raman!(RS_type, n2, o2)
-    RS_type.ϖ_Cabannes .= compute_ϖ_Cabannes(RS_type, λ)
-    # @show RS_type.ϖ_Cabannes
-    # determine RRS cross-sections to λ₀ from nSpecRaman wavelengths around λ₀  
-    index_raman_grid, atmo_σ_RRS = compute_optical_RS!(RS_type, grid_in, λ, n2, o2)
-    # declare ϖ_Raman to be a grid of length raman grid
-    #RS_type.ϖ_λ₁λ₀ = atmo_σ_RRS[end:-1:1]/atmo_σ_Rayl * (1-RS_type.ϖ_Cabannes[1])/sum(reverse(atmo_σ_RRS)/atmo_σ_Rayl) #the grid gets inverted because the central wavelength is now seen as the recipient of RRS from neighboring source wavelengths
-    RS_type.ϖ_λ₁λ₀ = (reverse(atmo_σ_RRS)/atmo_σ_Rayl) #the grid gets inverted because the central wavelength is now seen as the recipient of RRS from neighboring source wavelengths
-    #@show RS_type.ϖ_λ₁λ₀
-    #@show sum(RS_type.ϖ_λ₁λ₀)
-    #@show RS_type.ϖ_Cabannes
-    RS_type.i_λ₁λ₀ = reverse(index_raman_grid)
-    RS_type.n_Raman = length(RS_type.ϖ_λ₁λ₀)
-    return nothing
-end
+"""
+    getRamanSSProp!(rs::RRS, λ, grid_in)
 
+Fill the rotational Raman state of `rs` for the band grid `grid_in` (cm⁻¹) and
+the reference wavelength `λ` (nm; normally the band centre,
+`1e7 / mean(grid_in)`): the Raman phase coefficients, the Cabannes fraction and
+the line weights `ϖ_λ₁λ₀` with their source offsets `i_λ₁λ₀`. Throws an
+`ArgumentError` when the band holds no rotational line or `λ` lies outside it.
+"""
 function getRamanSSProp!(RS_type::RRS, λ, grid_in) 
     @unpack n2,o2 =  RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)

@@ -153,4 +153,15 @@ end
     end
 end
 
+@testset "Unused getRamanSSProp! overloads are removed" begin
+    # R6: the 4-argument RRS method reversed both ϖ_λ₁λ₀ and i_λ₁λ₀, which
+    # swapped Stokes and anti-Stokes weights. R8: the VS_0to1/VS_1to0 method
+    # assigned fields that the immutable VS structs do not have. Neither was
+    # called; the RRS entry point is getRamanSSProp!(rs, λ, ν).
+    @test !hasmethod(CoreRT.getRamanSSProp!, Tuple{IS.RRS, Any, Any, Any})
+    @test !hasmethod(CoreRT.getRamanSSProp!, Tuple{IS.VS_0to1, Any, Any, Any})
+    @test !hasmethod(CoreRT.getRamanSSProp!, Tuple{IS.VS_1to0, Any, Any, Any})
+    @test hasmethod(CoreRT.getRamanSSProp!, Tuple{IS.RRS, Any, Any})
+end
+
 end # module
