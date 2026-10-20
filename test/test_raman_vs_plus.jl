@@ -1,7 +1,8 @@
 # Vibrational Raman over concatenated bands (VS_0to1_plus, VS_1to0_plus).
 #
 # One incident wavelength (band 1) and its N₂/O₂ vibrational target bands, pure
-# Rayleigh, one layer, flat F₀. Covers the forward run itself.
+# Rayleigh, one layer, flat F₀. Covers the forward run and the source-band
+# depletion (decision 7, R5).
 
 module RamanVSPlusTests
 
@@ -67,6 +68,24 @@ end
     active = sort(unique(filter(>(0), rs.i_λ₁λ₀_all)))
     @test all(>(0), ieR[1, 1, active])
     @test all(iszero, ieR[1, 1, setdiff(1:nspec, active)])
+end
+
+@testset "VS plus: the incident band is the Raman source" begin
+    # Both directions take the vibrational Raman light from band 1 (the
+    # incident wavelength), so band 1 is depleted by the VRS + RVRS fraction
+    # and the target bands keep ϖ_Cabannes = 1. The depletion covers both
+    # directions (0→1 and 1→0); the weights of a VS_0to1_plus run carry the
+    # 0→1 part, i.e. all but ~6e-5 of it at the profile's effective
+    # temperature (the builder recomputes the molecular constants there).
+    for T in (IS.VS_0to1_plus, IS.VS_1to0_plus)
+        rs, _, _ = _vs_model(T)
+        @test rs.ϖ_Cabannes[1] < 1
+        @test rs.ϖ_Cabannes[2:end] == ones(FT, length(rs.ϖ_Cabannes) - 1)
+    end
+    rs, _, _ = _vs_model(IS.VS_0to1_plus)
+    depletion = 1 - rs.ϖ_Cabannes[1]
+    raman = sum(rs.ϖ_λ₁λ₀) + sum(rs.ϖ_λ₁λ₀_VS_n2) + sum(rs.ϖ_λ₁λ₀_VS_o2)
+    @test 0 < depletion - raman < 1e-4 * depletion
 end
 
 end # module

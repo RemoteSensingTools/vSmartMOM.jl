@@ -124,12 +124,14 @@ function getRamanSSProp!(
         _grid_in = grid_in[iB]
         λ = nm_per_m/(0.5*(_grid_in[1]+_grid_in[end]))
         
+        # Band 1 (the incident wavelength) is the source of the vibrational
+        # Raman light that the kernels put into bands 2 and 3, so its elastic
+        # part is depleted by the VRS + RVRS fraction; the target bands are not
+        # sources here and keep ϖ_Cabannes = 1 (as in VS_1to0_plus).
         if iB==1
-            #@show InelasticScattering.compute_ϖ_Cabannes(RS_type, depol, λ_inc, n2, o2)
-            ϖ_Cabannes[iB] = 1.    #@show ϖ_Cabannes
-        else
             ϖ_Cabannes[iB] = InelasticScattering.compute_ϖ_Cabannes(RS_type, λ_inc)
-            # 1.
+        else
+            ϖ_Cabannes[iB] = 1.
         end
         if iB==1
             t_ϖ_VRS = [0.]

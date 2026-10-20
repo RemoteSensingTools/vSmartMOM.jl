@@ -93,6 +93,16 @@ Architecturally:
   point, the result does not depend on whether `λ` falls on a grid point
   (the mean of an even-length band does not). The vibrational Raman lines of
   the VS modes are put on their target grids by the same interpolation.
+- **Vibrational Raman (`_plus`) runs take the Raman light from band 1.**
+  Band 1 holds the incident wavelength; its elastic single-scattering albedo
+  is reduced by the whole vibrational Raman fraction
+  ``(\sigma_\mathrm{VRS}+\sigma_\mathrm{RVRS})/\sigma_\mathrm{Rayl}`` of both
+  directions (≈ 9 × 10⁻⁴ at 395 nm), and the target bands keep the full
+  elastic albedo. A `VS_0to1_plus` run puts the Stokes (0→1) part, nearly all
+  of it, into its target bands; a `VS_1to0_plus` run only the anti-Stokes part
+  (at most a few 10⁻⁴ of it at atmospheric temperatures), so the energy
+  closes when both directions are combined. Rotational Raman is not
+  redistributed in these runs: its energy stays in the elastic part.
 - **Raman Jacobians are unsupported**. The `_lin.jl` files
   cover the elastic path only; ``\partial \mathbf{R}/\partial \mathbf{x}`` derivatives
   through inelastic scattering are not yet implemented.
