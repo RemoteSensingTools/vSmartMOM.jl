@@ -83,6 +83,12 @@ Architecturally:
   energy but concentrates it on those lines. All lines lie within ±234 cm⁻¹
   (N₂, J ≤ 28), so a complete RRS band needs a shoulder of that width around
   every output point.
+- **Raman lines fall between grid points.** Each line is shared between
+  its two neighbouring grid points by linear interpolation, which keeps the
+  line's strength and position. Because the shifts are measured from a grid
+  point, the result does not depend on whether `λ` falls on a grid point
+  (the mean of an even-length band does not). The vibrational Raman lines of
+  the VS modes are put on their target grids by the same interpolation.
 - **Raman Jacobians are unsupported**. The `_lin.jl` files
   cover the elastic path only; ``\partial \mathbf{R}/\partial \mathbf{x}`` derivatives
   through inelastic scattering are not yet implemented.

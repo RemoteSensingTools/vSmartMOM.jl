@@ -32,6 +32,62 @@ const PHASE1B_RUN_CPU = get(ENV, "PHASE1B_CPU", "0") == "1" || try
     using CUDA; CUDA.functional()
 catch; false; end
 
+# Rotational lines of `rs` with their strengths S = vmr σ (ν₀ + Δν)⁴.
+function _phase1b_lines(rs, ν₀)
+    lines = Tuple{Float64, Float64}[]
+    for mol in (rs.n2, rs.o2)
+        e = mol.effCoeff
+        for (Δ, σ) in zip(vcat(parent(e.Δν̃_RoRaman_coeff_JtoJp2), parent(e.Δν̃_RoRaman_coeff_JtoJm2)),
+                          vcat(parent(e.σ_RoRaman_coeff_JtoJp2), parent(e.σ_RoRaman_coeff_JtoJm2)))
+            σ > 0 && push!(lines, (Δ, mol.vmr * σ * (ν₀ + Δ)^4))
+        end
+    end
+    return lines
+end
+
+"""
+Line weights by source offset (`i => w`, kernel convention n₀ = n₁ + i) on the
+band grid `ν`, with shifts from the grid point nearest the band mean, for the
+legacy placement (S/2 on each neighbouring grid point, as when the reference
+was made; `:legacy`) or for linear interpolation (`:linear`). Built here
+independently of the package code.
+"""
+function _phase1b_line_weights(rs, ν, placement)
+    n = length(ν)
+    k₀ = argmin(abs.(ν .- sum(ν) / n))
+    ν₀ = Float64(ν[k₀])
+    Δν_grid = Float64.(ν) .- ν₀
+    w = Dict{Int, Float64}()
+    add!(k, x) = x > 0 && (w[k₀ - k] = get(w, k₀ - k, 0.0) + x)   # i = -(output offset)
+    for (Δ, S) in _phase1b_lines(rs, ν₀)
+        first(Δν_grid) < Δ < last(Δν_grid) || continue
+        if placement === :legacy
+            k = argmin(abs.(Δ .- Δν_grid))
+            pair = Δν_grid[k] < Δ ? (k, k + 1) : (k - 1, k)
+            foreach(kk -> add!(kk, S / 2), pair)
+        else
+            k = searchsortedlast(Δν_grid, Δ)
+            f = (Δ - Δν_grid[k]) / (Δν_grid[k + 1] - Δν_grid[k])
+            add!(k, (1 - f) * S)
+            add!(k + 1, f * S)
+        end
+    end
+    return w
+end
+
+"""
+Per-output-point factor that takes the frozen inelastic reference from the
+legacy line placement to linear interpolation: the ratio of the fractions of
+the line weight whose source point lies inside the band.
+"""
+function _phase1b_line_placement_correction(rs, ν)
+    n = length(ν)
+    legacy = _phase1b_line_weights(rs, ν, :legacy)
+    linear = _phase1b_line_weights(rs, ν, :linear)
+    in_band(w, k) = sum((wi for (i, wi) in w if 1 <= k + i <= n); init = 0.0) / sum(values(w))
+    return [in_band(linear, k) / in_band(legacy, k) for k in 1:n]
+end
+
 @testset "Phase 1b RRS regression" begin
 
 if !PHASE1B_RUN_CPU
@@ -74,8 +130,25 @@ else
     ref = load(joinpath(@__DIR__, "reference", "phase1b_RRS_sanghavi_q0.jld2"))
     R_ref   = ref["R_rrs"]
     T_ref   = ref["T_rrs"]
-    ieR_ref = ref["ieR"]
-    ieT_ref = ref["ieT"]
+    # Line-placement correction of the frozen inelastic reference (data left
+    # untouched). The reference put half of each rotational line on each of
+    # its two neighbouring grid points; lines are now shared by linear
+    # interpolation (v2.2 decision log, decision 7, R7). The total weight is
+    # unchanged, and with a flat F₀ the inelastic radiance at output point k is,
+    # to first order (τ_Rayleigh varies by ≈ 1.6 % across the band),
+    # proportional to the weight whose source k + i_λ₁λ₀ lies inside the band,
+    # so the reference is rescaled by the ratio of those in-band fractions.
+    # Away from the points where a line's source leaves the band the two
+    # placements agree to ~1e-5; with the rescaling they agree to < 1e-3
+    # everywhere (uncorrected: up to 12 % at six such points). The weights the
+    # code uses are first checked against the independent linear placement.
+    linear = _phase1b_line_weights(RS_type, ν, :linear)
+    @test sort(collect(keys(linear))) == sort(RS_type.i_λ₁λ₀)
+    w_code = Dict(zip(RS_type.i_λ₁λ₀, RS_type.ϖ_λ₁λ₀ ./ sum(RS_type.ϖ_λ₁λ₀)))
+    @test all(isapprox(w_code[i], w / sum(values(linear)); rtol = 1e-5) for (i, w) in linear)
+    corr = _phase1b_line_placement_correction(RS_type, ν)
+    ieR_ref = ref["ieR"] .* reshape(corr, 1, 1, :)
+    ieT_ref = ref["ieT"] .* reshape(corr, 1, 1, :)
 
     atol_all = 1e-6
     rtol_Stokes = 0.02   # see docstring — headroom for FP32 per-pixel noise after greek_cabannes fix

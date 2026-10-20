@@ -61,7 +61,7 @@ CPU; they do not add cases.
 | `test_forward_lin.jl` | historical | Legacy EMIT analytic-vs-FD Jacobians; 1–50 % thresholds with `isnan` allowances, so a pass is not accuracy evidence (see file header) |
 | `test_forward_noRS.jl` | active + flagged | Elastic forward-model smoke test; CUDA arm under `CUDA` |
 | `test_forward_raman.jl` | optional | Legacy RRS forward workflow; needs `test_parameters/O2Parameters.yaml` (CPU) or `O2Parameters_GPU.yaml` (GPU), which are not in `test_parameters/` (local copies live in `local/test_parameters/`) |
-| `test_forward_raman_phase1b.jl` | flagged | RRS forward vs frozen reference; runs only with `PHASE1B_CPU=1` or CUDA, otherwise one `@test_skip` |
+| `test_forward_raman_phase1b.jl` | flagged | RRS forward vs frozen reference (inelastic part rescaled in the test for the linear-interpolation line placement); runs only with `PHASE1B_CPU=1` or CUDA, otherwise one `@test_skip` |
 | `test_forward_ss.jl` | active | Single-scatter driver smoke test |
 | `test_fourier_convergence.jl` | active | Fourier early-exit strategies |
 | `test_fused_doubling.jl` | active + flagged | Fused doubling kernels on KA-CPU; CUDA arm under `CUDA` when device `BENCH_DEV` (default 0) can be selected |
@@ -105,7 +105,7 @@ CPU; they do not add cases.
 | `test_radau_overhead_sun.jl` | active | RadauQuad near an overhead sun: weights and geometry at SZA 0 in Float32/Float64, and continuity from SZA 0 to 1e-6, 1e-4 and Gauss |
 | `test_ray_cab_raman.jl` | active | Rayleigh/Cabannes/RRS identities |
 | `test_raman_placzek_teller.jl` | active | Placzek–Teller sum rule of the per-J Q/S/O lines; per-J Cabannes depolarization |
-| `test_raman_rrs_lines.jl` | active | RRS line weights on the band grid: a band without rotational lines is rejected |
+| `test_raman_rrs_lines.jl` | active | RRS line weights on the band grid: a band without rotational lines is rejected; linear-interpolation line placement; offsets from the reference grid point |
 | `test_raman_vs_plus.jl` | active | `VS_0to1_plus` / `VS_1to0_plus` forward runs over concatenated bands (pure Rayleigh, one layer) |
 | `test_rt_entry_guards.jl` | active | Solve-boundary guards: reused-RS F₀, HDR/BHR direct beam, TMS streams/bands, multisensor Cox–Munk TOA, U/V beams, thermal paths, linearized surfaces |
 | `test_scenario_sweep.jl` | active | Scenario sweeps vs monolithic `rt_run` |

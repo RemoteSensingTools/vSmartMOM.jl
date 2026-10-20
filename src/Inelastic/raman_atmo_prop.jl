@@ -85,20 +85,20 @@ function getRamanSSProp!(RS_type::RRS, λ, grid_in)
     RS_type.greek_raman = get_greek_raman(RS_type, n2, o2)
     #get_greek_raman!(RS_type, n2, o2)
     RS_type.ϖ_Cabannes .= compute_ϖ_Cabannes(RS_type, λ)
-    # @show RS_type.ϖ_Cabannes
-    # determine RRS cross-sections to λ₀ from nSpecRaman wavelengths around λ₀
-    index_raman_grid, atmo_σ_RRS = compute_optical_RS!(RS_type, grid_in, λ, n2, o2)
+    # RRS cross sections from a source point to the output points `offsets`
+    # grid steps away (output = source + offset), measured from the band grid
+    # point nearest λ.
+    offsets, atmo_σ_RRS = compute_optical_RS!(RS_type, grid_in, λ, n2, o2)
     # A band without any rotational line would drop the Raman fraction
     # 1 - ϖ_Cabannes from the elastic scattering without redistributing it.
     sum(atmo_σ_RRS) > 0 || throw(_no_rrs_line_error(grid_in, 1e7 / λ, n2, o2,
                                                     1 - RS_type.ϖ_Cabannes[1]))
-    # declare ϖ_Raman to be a grid of length raman grid
-    #RS_type.ϖ_λ₁λ₀ = atmo_σ_RRS[end:-1:1]/atmo_σ_Rayl * (1-RS_type.ϖ_Cabannes[1])/sum(reverse(atmo_σ_RRS)/atmo_σ_Rayl) #the grid gets inverted because the central wavelength is now seen as the recipient of RRS from neighboring source wavelengths
-    RS_type.ϖ_λ₁λ₀ = (reverse(atmo_σ_RRS)/atmo_σ_Rayl) #the grid gets inverted because the central wavelength is now seen as the recipient of RRS from neighboring source wavelengths
-    #@show RS_type.ϖ_λ₁λ₀
-    #@show sum(RS_type.ϖ_λ₁λ₀)
-    #@show RS_type.ϖ_Cabannes
-    RS_type.i_λ₁λ₀ = index_raman_grid #reverse(index_raman_grid)
+    # ϖ_λ₁λ₀[Δn] is the fraction of the Rayleigh scattering at a source point
+    # that goes to the output point `offset` steps away. The kernels index the
+    # source from the output, n₀ = n₁ + i_λ₁λ₀[Δn], so i_λ₁λ₀ = -offset. The
+    # pairs are listed in reverse so that i_λ₁λ₀ is ascending.
+    RS_type.ϖ_λ₁λ₀ = reverse(atmo_σ_RRS) / atmo_σ_Rayl
+    RS_type.i_λ₁λ₀ = -reverse(offsets)
     RS_type.n_Raman = length(RS_type.ϖ_λ₁λ₀)
     return nothing
 end 

@@ -543,17 +543,23 @@ function apply_lineshape!(Δνᵢ, σᵢ,  # discrete transitions
     #@show S_sum, sum(σ_out)*dν
 end
 
+"""
+    apply_gridlines!(Δνᵢ, σᵢ, λ₀, ν_in, σ_out; wavelength_flag=false)
+
+Put discrete Raman lines (shifts `Δνᵢ` in cm⁻¹ from ν₀ = 10⁷/λ₀, coefficients
+`σᵢ`) on the sorted wavenumber grid `ν_in`, writing `σ_out`. A line of
+strength S = σᵢ (ν₀ + Δνᵢ)⁴ inside the grid (end points included) is shared
+between its two bracketing grid points by linear interpolation, S(1 − f) and
+S f with f = (ν₀ + Δνᵢ − νₖ)/(νₖ₊₁ − νₖ), which keeps both the line strength
+and its position (first moment). Lines outside the grid are dropped.
+"""
 function apply_gridlines!(Δνᵢ, σᵢ,  # discrete transitions
     λ₀,                 # incident  wavelength [nm]
     # Note:  λ₀ can either be used to denote an individual 
     # wavelength or as a representative (e.g. central) 
     # wavelength for a specific band
-    ν_in,             # Output grid (equidistant)
+    ν_in,             # Output grid (sorted, ascending or descending)
     σ_out;              # σ at output grid
-    
-    #pressure::Real,     # actual pressure [hPa]
-    #temperature::Real,  # Temperature (K)
-    #molMass; 
     wavelength_flag::Bool=false)    
     σ_out .= 0;
     # Notify user of wavelength grid
@@ -562,57 +568,30 @@ function apply_gridlines!(Δνᵢ, σᵢ,  # discrete transitions
         Note: Rayleigh/Raman Cross-section reported to wavelength grid (nm)
         """  maxlog = 5
     end
-    Δν_in = ν_in .- nm_per_cm/λ₀
+    ν₀ = nm_per_cm/λ₀
+    # Shifts of the grid points from ν₀, in Float64 for any grid type.
+    Δν_in = Float64.(ν_in) .- ν₀
+    n = length(Δν_in)
+    rev = first(Δν_in) > last(Δν_in)
+    grid_min, grid_max = extrema(Δν_in)
 
-    # Max min range (ignoring wing cutoff here)
-    grid_max = maximum(Δν_in) 
-    grid_min = minimum(Δν_in) 
-
-    # Interpolators from grid bounds to index values
-    #grid_idx_interp_low  = linear_interpolation(Δν_out, 1:1:length(Δν_out), extrapolation_bc=1) 
-    #grid_idx_interp_high = linear_interpolation(Δν_out, 1:1:length(Δν_out), extrapolation_bc=length(Δν_out))
-    S_sum = 0.0
     # Loop through all transition lines:
     for j in eachindex(Δνᵢ)
-        #@show(grid_min, Δνᵢ[j], grid_max)
-        # Test that this ν lies within the grid
-        if grid_min < Δνᵢ[j] < grid_max
-            
-            ν = Δνᵢ[j] + nm_per_cm/λ₀#13500.0 #Dummy for now #Suniti
-
-            # Compute Doppler HWHM, ν still needs to be supplied, @Suniti?:
-            #γ_d = ((cSqrt2Ln2 / cc_) * sqrt(cBolts_ / cMassMol) * sqrt(temperature) * ν / sqrt(molMass))
-            # line intensity 
-            S = σᵢ[j] *  ν^4 #Suniti
-            #@show γ_d, Δνᵢ[j], S, ν, λ₀, cMassMol
-            S_sum += S
-            #wing_cutoff = 2γ_d 
-            i=argmin(abs.(Δνᵢ[j].-Δν_in))
-            #@show i, Δνᵢ[j]-Δν_in[i]    
-            if Δν_in[i]<Δνᵢ[j]
-                ind_start = i
-                ind_stop  = i+1
-            else
-                ind_start = i-1
-                ind_stop  = i
-            end         
-            # Calculate index range that this transition impacts
-            #ind_start = Int64(floor(grid_idx_interp_low(Δνᵢ[j] - wing_cutoff)))
-            #ind_stop  = Int64(ceil(grid_idx_interp_high(Δνᵢ[j] + wing_cutoff)))
-
-            # Create views from the result and grid arrays
-            result_view   = view(σ_out,  ind_start:ind_stop);
-            grid_view     = view(Δν_in, ind_start:ind_stop);
-
-            # Just Doppler broadening for now, can be modified with any line-shape later (using a kernel ideally)
-            for I in eachindex(grid_view)
-                # If we undersample the line-width, we have to make sure the integral is conserved (almost), TBD
-                @inbounds result_view[I] += S/2.# * cSqrtLn2divSqrtPi * exp(-cLn2 * (((grid_view[I]) - Δνᵢ[j]) / γ_d)^2) / γ_d
-                #@show grid_view[I], result_view[I]
-            end
+        # Test that this ν lies within the grid (end points included)
+        grid_min ≤ Δνᵢ[j] ≤ grid_max || continue
+        # line intensity at the scattered wavenumber
+        S = σᵢ[j] * (Δνᵢ[j] + ν₀)^4
+        if n == 1
+            σ_out[1] += S
+            continue
         end
+        # Bracketing grid points k, k+1 and the linear-interpolation weight
+        # (a line on the last grid point goes to it with f = 1)
+        k = min(searchsortedlast(Δν_in, Δνᵢ[j]; rev), n - 1)
+        f = (Δνᵢ[j] - Δν_in[k]) / (Δν_in[k+1] - Δν_in[k])
+        σ_out[k]   += (1 - f) * S
+        σ_out[k+1] += f * S
     end
-    #@show S_sum, sum(σ_out)
     nothing
 end
 
@@ -658,43 +637,57 @@ function _no_rrs_line_error(grid, ν₀, n2, o2, raman_fraction)
         "or use noRS() for this band.")
 end
 
+"""
+    compute_optical_RS!(rs::RRS, grid_in, λ₀, n2, o2) -> (offsets, σ_RRS)
+
+Rotational Raman cross sections (cm², VMR-weighted N₂ + O₂) on the uniform
+band grid `grid_in` (cm⁻¹). The line shifts are measured from the grid point
+`k₀` nearest the reference wavenumber 10⁷/λ₀, so the result does not depend on
+whether λ₀ falls on a grid point (the mean of an even-length band lies between
+two). `σ_RRS[k]` is the cross section from a source point to the output point
+`offsets[k]` grid steps away (output = source + offset; on an ascending
+grid, Stokes lines have negative offsets).
+"""
 function compute_optical_RS!(RS_type::RRS, grid_in, λ₀, n2, o2)
-    #plotly()
-    # grid_in is a uniform wavenumber grid covering the entire band spectrum 
-    # TMP: grid_in = nm_per_cm/λ₀.+collect(-250:0.002:250) #this is a wavenumber grid
-    # get_greek_raman!(RS_type, n2, o2)
-    
     grid_in_collected = collect(grid_in)
+    # Reference grid point: the line shifts, and hence the offsets, are taken
+    # from it, never from an off-grid ν₀.
+    ν_ref = nm_per_cm/λ₀
+    k₀ = argmin(abs.(grid_in_collected .- ν_ref))
+    if length(grid_in_collected) > 1
+        # λ₀ must lie within the band, up to rounding: 10⁻³ of a grid step plus
+        # a few ulps of the λ₀ and grid precisions (Float32 inputs).
+        tol = 1e-3 * minimum(abs, diff(grid_in_collected)) +
+              4 * (eps(float(typeof(λ₀))) + eps(float(eltype(grid_in_collected)))) * abs(ν_ref)
+        ν_min, ν_max = extrema(grid_in_collected)
+        ν_min - tol ≤ ν_ref ≤ ν_max + tol || throw(ArgumentError(
+            "rotational Raman (RRS): the reference wavelength λ = $(λ₀) nm " *
+            "($(ν_ref) cm⁻¹) lies outside the band grid " *
+            "$(first(grid_in_collected))–$(last(grid_in_collected)) cm⁻¹; use the band " *
+            "centre, λ = 1e7 / mean(ν)"))
+    end
+    λ_ref = nm_per_cm/Float64(grid_in_collected[k₀])
+
     σ_out = similar(grid_in_collected);
-    atmo_σ_RRS_JtoJp2 = similar(grid_in_collected);
-    atmo_σ_RRS_JtoJm2 = similar(grid_in_collected);
     σ_tmp = similar(grid_in_collected);
 
     # N2
-    apply_gridlines!(n2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2, n2.effCoeff.σ_RoRaman_coeff_JtoJp2,  λ₀, grid_in_collected, σ_out);
+    apply_gridlines!(n2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2, n2.effCoeff.σ_RoRaman_coeff_JtoJp2, λ_ref, grid_in_collected, σ_out);
     atmo_σ_RRS_JtoJp2 = n2.vmr * σ_out #cross section in cm^2
 
-    apply_gridlines!(n2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2, n2.effCoeff.σ_RoRaman_coeff_JtoJm2, λ₀, grid_in_collected, σ_out);
+    apply_gridlines!(n2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2, n2.effCoeff.σ_RoRaman_coeff_JtoJm2, λ_ref, grid_in_collected, σ_out);
     atmo_σ_RRS_JtoJm2 = n2.vmr * σ_out #cross section in cm^2
     # O2
-    apply_gridlines!(o2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2, o2.effCoeff.σ_RoRaman_coeff_JtoJp2, λ₀, grid_in_collected, σ_out);
+    apply_gridlines!(o2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2, o2.effCoeff.σ_RoRaman_coeff_JtoJp2, λ_ref, grid_in_collected, σ_out);
     atmo_σ_RRS_JtoJp2 += o2.vmr * σ_out #cross section in cm^2
 
-    apply_gridlines!(o2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2, o2.effCoeff.σ_RoRaman_coeff_JtoJm2, λ₀, grid_in_collected, σ_out);
+    apply_gridlines!(o2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2, o2.effCoeff.σ_RoRaman_coeff_JtoJm2, λ_ref, grid_in_collected, σ_out);
     atmo_σ_RRS_JtoJm2 += o2.vmr * σ_out #cross section in cm^2
 
     σ_tmp .= atmo_σ_RRS_JtoJm2 .+ atmo_σ_RRS_JtoJp2
     index_ramangrid_out = findall(>(0), σ_tmp)
     atmo_σ_RRS = σ_tmp[index_ramangrid_out]
-    if (nm_per_cm/λ₀>grid_in[1] && nm_per_cm/λ₀<grid_in[end])
-        index_ramangrid_out .-= argmin(abs.(grid_in_collected .- nm_per_cm/λ₀))
-    end 
-    #for I in eachindex(atmo_σ_RRS)
-    #    @show grid_in[argmin(abs.(grid_in .- nm_per_cm/λ₀))+index_ramangrid_out[I]], index_ramangrid_out[I], atmo_σ_RRS[I]
-    #end    
-    return index_ramangrid_out, atmo_σ_RRS;
-    #plot(grid_out, atmo_σ_RRS_JtoJp2, yscale=:log10)
-    #plot(1.e7/λ₀ .+ grid_out, atmo_σ_RRS_plot*1.e40)
+    return index_ramangrid_out .- k₀, atmo_σ_RRS;
 end
 
 function compute_optical_RS!(RS_type::Union{VS_0to1, VS_0to1_plus}, grid_in, λ₀, n2, o2)
