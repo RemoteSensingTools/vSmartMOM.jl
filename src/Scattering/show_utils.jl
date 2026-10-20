@@ -87,6 +87,7 @@ function Base.show(io::IO, ::MIME"text/plain", x::MieModel)
     println(io, _S_TREE_MID, "aerosol: ", x.aerosol)
     println(io, _S_TREE_MID, "λ: ", x.λ, " μm")
     println(io, _S_TREE_MID, "polarization: ", pol_name)
+    println(io, _S_TREE_MID, "r_min: ", x.r_min, " μm")
     println(io, _S_TREE_MID, "r_max: ", x.r_max, " μm")
     println(io, _S_TREE_MID, "nquad_radius: ", x.nquad_radius)
     print(io,   _S_TREE_END, "architecture: ", typeof(x.architecture).name.name,

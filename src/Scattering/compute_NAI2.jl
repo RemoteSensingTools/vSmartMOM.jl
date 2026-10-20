@@ -101,10 +101,9 @@ function compute_aerosol_optical_properties(model::MieModel{FDT,FT}, FT_out::Typ
     # not meaningful for Dual; the _mie_dn_recursion! generic path handles it).
     IC = FT <: AbstractFloat ? Float64 : FT  # IC = Internal Computation type
 
-    # Get radius quadrature points and weights using log-space quadrature
-    # (equidistant in ln(r) for efficient integration of log-normal distributions)
-    r_min = max(quantile(size_distribution, 1e-8), 1e-6 * IC(r_max))
-    r, wᵣ = gauleg_log(nquad_radius, IC(r_min), IC(r_max); norm=false)
+    # Radius quadrature points and weights, Gauss-Legendre in ln(r) on the fixed
+    # interval [r_min, r_max]: the nodes do not depend on the size distribution.
+    r, wᵣ = radius_quadrature(model, IC)
 
     # Wavenumber (in IC precision)
     k = IC(2π) / IC(λ)
@@ -364,7 +363,7 @@ Compute only the bulk extinction cross-section for the aerosol model:
 ```
 
 where ``C_{\mathrm{ext}}(r)`` is evaluated from the Mie series and ``p(r)`` is
-represented with quadrature over `[0, r_max]`.
+represented with quadrature over `[r_min, r_max]` (see [`radius_quadrature`](@ref)).
 
 The second argument `FT_out` sets the return type. It is supplied by the caller
 and must be passed explicitly — there is no default.  The internal cross-section
@@ -390,9 +389,8 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT,FT}, FT_out::Type) w
     # See compute_aerosol_optical_properties for the detailed rationale.
     IC = FT <: AbstractFloat ? Float64 : FT
 
-    # Get radius quadrature points and weights using log-space quadrature
-    r_min = max(quantile(size_distribution, 1e-8), 1e-6 * IC(r_max))
-    r, wᵣ = gauleg_log(nquad_radius, IC(r_min), IC(r_max); norm=false)
+    # Radius quadrature on the fixed interval [r_min, r_max]
+    r, wᵣ = radius_quadrature(model, IC)
 
     # Wavenumber (IC precision)
     k = IC(2π) / IC(λ)
@@ -448,10 +446,12 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT,FT}, FT_out::Type) w
 end
 
 @doc raw"""
-    phase_function(aerosol::Aerosol, λ, r_max, nquad_radius)
+    phase_function(aerosol::Aerosol, λ, r_max, nquad_radius; r_min=DEFAULT_R_MIN)
         -> (μ, w_μ, p11, C_ext, C_sca, g)
 
-Compute scalar phase-function output for a size-distributed aerosol.
+Compute scalar phase-function output for a size-distributed aerosol, with the
+size integral on `nquad_radius` log-spaced Gauss-Legendre nodes in the fixed
+interval `[r_min, r_max]` (the grid of [`radius_quadrature`](@ref)).
 
 The returned `p11(μ)` is normalized by the bulk scattering cross-section and
 satisfies:
@@ -468,7 +468,7 @@ g = \frac{1}{2}\int_{-1}^{1}\mu\,p_{11}(\mu)\,d\mu.
 
 Reference: Sanghavi (2014), Mie-amplitude/cross-section setup from Eq. (1), with NAI-style angular integration discussed in Secs. 3-4.
 """
-function phase_function(aerosol::Aerosol, λ, r_max, nquad_radius) 
+function phase_function(aerosol::Aerosol, λ, r_max, nquad_radius; r_min=DEFAULT_R_MIN)
 
     # Extract variables from aerosol struct:
     (; size_distribution, nᵣ, nᵢ) = aerosol
@@ -479,9 +479,9 @@ function phase_function(aerosol::Aerosol, λ, r_max, nquad_radius)
     # Get the refractive index's real part type
     FT = eltype(nᵣ);
     # @assert FT == Float64 "Aerosol computations require 64bit"
-    # Get radius quadrature points and weights using log-space quadrature
-    r_min = max(quantile(size_distribution, 1e-8), 1e-6 * r_max)
-    r, wᵣ = gauleg_log(nquad_radius, r_min, r_max; norm=true)
+    # Radius quadrature on the fixed interval [r_min, r_max]
+    _check_radius_bounds(r_min, r_max)
+    r, wᵣ = gauleg_log(nquad_radius, FT(r_min), FT(r_max); norm=true)
 
     # Wavenumber
     k = 2π / λ
@@ -624,11 +624,12 @@ function phase_function(r::FT, λ::FT, nᵣ::FT, nᵢ::FT) where {FT<:AbstractFl
 end
 
 @doc raw"""
-    compute_aerosol_XS(aerosol::Aerosol, λ, r_max, nquad_radius)
+    compute_aerosol_XS(aerosol::Aerosol, λ, r_max, nquad_radius; r_min=DEFAULT_R_MIN)
         -> (XS_ext, XS_sca, Cext_eff, Csca_eff)
 
 Compute bulk extinction/scattering cross-sections for a size-distributed aerosol
-without reconstructing phase matrices.
+without reconstructing phase matrices. The size integral uses the fixed radius
+interval `[r_min, r_max]` (the grid of [`radius_quadrature`](@ref)).
 
 # Returns
 - `XS_ext`: bulk extinction cross-section ``\bar{C}_{\mathrm{ext}}``
@@ -644,7 +645,8 @@ C_{\mathrm{eff}} = \frac{\bar{C}}{\pi\int r^2 p(r)\,dr}.
 
 Reference: Sanghavi (2014), Eq. (1) for particle-level `C_ext`/`C_sca`.
 """
-function compute_aerosol_XS(aerosol::Aerosol, λ::FT, r_max::FT, nquad_radius::Int64) where {FT<:AbstractFloat} 
+function compute_aerosol_XS(aerosol::Aerosol, λ::FT, r_max::FT, nquad_radius::Int64;
+                            r_min=DEFAULT_R_MIN) where {FT<:AbstractFloat}
     # Extract variables from aerosol struct:
     (; size_distribution, nᵣ, nᵢ) = aerosol
     
@@ -655,9 +657,9 @@ function compute_aerosol_XS(aerosol::Aerosol, λ::FT, r_max::FT, nquad_radius::I
     #@show size_distribution.σ  
     #FT = eltype(size_distribution.σ);
     # @assert FT == Float64 "Aerosol computations require 64bit"
-    # Get radius quadrature points and weights using log-space quadrature
-    r_min = max(quantile(size_distribution, 1e-8), 1e-6 * r_max)
-    r, wᵣ = gauleg_log(nquad_radius, r_min, r_max; norm=true)
+    # Radius quadrature on the fixed interval [r_min, r_max]
+    _check_radius_bounds(r_min, r_max)
+    r, wᵣ = gauleg_log(nquad_radius, FT(r_min), r_max; norm=true)
 
     # Wavenumber
     k = 2π / λ

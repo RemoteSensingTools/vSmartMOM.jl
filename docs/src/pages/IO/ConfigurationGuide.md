@@ -358,7 +358,10 @@ into a per-layer optical depth.
 **Band-level scattering knobs**
 
 - `r_max`, `nquad_radius` — the radius quadrature `Mie` integrates over. Larger
-  `nquad_radius` resolves the size distribution better at more cost.
+  `nquad_radius` resolves the size distribution better at more cost. The
+  optional `r_min` (default `1e-3` µm) is the lower bound; the nodes on
+  `[r_min, r_max]` do not move with the aerosol `μ`, `σ`, so the analytic size
+  Jacobians are exact for the chosen `nquad_radius`.
 - `λ_ref` — the wavelength `τ_ref` is anchored to.
 - `decomp_type` — phase-matrix Fourier decomposition: `NAI2()` (cheaper, GPU-
   capable, the default) or `PCW()` (precomputed Wigner; faster for very large

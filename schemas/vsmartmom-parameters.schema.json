@@ -525,6 +525,13 @@
         "r_max": {
           "type": "number"
         },
+        "r_min": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMinimum": true,
+          "default": 0.001,
+          "description": "Lower radius bound of the size-distribution quadrature (µm), fixed for the run and independent of the aerosol size parameters; must be below r_max."
+        },
         "nquad_radius": {
           "type": "number"
         },

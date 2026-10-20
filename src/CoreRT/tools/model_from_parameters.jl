@@ -525,7 +525,8 @@ function model_from_parameters(params::vSmartMOM_Parameters;
                                         params.polarization_type,
                                         truncation_type,
                                         params.scattering_params.r_max,
-                                        params.scattering_params.nquad_radius)
+                                        params.scattering_params.nquad_radius;
+                                        r_min = params.scattering_params.r_min)
         # k for reference wavelength (uses n_ref index, not the aerosol's own index)
         k_ref          = compute_ref_aerosol_extinction(mie_model_ref, params.float_type)
 
@@ -536,6 +537,7 @@ function model_from_parameters(params::vSmartMOM_Parameters;
                                       params.polarization_type, truncation_type,
                                       params.scattering_params.r_max,
                                       params.scattering_params.nquad_radius;
+                                      r_min = params.scattering_params.r_min,
                                       architecture = params.architecture)
 
         # Loop over bands
@@ -994,7 +996,8 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                                           params.polarization_type,
                                           truncation_type,
                                           params.scattering_params.r_max,
-                                          params.scattering_params.nquad_radius)
+                                          params.scattering_params.nquad_radius;
+                                          r_min = params.scattering_params.r_min)
         k_ref          = compute_ref_aerosol_extinction(mie_model_ref_vs, params.float_type)
 
         #params.scattering_params.rt_aerosols[i_aer].p₀, params.scattering_params.rt_aerosols[i_aer].σp
@@ -1012,6 +1015,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                                             truncation_type,
                                             params.scattering_params.r_max,
                                             params.scattering_params.nquad_radius;
+                                            r_min = params.scattering_params.r_min,
                                             architecture = params.architecture)
 
             # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually).

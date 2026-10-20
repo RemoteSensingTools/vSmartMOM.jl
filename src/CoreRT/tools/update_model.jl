@@ -282,7 +282,8 @@ function BatchContext(params::vSmartMOM_Parameters;
                                                 params.polarization_type,
                                                 truncation_type,
                                                 params.scattering_params.r_max,
-                                                params.scattering_params.nquad_radius)
+                                                params.scattering_params.nquad_radius;
+                                                r_min = params.scattering_params.r_min)
                 push!(k_ref_vec, Float64(compute_ref_aerosol_extinction(mie_model_ref, FT)))
             end
         end
@@ -973,7 +974,9 @@ is necessary.
 # Cost
 
 Full Mie per band (`O(n_bands × nquad_radius × size_distribution_points)`),
-i.e. the same cost as the aerosol section of `model_from_parameters`.
+i.e. the same cost as the aerosol section of `model_from_parameters`. The
+radius nodes are those of `ctx.params.scattering_params` (`r_min`, `r_max`,
+`nquad_radius`); they do not move with the new size distribution.
 
 # What it invalidates
 
@@ -1026,7 +1029,7 @@ function update_aerosol_microphysics!(ctx::BatchContext, i_aer::Int, aerosol::Ae
     mie_model_ref = make_mie_model(
         sp.decomp_type, ref_aerosol_mic, sp.λ_ref,
         params.polarization_type, truncation_type,
-        sp.r_max, sp.nquad_radius)
+        sp.r_max, sp.nquad_radius; r_min = sp.r_min)
     new_k_ref = Float64(compute_ref_aerosol_extinction(mie_model_ref, FT))
 
     # ── 2. Per-band Mie + truncation + τ_aer rows ───────────────────────────
@@ -1042,7 +1045,7 @@ function update_aerosol_microphysics!(ctx::BatchContext, i_aer::Int, aerosol::Ae
     _mie_fwd(λ) = make_mie_model(
         sp.decomp_type, aerosol, λ,
         params.polarization_type, truncation_type,
-        sp.r_max, sp.nquad_radius)
+        sp.r_max, sp.nquad_radius; r_min = sp.r_min)
 
     for i_band in 1:ctx.n_bands
         curr_band_λ = FT.(1e4 ./ params.spec_bands[i_band])

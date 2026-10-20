@@ -45,9 +45,8 @@ function compute_aerosol_optical_properties(model::MieModel{FDT,FT}, FT2::Type) 
 
     # FT is captured from the MieModel{FDT,FT,...} type parameter (same as aerosol.nᵣ type).
 
-    # Compute radii and weights using log-space quadrature
-    r_min = max(quantile(size_distribution, 1e-8), 1e-6 * r_max)
-    r, wᵣ = gauleg_log(nquad_radius, r_min, r_max; norm=true)
+    # Radii and weights: log-space quadrature on the fixed interval [r_min, r_max]
+    r, wᵣ = radius_quadrature(model; norm=true)
     wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max)
 
     # Find overall N_max from the maximum radius

@@ -363,11 +363,41 @@ Model that specifies the Mie computation details
 =#
 
 """
+    DEFAULT_R_MIN
+
+Default lower bound of the radius quadrature, `1e-3` µm (a radius of 1 nm,
+the smallest atmospheric aerosol particles).
+
+The bound is fixed: the radius nodes depend only on `r_min`, `r_max` and
+`nquad_radius`, never on the size-distribution parameters, so the analytic
+size-parameter tangents are exact derivatives of the discretized optics. For
+the size distributions in the shipped configurations, at most `1e-14` of the
+particle number lies below `1e-3` µm; the extinction cross-section falls at
+least as fast as `r²` towards small radii, so their optical contribution is
+smaller still.
+"""
+const DEFAULT_R_MIN = 1.0e-3
+
+"""
+    _check_radius_bounds(r_min, r_max)
+
+Require a finite radius interval `0 < r_min < r_max` for the size quadrature.
+"""
+function _check_radius_bounds(r_min, r_max)
+    (isfinite(r_min) && isfinite(r_max) && 0 < r_min < r_max) ||
+        throw(ArgumentError("the radius quadrature needs 0 < r_min < r_max; " *
+                            "got r_min = $r_min, r_max = $r_max"))
+    return nothing
+end
+
+"""
     MieModel{FDT<:AbstractFourierDecompositionType, FT, ARCH}
 
 Configuration for a Lorenz–Mie scattering computation.  Specifies the aerosol
 (size distribution + refractive index), wavelength, polarization type,
 truncation strategy, integration parameters, and the compute architecture.
+The size integral uses `nquad_radius` Gauss–Legendre nodes in `ln r` on the
+fixed interval `[r_min, r_max]` ([`radius_quadrature`](@ref)).
 The `computation_type` selects between NAI-2 (Siewert) and PCW (Domke) Fourier
 decomposition algorithms.
 
@@ -378,8 +408,8 @@ when unused (NAI2 path).
 # FT semantics (three orthogonal precision axes)
 
 `FT` is the **output** float type of the returned Greek coefficients and
-optical scalars.  It is carried by `λ`, `r_max`, and `aerosol` (which must all
-share the same `FT`) so that the entire `MieModel` is FT-consistent. This is
+optical scalars.  It is carried by `λ`, `r_max`, `r_min`, and `aerosol` (which
+must all share the same `FT`) so that the entire `MieModel` is FT-consistent. This is
 independent of two other precision choices:
 
 1. `FT` (output type) — what the user consumes downstream in the RT pipeline.
@@ -413,6 +443,8 @@ struct MieModel{FDT<:AbstractFourierDecompositionType, FT, ARCH}
 
     "Maximum radius `[μm]`"
     r_max::FT
+    "Minimum radius `[μm]`; fixed, independent of the size distribution (default [`DEFAULT_R_MIN`](@ref))"
+    r_min::FT
     "Number of quadrature points for integration over size distribution"
     nquad_radius::Int
 
@@ -429,19 +461,33 @@ struct MieModel{FDT<:AbstractFourierDecompositionType, FT, ARCH}
 end
 
 # Keyword constructor — preserves the public `MieModel(; …)` API that the former
-# `Base.@kwdef` provided, while enforcing the FT-consistent field types. `λ`, `r_max`
-# and the (placeholder) Wigner tables are promoted to the aerosol's float type `FT`,
+# `Base.@kwdef` provided, while enforcing the FT-consistent field types. `λ`, `r_max`,
+# `r_min` and the (placeholder) Wigner tables are promoted to the aerosol's float type `FT`,
 # exactly as `make_mie_model` does, so an `Aerosol{FT}` always yields a `MieModel{…,FT,…}`.
 # (FT is read from the aerosol inside the body: a `where {FT}` param cannot be bound from
 # a keyword argument — only positional args do that — so the type annotation route fails.)
 function MieModel(; computation_type, aerosol, λ, polarization_type, truncation_type,
-                  r_max, nquad_radius, wigner_A = nothing, wigner_B = nothing,
+                  r_max, nquad_radius, r_min = DEFAULT_R_MIN,
+                  wigner_A = nothing, wigner_B = nothing,
                   architecture = Architectures.CPU(), precision_policy = nothing)
     FT = typeof(aerosol.nᵣ)   # aerosol::Aerosol{FT}
+    _check_radius_bounds(FT(r_min), FT(r_max))
     wA = wigner_A === nothing ? zeros(FT, 1, 1, 1) : convert(Array{FT,3}, wigner_A)
     wB = wigner_B === nothing ? zeros(FT, 1, 1, 1) : convert(Array{FT,3}, wigner_B)
     return MieModel(computation_type, aerosol, FT(λ), polarization_type, truncation_type,
-                    FT(r_max), nquad_radius, wA, wB, architecture, precision_policy)
+                    FT(r_max), FT(r_min), nquad_radius, wA, wB, architecture, precision_policy)
+end
+
+# Positional form without `r_min` (the field order before the fixed radius grid):
+# the quadrature starts at `DEFAULT_R_MIN`.
+function MieModel(computation_type::AbstractFourierDecompositionType, aerosol::Aerosol{FT},
+                  λ, polarization_type, truncation_type, r_max, nquad_radius::Integer,
+                  wigner_A, wigner_B, architecture, precision_policy) where {FT}
+    _check_radius_bounds(FT(DEFAULT_R_MIN), FT(r_max))
+    return MieModel(computation_type, aerosol, FT(λ), polarization_type, truncation_type,
+                    FT(r_max), FT(DEFAULT_R_MIN), Int(nquad_radius),
+                    convert(Array{FT,3}, wigner_A), convert(Array{FT,3}, wigner_B),
+                    architecture, precision_policy)
 end
 
 #=

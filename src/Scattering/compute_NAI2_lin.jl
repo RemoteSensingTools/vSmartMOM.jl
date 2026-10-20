@@ -13,6 +13,13 @@ Compute the aerosol optical properties and their derivatives (w.r.t. nᵣ, nᵢ
 and the native `LogNormal` log-radius location and width)
 using the Siewert-NAI2 linearized method.
 
+The radius nodes ([`radius_quadrature`](@ref)) are fixed by `model.r_min`,
+`model.r_max` and `model.nquad_radius`, so the size directions act only on the
+normalized quadrature weights. The returned tangents are therefore the exact
+derivatives of the discretized forward optics of the same `MieModel` at any
+`nquad_radius`; their accuracy as derivatives of the continuous size integral
+follows the convergence of the forward quadrature.
+
 The third argument `FT2` sets the **output** float type for both the forward Greek
 coefficients and the derivative (lin) greek coefficients. It must be passed
 explicitly — there is no default.  The internal computation always runs in Float64 for
@@ -27,8 +34,7 @@ function compute_aerosol_optical_properties(lin::LinMode, model::MieModel{FDT,FT
     size_distribution = aerosol.size_distribution
     @assert aerosol.nᵢ ≥ 0
     IC = FT <: AbstractFloat ? Float64 : FT
-    r_min = max(quantile(size_distribution, 1e-8), 1e-6 * IC(r_max))
-    r, wᵣ = gauleg_log(nquad_radius, IC(r_min), IC(r_max); norm=false)
+    r, wᵣ = radius_quadrature(model, IC)
     wₓ, ẇₓ = compute_wₓ(lin, size_distribution, wᵣ, r, IC(r_max))
     return _nai2_bulk_optics_lin(model, FT2, r, wₓ, ẇₓ)
 end
@@ -327,9 +333,8 @@ function compute_ref_aerosol_extinction(lin::LinMode, model::MieModel{FDT,FT}, F
     # Internal computation precision: Float64 for plain floats, native for Dual.
     IC = FT <: AbstractFloat ? Float64 : FT
 
-    # Get radius quadrature points and weights using log-space quadrature
-    r_min = max(quantile(size_distribution, 1e-8), 1e-6 * IC(r_max))
-    r, wᵣ = gauleg_log(nquad_radius, IC(r_min), IC(r_max); norm=false)
+    # Radius quadrature on the fixed interval [r_min, r_max]
+    r, wᵣ = radius_quadrature(model, IC)
 
     # Wavenumber (IC precision)
     k = IC(2π) / IC(λ)

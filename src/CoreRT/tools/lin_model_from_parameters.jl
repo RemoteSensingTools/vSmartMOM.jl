@@ -550,7 +550,7 @@ function model_from_parameters(lin::LinMode,
         # builds Jacobians correctly via compute_aerosol_optical_properties(lin, …).
         _mie(λ) = make_mie_model(scat.decomp_type, mie_aerosol, λ,
             params.polarization_type, truncation_type, scat.r_max, scat.nquad_radius;
-            architecture = Architectures.CPU())
+            r_min = scat.r_min, architecture = Architectures.CPU())
 
         # Use the same AOD convention as the forward constructor:
         # q(λ) = k(λ; n, size) / k_ref(λ_ref; n_ref, size).
@@ -561,7 +561,8 @@ function model_from_parameters(lin::LinMode,
         mie_model_ref = make_mie_model(
             scat.decomp_type, ref_aerosol, scat.λ_ref,
             params.polarization_type, truncation_type,
-            scat.r_max, scat.nquad_radius; architecture=Architectures.CPU())
+            scat.r_max, scat.nquad_radius; r_min=scat.r_min,
+            architecture=Architectures.CPU())
         if compute_aerosol_microphysics_jacobians
             k_ref, k̇_ref = compute_ref_aerosol_extinction(
                 lin, mie_model_ref, params.float_type)

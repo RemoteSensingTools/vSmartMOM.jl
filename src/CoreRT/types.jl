@@ -1026,7 +1026,17 @@ mutable struct ScatteringParameters{FT<:Real}
     n_ref::Complex{FT}
     "Algorithm to use for fourier decomposition (NAI2/PCW)"
     decomp_type::AbstractFourierDecompositionType
+    "Minimum aerosol particle radius for quadrature points/weights (µm); fixed, independent of the size distributions"
+    r_min::FT
 end
+
+# Six-argument form (before `r_min` existed): the radius quadrature starts at
+# `Scattering.DEFAULT_R_MIN`.
+ScatteringParameters(rt_aerosols::Vector{RT_Aerosol{FT}}, r_max::FT, nquad_radius::Integer,
+                     λ_ref::FT, n_ref::Complex{FT},
+                     decomp_type::AbstractFourierDecompositionType) where {FT} =
+    ScatteringParameters(rt_aerosols, r_max, nquad_radius, λ_ref, n_ref, decomp_type,
+                         FT(Scattering.DEFAULT_R_MIN))
 
 """
     AbstractFourierConvergence

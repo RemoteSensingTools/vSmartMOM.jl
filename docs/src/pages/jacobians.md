@@ -414,6 +414,12 @@ divide the native size columns by `rₘ` and `σ_g`, respectively. This upstream
 coordinate convention is independent of the retrieval-specific transformations
 performed by a selected Jacobian plan.
 
+The size columns are derivatives of the discretized optics: the radius nodes
+are fixed by `scattering.r_min`, `r_max` and `nquad_radius` and do not move with
+`μ_logr` or `σ_logr`, so central differences of a rebuilt model reproduce them
+at any `nquad_radius`. Their accuracy as derivatives of the continuous size
+integral follows the convergence of the forward optics in `nquad_radius`.
+
 The array dimensions should always satisfy:
 
 ```julia

@@ -144,7 +144,8 @@ mie_model = make_mie_model(params.scattering_params.decomp_type,
                             params.polarization_type,
                             truncation_type,
                             params.scattering_params.r_max,
-                            params.scattering_params.nquad_radius)
+                            params.scattering_params.nquad_radius;
+                            r_min = params.scattering_params.r_min)
 
 # Analytic derivatives (the default production path)
 aer_optics_analytic, lin_aer_optics = compute_aerosol_optical_properties(

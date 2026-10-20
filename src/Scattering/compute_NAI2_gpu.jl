@@ -80,8 +80,7 @@ function compute_aerosol_optical_properties_gpu(
     _check_policy_ft(precision_policy, FT)
 
     # --- Setup (same as CPU path) ---
-    r_min = max(quantile(size_distribution, 1e-8), 1e-6 * r_max)
-    r, wᵣ = gauleg_log(nquad_radius, r_min, r_max; norm=false)
+    r, wᵣ = radius_quadrature(model, FT)
 
     k_wavenum = FT(2π / λ)
     x_size_param = k_wavenum .* r

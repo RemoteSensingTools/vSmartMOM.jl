@@ -75,6 +75,21 @@ the repository's `CITATION.bib`, with their original publication author order.
 - `model_from_parameters(LinMode(), params)` no longer adds water-vapour line
   absorption when the configuration has no `absorption` block: as in the
   forward constructor, omitting the block means no gas absorption.
+- The Mie radius quadrature no longer depends on the size distribution: its
+  nodes lie on the fixed interval `[r_min, r_max]`, with the new optional
+  `scattering.r_min` (default `1e-3` µm; `make_mie_model(...; r_min)`) in place
+  of each distribution's `1e-8` quantile. Analytic aerosol size Jacobians
+  (`μ_logr`, `σ_logr`) are now the exact derivatives of the forward model at
+  any `nquad_radius`; with nodes that moved with the size parameters they
+  could differ from finite differences by tens of per cent, and up to ~100 %,
+  at under-resolved node counts. Forward aerosol optics change by the
+  radius-quadrature error at the configured `nquad_radius` (e.g. ≤ 1e-5
+  relative in TOA radiance for an OCO-like three-mode scene with 300 nodes).
+  At a given `nquad_radius` the nodes now span a 1.2–1.6× wider range of
+  `ln r`; check convergence, in particular for coarse modes at ~100 nodes.
+  To reproduce a single-mode result
+  of an earlier version exactly, set `r_min` to that distribution's `1e-8`
+  quantile (or to `1e-6 r_max` if that is larger).
 - `default_parameters()` gives the aerosol pressure peak and width in hPa
   (`p₀: 900`, `σp: 50`), the unit of the profile; they were given in Pa.
   Aerosol results of `default_parameters()` and of GEOS-Chem-generated

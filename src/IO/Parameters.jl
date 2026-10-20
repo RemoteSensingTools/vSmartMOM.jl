@@ -1281,6 +1281,15 @@ function _parse_scattering(params_dict::Dict, FT::Type{<:AbstractFloat}=Float64)
     FTa = FT
     aerosols = aerosol_params_to_obj(params_dict["scattering"]["aerosols"], FTa)
     r_max = FTa(params_dict["scattering"]["r_max"])
+    # Optional fixed lower bound of the radius quadrature (µm). The nodes do not
+    # depend on the size distributions, so the size Jacobians are exact
+    # derivatives of the discretized optics.
+    r_min_value = get(params_dict["scattering"], "r_min", Scattering.DEFAULT_R_MIN)
+    _require_config(r_min_value isa Real && !(r_min_value isa Bool),
+        "scattering.r_min must be a number (µm); got $(repr(r_min_value))")
+    r_min = FTa(r_min_value)
+    _require_config(isfinite(r_min) && isfinite(r_max) && 0 < r_min < r_max,
+        "scattering.r_min must satisfy 0 < r_min < r_max; got r_min = $r_min, r_max = $r_max")
     nquad_radius = params_dict["scattering"]["nquad_radius"]
     λ_ref = FTa(params_dict["scattering"]["λ_ref"])
     dkey = replace(String(params_dict["scattering"]["decomp_type"]),"()"=>"")
@@ -1291,7 +1300,7 @@ function _parse_scattering(params_dict::Dict, FT::Type{<:AbstractFloat}=Float64)
     else
         parse(Complex{FTa}, params_dict["scattering"]["n_ref"])
     end
-    return ScatteringParameters(aerosols, r_max, nquad_radius, λ_ref, n_ref, decomp_type)
+    return ScatteringParameters(aerosols, r_max, nquad_radius, λ_ref, n_ref, decomp_type, r_min)
 end
 
 """

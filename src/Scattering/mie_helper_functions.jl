@@ -284,6 +284,26 @@ function gauleg_log(n, r_min, r_max; norm=false)
     return r, w
 end
 
+"""
+    radius_quadrature(model::MieModel, ::Type{T}=typeof(model.r_max); norm=false) -> (r, wᵣ)
+
+Radius nodes and weights of `model`'s size-distribution quadrature:
+`gauleg_log` with `model.nquad_radius` nodes on `[model.r_min, model.r_max]`.
+The bounds are converted to `T`; the nodes and weights come back in
+`promote_type(T, Float64)` (the Gauss–Legendre abscissae are `Float64`).
+
+The nodes depend only on `r_min`, `r_max` and `nquad_radius`, not on the size
+distribution, so a change of the distribution parameters changes only the
+weights (`compute_wₓ`); the linearized NAI-2 path differentiates exactly those
+weights. Every log-normal Mie path (NAI-2 CPU and GPU, linearized NAI-2, PCW)
+builds its nodes here.
+"""
+function radius_quadrature(model::MieModel, ::Type{T}=typeof(model.r_max);
+                           norm=false) where {T}
+    _check_radius_bounds(model.r_min, model.r_max)
+    return gauleg_log(model.nquad_radius, T(model.r_min), T(model.r_max); norm=norm)
+end
+
 @doc raw"""
     reconstruct_phase(greek_coefs, μ; returnLeg = false)
 

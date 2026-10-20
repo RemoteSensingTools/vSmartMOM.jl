@@ -15,8 +15,11 @@ runs.
   (see [Per-aerosol fields](#Per-aerosol-fields) below).
 - **`r_max`** — `Real` [µm]. Maximum particle radius for the size
   distribution quadrature. 30 µm covers most tropospheric Mie cases.
-- **`nquad_radius`** — `Integer`. Number of radius quadrature points.
-  Typical: 250–500.
+- **`nquad_radius`** — `Integer`. Number of radius quadrature points,
+  Gauss–Legendre in `ln r` on `[r_min, r_max]`. Typical: 250–500. The
+  nodes span the whole interval whatever the size distribution, so check
+  convergence of the optics (and of size Jacobians) for the narrowest or
+  largest-particle mode in the run.
 - **`λ_ref`** — `Real` [µm]. Reference wavelength for the aerosol
   optical depth normalization.
 - **`decomp_type`** — `String`. Fourier decomposition algorithm:
@@ -26,6 +29,20 @@ runs.
 
 ## Optional fields
 
+- **`r_min`** — `Real` [µm], default `1e-3` (1 nm). Lower radius bound of the
+  size-distribution quadrature; requires `0 < r_min < r_max`. Like `r_max` it
+  is fixed for the run and shared by all aerosol modes: the radius nodes depend
+  only on `r_min`, `r_max` and `nquad_radius`, never on any mode's `μ` or `σ`.
+  A change of `μ` or `σ` therefore changes only the quadrature weights, and the
+  analytic size-parameter Jacobians are the exact derivatives of the
+  discretized optics at any `nquad_radius` (finite differences that rebuild
+  the model with perturbed `μ`/`σ` reproduce them). How closely those optics
+  and derivatives approach the continuous size integral depends on
+  `nquad_radius`. Below 1 nm the configured distributions hold at most `1e-14`
+  of their particle number and a negligible part of their extinction; raise
+  `r_min` only for distributions without such small particles, to concentrate
+  the nodes. (Before v2.2 the lower bound was each distribution's `1e-8`
+  quantile, so the nodes moved with `μ` and `σ`.)
 - **`n_ref`** — `Complex`. Reference refractive index for the AOD
   normalization. Defaults to the first aerosol's `(nᵣ, nᵢ)` if
   omitted. Once parsed, this is fixed configuration shared by all aerosol

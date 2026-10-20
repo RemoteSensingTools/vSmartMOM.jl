@@ -65,8 +65,10 @@ model_NAI2 = make_mie_model(NAI2(), aero, λ, Stokes_IQUV(), δBGE(20), 30.0, 50
 # bound increases; a small omitted number fraction can still carry substantial
 # cross section.
 #
-# **`nquad_radius`** — Gauss–Legendre points over ``[0, r_{\max}]``. More points → better
-# accuracy for broad size distributions. Typical: 500–2000; narrow distributions need fewer.
+# **`nquad_radius`** — Gauss–Legendre points in ``\ln r`` over the fixed interval
+# ``[r_{\min}, r_{\max}]`` (`r_min` keyword of `make_mie_model`, default `1e-3` µm). The
+# nodes do not depend on the size distribution, so they must resolve the narrowest mode
+# and the Mie oscillations of the largest particles. Typical: 500–2000.
 #
 # **`l_max` / `l_trunc`** — Maximum Legendre order in the Greek expansion. Must exceed
 # the effective size parameter; ``l_{\max} \gtrsim 2\pi r_{\max}/\lambda``. Too low truncates

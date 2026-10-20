@@ -131,6 +131,9 @@ scattering:
       σp:             50.0          # Pressure peak width (hPa)
   # Maximum aerosol particle radius for quadrature points/weights (µm)
   r_max:          50.0
+  # Optional minimum radius (µm); the radius nodes on [r_min, r_max] do not
+  # depend on the size distribution. Default 0.001.
+  # r_min:          0.001
   # Number of quadrature points for aerosol radius
   nquad_radius:   2500
   # Reference wavelength (µm)
