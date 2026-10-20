@@ -1,9 +1,10 @@
-# Per-J Q-branch line strengths: Placzek–Teller weight b_JJ (decision 5, R2)
+# Per-J Q-branch lines and the VS Q-branch phase matrix: Placzek–Teller weight b_JJ (decisions 5 and 7; R2, R4)
 
 Decided by Suniti Sanghavi on 2026-10-19 after the reference check below.
 Code: `compute_σ_Rayl_VibRaman_coeff_hires!` in
 `src/Inelastic/src/inelastic_cross_section.jl`; test:
-`test/test_raman_placzek_teller.jl`.
+`test/test_raman_placzek_teller.jl`. The VS Q-branch phase matrix (R4) is in
+its own section below.
 
 ## What changed
 
@@ -60,14 +61,59 @@ squared b_JJ, apparently a parenthesization slip.
 - **Eq. 32** multiplies the whole line, including α′², by b_JJ. That scales
   the isotropic part by ≈ ¼, which Placzek–Teller does not do.
 - **The code's per-J line strengths** now follow Placzek–Teller (points 1–3
-  above). The VS Q-branch *phase matrix* (`get_greek_raman_VS`, through
-  `rho_depol_VibRaman`) still uses the J-independent depolarization of Eq. 29
-  with the full γ′² (γ_C = 0.085 for N₂ and 0.170 for O₂; Sanghavi 2022,
-  Table 4). The value consistent with these line strengths, using ⟨b_JJ⟩, is
-  γ_C ≈ 0.024 / 0.053. That is the
-  open Raman item R4 ("band-depolarized Q-branch phase"), not part of this change.
+  above), and so does the VS Q-branch *phase matrix* (R4, next section). It
+  used the J-independent depolarization of Eq. 29 with the full γ′²
+  (γ_C = 0.085 for N₂ and 0.170 for O₂; Sanghavi 2022, Table 4).
 
-## Effect
+## VS Q-branch phase matrix: ⟨b_JJ⟩ (decision 7, R4)
+
+Decided by Suniti Sanghavi on 2026-10-19 (decision 7, "fix all as cleanup").
+Code: `get_greek_raman_VS` in `src/Inelastic/inelastic_helper.jl` and
+`q_branch_mean_b` in `src/Inelastic/src/inelastic_cross_section.jl`; test:
+`test/test_raman_placzek_teller.jl`, testset "VS Q-branch phase matrix uses
+the line-weighted ⟨b_JJ⟩".
+
+The VS runs treat the vibrational Q branch (ΔJ = 0) of each molecule as one
+set of lines with one phase matrix; the O and S branches are separate RVRS
+lines with the RRS phase matrix (γ_C = 3/4). Each per-J Q line is a
+Rayleigh-type line with isotropic part α′²/3 and anisotropic part
+(2/27) b_JJ γ′² (section "What changed"). The phase matrix of such a line is
+linear in the two parts, so the sum of the lines is again a Rayleigh-type
+line, with anisotropic part (2/27) ⟨b_JJ⟩ γ′²:
+
+    ⟨b_JJ⟩ = Σ_J w_J b_JJ / Σ_J w_J,   w_J = g_J (2J+1) exp(−hc E(v,J)/(k T)),
+    γ_C,Q = 3⟨b_JJ⟩γ′² / (45α′² + 4⟨b_JJ⟩γ′²) = _q_branch_depolarization(α′, γ′, ⟨b_JJ⟩),
+    ρ_Q = 2γ_C,Q / (1 + γ_C,Q),
+
+summed over the levels J = 0…Jmax of the per-J lines, with v = 0 for
+`VS_0to1(_plus)` and v = 1 for `VS_1to0(_plus)`. T is the temperature at which
+the per-J lines were computed: `compute_σ_Rayl_VibRaman_coeff_hires!` now
+stores it in `mol.effCoeff.T` (the field existed but was never set), so the
+phase matrix and the line strengths describe the same population. The ν⁴
+factors of the individual lines (the Q-branch lines spread over a few cm⁻¹)
+are left out of the weights; they change ⟨b_JJ⟩ by much less than 10⁻⁴.
+
+| 395 nm, 300 K | ⟨b_JJ⟩ | γ_C before → after | ρ before → after | β₂ before → after |
+|---|---|---|---|---|
+| N₂ | 0.2552 | 0.0850 → 0.0237 | 0.1566 → 0.0463 | 0.391 → 0.466 |
+| O₂ | 0.2595 | 0.1695 → 0.0528 | 0.2899 → 0.1004 | 0.310 → 0.428 |
+
+⟨b_JJ⟩ hardly depends on T (N₂ 0.2563 at 220 K, O₂ 0.2624) and v = 1 differs
+from v = 0 by less than 5 × 10⁻⁴. `γ_C_VibRaman` and `rho_depol_VibRaman` keep
+the whole-band value of Eq. 29; it still enters `compute_σ_VibRaman_coeff!`
+(whole-band cross section) and the stellar H₂ `get_greek_raman_VS`, which is
+not changed here.
+
+**Effect** (`VS_0to1_plus` at 395 nm, pure Rayleigh, one layer with
+τ_Rayleigh = 0.378, SZA 45°, flat F₀; measured with the corrected builder of
+decision 8). The elastic radiances do not change, and neither does the
+vibrational Raman energy (the line strengths are the same). Its angular and
+polarization distribution does: the band-summed inelastic I changes by
++4.1 % at nadir, −4.1 % at VZA 45° (Δφ = 0°), +3.1 % at VZA 45° (Δφ = 180°)
+and −1.9 % at VZA 60° (Δφ = 90°); its Q/I goes from 0.208 to 0.243 at nadir
+and from 0.658 to 0.850 at VZA 45° (Δφ = 0°).
+
+## Effect of the b_JJ line weights
 
 - **σ_VRS rises.** σ_VRS (vibrational Q branch, `inelastic_helper.jl`) rises by
   13.3 % (O₂) and 5.9 % (N₂) relative to the old code, at 250–300 K and
@@ -84,7 +130,7 @@ squared b_JJ, apparently a parenthesization slip.
 
 ## Tests
 
-`test/test_raman_placzek_teller.jl` checks two things.
+`test/test_raman_placzek_teller.jl` checks the following.
 
 - **Per-J identity.** Q + S + O = 128π⁵ g_J(2J+1) N_J (α²/3 + 2γ²/27) holds to
   1e-10 for every J ≤ Jmax−2. It is checked for the elastic lines and the
@@ -98,6 +144,12 @@ squared b_JJ, apparently a parenthesization slip.
   energy-conservation route `compute_γ_mol_Cabannes!` to within 2 % at 395 and
   760 nm, and its anisotropy fraction lies in 0.24–0.28.
 - **Discrimination.** With the old b_JJ², 176 of the original 210 checks fail.
+- **VS Q-branch phase matrix (R4).** `q_branch_mean_b` equals the anisotropy
+  fraction X/γ′² of the summed per-J Q lines to 1e-10 (v = 0 and 1, N₂ and O₂,
+  220 and 300 K) and lies in 0.24–0.28; the depolarization carried by the
+  Greek coefficients of `get_greek_raman_VS` equals
+  3⟨b_JJ⟩γ′²/(45α′² + 4⟨b_JJ⟩γ′²) to 1e-10 and is below a third of the
+  whole-band value.
 
 ## References
 

@@ -103,6 +103,10 @@ Architecturally:
   (at most a few 10⁻⁴ of it at atmospheric temperatures), so the energy
   closes when both directions are combined. Rotational Raman is not
   redistributed in these runs: its energy stays in the elastic part.
+- **The vibrational Q branch (ΔJ = 0) has a Rayleigh-type phase matrix**
+  whose depolarization follows from the population-weighted Placzek–Teller
+  coefficient ⟨b_JJ⟩ of its per-J lines (ρ ≈ 0.046 for N₂ and 0.100 for O₂);
+  the O and S branches use the rotational Raman phase matrix.
 - **Raman Jacobians are unsupported**. The `_lin.jl` files
   cover the elastic path only; ``\partial \mathbf{R}/\partial \mathbf{x}`` derivatives
   through inelastic scattering are not yet implemented.

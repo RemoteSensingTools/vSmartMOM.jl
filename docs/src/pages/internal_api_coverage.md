@@ -105,6 +105,7 @@ vSmartMOM.StandaloneSS.chain_rule_combine_surface_brdf
 
 ```@docs
 vSmartMOM.InelasticScattering.get_greek_raman_VS
+vSmartMOM.InelasticScattering.q_branch_mean_b
 vSmartMOM.InelasticScattering.has_inelastic
 vSmartMOM.InelasticScattering.uses_cabannes_phase
 vSmartMOM.InelasticScattering.needs_interaction_workspace

@@ -95,3 +95,40 @@ end
         @test iszero(_IS._q_branch_depolarization(α, γ, zero(FT)))
     end
 end
+
+@testset "VS Q-branch phase matrix uses the line-weighted ⟨b_JJ⟩" begin
+    # The VS Q-branch phase matrix (decision 7, R4) must be the one of the sum
+    # of the per-J Q lines: α′²/3 + (2/27)⟨b_JJ⟩γ′² with the population-weighted
+    # ⟨b_JJ⟩ at the temperature of the lines, not the whole-band γ_C of
+    # Sanghavi (2022), Eq. 29 (b = 1).
+    Jmax = 30
+    for T in (220.0, 300.0)
+        n2, o2 = _IS.getRamanAtmoConstants(1e7 / 395.0, T)
+        for (mol, γ_range) in ((n2, (0.020, 0.030)), (o2, (0.045, 0.060)))
+            c = mol.effCoeff
+            @test c.T == T
+            Z = _partition(mol, T, Jmax)
+            for (v, lines, RS) in ((0, c.σ_VibRaman_coeff_0to1_hires, _IS.VS_0to1_plus),
+                                   (1, c.σ_VibRaman_coeff_1to0_hires, _IS.VS_1to0_plus))
+                # Anisotropy fraction X/γ′² of the summed Q lines.
+                w = [_spin_weight(mol, J) * (2J + 1) * _boltzmann(mol, v, J, T) / Z for J in 0:Jmax]
+                Q = sum(lines[J] for J in 0:Jmax) / (128π^5)
+                b_lines = (Q / sum(w) - c.α_prime^2 / 3) * 27 / (2c.γ_prime^2)
+                b̄ = _IS.q_branch_mean_b(mol, v)
+                @test b̄ ≈ b_lines rtol = 1e-10
+                @test 0.24 < b̄ < 0.28
+                # Depolarization carried by the Greek coefficients:
+                # β₂ = (1 − ρ)/(2 + ρ), so ρ = (1 − 2β₂)/(1 + β₂).
+                # VS_1to0_plus has no keyword defaults; reuse those of VS_0to1_plus.
+                rs0 = _IS.VS_0to1_plus{Float64}(n2 = n2, o2 = o2)
+                rs = RS{Float64}(; (f => getfield(rs0, f) for f in fieldnames(RS))...)
+                β₂ = _IS.get_greek_raman_VS(rs, mol).β[3]
+                ρ = (1 - 2β₂) / (1 + β₂)
+                γ_C = ρ / (2 - ρ)
+                @test γ_C ≈ 3b̄ * c.γ_prime^2 / (45c.α_prime^2 + 4b̄ * c.γ_prime^2) rtol = 1e-10
+                @test γ_range[1] < γ_C < γ_range[2]
+                @test γ_C < c.γ_C_VibRaman / 3   # whole-band value (b = 1)
+            end
+        end
+    end
+end

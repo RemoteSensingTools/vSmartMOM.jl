@@ -205,7 +205,34 @@ function compute_σ_Rayl_VibRaman_coeff_hires!(T, mol::MolecularConstants{FT}; J
     σ_VibRaman_coeff_0to1_hires /= Z_pf
     σ_VibRaman_coeff_1to0_hires /= Z_pf
     #@show Z_pf
-    @pack! mol.effCoeff = σ_Rayl_coeff_hires, σ_VibRaman_coeff_0to1_hires, σ_VibRaman_coeff_1to0_hires, Δν̃_Rayl_coeff_hires, Δν̃_VibRaman_coeff_0to1_hires, Δν̃_VibRaman_coeff_1to0_hires
+    # T is kept as the temperature of these per-J lines (see q_branch_mean_b).
+    @pack! mol.effCoeff = σ_Rayl_coeff_hires, σ_VibRaman_coeff_0to1_hires, σ_VibRaman_coeff_1to0_hires, Δν̃_Rayl_coeff_hires, Δν̃_VibRaman_coeff_0to1_hires, Δν̃_VibRaman_coeff_1to0_hires, T
+end
+
+"""
+    q_branch_mean_b(mol, v)
+
+Population-weighted Placzek–Teller coefficient of the Q-branch (ΔJ = 0) lines
+that start in vibrational level `v`,
+
+    ⟨b_JJ⟩ = Σ_J w_J b_JJ / Σ_J w_J,   w_J = g_J (2J+1) exp(−hc E(v,J)/(k T)),
+
+with b_JJ = J(J+1)/((2J−1)(2J+3)) (Sanghavi 2022, Eq. 31) and g_J the nuclear
+spin weight. The sum runs over the levels J = 0…Jmax of the per-J lines of
+`compute_σ_Rayl_VibRaman_coeff_hires!`, at the temperature T they were
+computed for (`mol.effCoeff.T`). Each of those lines carries the anisotropy
+b_JJ γ², so their sum carries ⟨b_JJ⟩ γ².
+"""
+function q_branch_mean_b(mol, v)
+    (; E_vJ, T, σ_VibRaman_coeff_0to1_hires) = mol.effCoeff
+    num = 0.0
+    den = 0.0
+    for J in axes(σ_VibRaman_coeff_0to1_hires, 1)
+        w = mol.gₛ[2 - J % 2] * (2J + 1) * exp(-h * c * E_vJ[v, J] / (k_B * T))
+        num += w * J * (J + 1) / ((2J - 1) * (2J + 3))
+        den += w
+    end
+    return num / den
 end
 
 """

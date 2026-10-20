@@ -909,17 +909,32 @@ function get_greek_raman(RS_type::Union{RRS, VS_0to1, VS_0to1_plus, VS_1to0, VS_
     #return nothing
 end
 
+# Vibrational level from which the lines of each vibrational Raman mode start.
+_vs_initial_level(::Union{VS_0to1, VS_0to1_plus}) = 0
+_vs_initial_level(::Union{VS_1to0, VS_1to0_plus}) = 1
+
 """
     get_greek_raman_VS(rs, molecule)
 
-Return vibrational Raman phase-function Greek coefficients for one molecular
-species.
+Return the Greek coefficients of the vibrational Q-branch (ΔJ = 0) phase
+matrix of one molecular species. The Q branch is the sum of the per-J lines of
+`compute_σ_Rayl_VibRaman_coeff_hires!`, each a Rayleigh-type line with
+isotropic part α′²/3 and anisotropic part (2/27) b_JJ γ′². Their sum is a
+single Rayleigh-type line with the population-weighted ⟨b_JJ⟩
+(`q_branch_mean_b`, same temperature as the lines), so the phase
+matrix uses
+
+    γ_C = 3⟨b_JJ⟩γ′² / (45α′² + 4⟨b_JJ⟩γ′²),   ρ = 2γ_C / (1 + γ_C).
+
+(The O and S branches are separate RVRS lines with the RRS phase matrix.)
 """
 function get_greek_raman_VS(RS_type::Union{VS_0to1, VS_0to1_plus, VS_1to0, VS_1to0_plus}, 
                             in_molec)
-    
-    depol = in_molec.effCoeff.rho_depol_VibRaman
-    
+    e = in_molec.effCoeff
+    b̄ = q_branch_mean_b(in_molec, _vs_initial_level(RS_type))
+    γ_C = _q_branch_depolarization(e.α_prime, e.γ_prime, b̄)
+    depol = 2γ_C / (1 + γ_C)
+
     FT = eltype(depol)
     # Rayleigh Greek Parameters
     dpl_p = (1 - depol)  / (1 + depol / 2)
