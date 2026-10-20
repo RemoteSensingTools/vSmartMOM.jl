@@ -494,7 +494,9 @@ construct_Π_matrix(mod::Stokes_I, P, R, T, l::Int, m::Int; sign_change=false) =
 """
     $(FUNCTIONNAME)(mod::Stokes_IQUV, α, β, γ, δ, ϵ, ζ, l::Int)
 Compute B matrix for all stokes vector elements used in computations of the phase matrix
-See Sanghavi 2014, eq. 16
+See Sanghavi 2014, eq. 16. Storage convention: `+ϵ` at [3,4] is Siewert's (and
+Sanghavi & Stephens 2015, Eq. 22) `-ε`, because the code's γ and ϵ carry the
+opposite sign to Siewert's; see the conventions page, §2.
 """
 construct_B_matrix(mod::Stokes_IQUV, α, β, γ, δ, ϵ, ζ, l::Int) = SMatrix{4,4}([β[l] γ[l] 0 0 ; γ[l] α[l] 0 0; 0 0 ζ[l] ϵ[l]; 0 0 -ϵ[l] δ[l]])
 

@@ -80,6 +80,10 @@ review of General's sequential-version rule.
   path; RRS, Rayleigh and all noRS/RRS results are unchanged. Derivation and
   references:
   `docs/dev_notes/raman_q_branch_placzek_teller.md`.
+- Documentation: the Greek matrix B_l is shown as printed by Sanghavi &
+  Stephens (2015, Eq. 22) in Siewert's form, which the vSmartMOM paper uses by
+  reference (−ε at [3,4]), with the exact mapping to the code's stored γ and ε;
+  no numerical change.
 - HITRAN cache: `artifact(molecule)` under a downloaded edition now uses the
   cached file only if it is a verified full dataset (0–150000 cm⁻¹, all
   isotopologues, SHA-256 matching its metadata); otherwise it downloads the

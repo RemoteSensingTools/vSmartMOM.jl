@@ -52,24 +52,29 @@ in `src/Scattering/`. The dispatcher branches on the decomposition algorithm
 ## The Greek matrix `B_l`
 
 Polarized Mie scattering is fully captured by the Greek expansion of the
-``4 \times 4`` phase matrix (Sanghavi 2014 App. A; Sanghavi 2014 Mie-Fourier
-Eq. 16):
+``4 \times 4`` phase matrix. Sanghavi & Stephens (2015, Eq. 22) print it in
+Siewert's form, which the vSmartMOM paper (Sanghavi et al. 2014) uses by
+reference:
 
 ```math
 \mathbf{B}_l =
 \begin{bmatrix}
 \beta_l & \gamma_l & 0 & 0 \\
 \gamma_l & \alpha_l & 0 & 0 \\
-0 & 0 & \zeta_l & \epsilon_l \\
-0 & 0 & -\epsilon_l & \delta_l
+0 & 0 & \zeta_l & -\epsilon_l \\
+0 & 0 & \epsilon_l & \delta_l
 \end{bmatrix}
 ```
 
-This is vSmartMOM's storage convention (`construct_B_matrix`, with
-`B[3,4] = +ε`). Some printed forms (e.g. Siewert 2000; de Haan et al. 1987)
-put ``-\epsilon_l`` at ``[3,4]``; the
+Relative to that (Siewert/VLIDORT) convention the code's Stokes vector is
+``(I, -Q, -U, -V)``:
+`construct_B_matrix` stores ``\gamma_l`` and ``\epsilon_l`` with the opposite
+sign and writes ``+\epsilon_l`` at ``[3,4]``, so its ``[3,4]/[4,3]`` block is
+numerically the one above and only the ``\gamma`` elements differ. The
+[conventions page](../conventions.md#2.-Phase-matrix-and-Greek-coefficients)
+gives the exact mapping, and the
 [import/export checklist](../conventions.md#5.-Quick-reference:-import/export-checklist)
-flips the sign of ε for Siewert/VLIDORT imports accordingly.
+negates γ and ε for coefficients in Siewert's (2000) or VLIDORT's convention.
 
 The six coefficients ``(\alpha_l, \beta_l, \gamma_l, \delta_l, \epsilon_l, \zeta_l)``
 fully determine the polarized scattering pattern — ``\beta_l`` is the
@@ -411,6 +416,7 @@ Runnable examples with Plotly figures:
 - **Sanghavi (2014)**, *Revisiting the Fourier expansion of Mie scattering matrices in generalized spherical functions*, JQSRT **136**:16–27, [doi:10.1016/j.jqsrt.2013.12.015](https://doi.org/10.1016/j.jqsrt.2013.12.015). **NAI-2 vs PCW comparison; corrected Domke formalism.**
 - Sanghavi et al. (2014), JQSRT **133**:412–433, [doi:10.1016/j.jqsrt.2013.09.004](https://doi.org/10.1016/j.jqsrt.2013.09.004), App. A.
 - Hansen, J. E. & Travis, L. D. (1974), *Light scattering in planetary atmospheres*, Space Sci. Rev. **16**:527. (Background on Mie + Greek matrix.)
+- Sanghavi, S. & Stephens, G. (2015), *Adaptation of the delta-m and δ-fit truncation methods to vector radiative transfer: Effect of truncation on radiative transfer accuracy*, JQSRT **159**:53–68, [doi:10.1016/j.jqsrt.2015.03.007](https://doi.org/10.1016/j.jqsrt.2015.03.007), Eqs. 21–22.
 - Siewert, C. E. (1981, 1982), *On the equation of transfer relevant to the scattering of polarized light*, *On the phase matrix basic to the scattering of polarized light*. (NAI formalism.)
 - Domke, H. (1974), *The expansion of scattering matrices for an isotropic medium in generalized spherical functions*, Astrophys. Space Sci. **29**:379. (PCW basis.)
 - de Rooij, W. A. & van der Stap, C. C. A. H. (1984), *Expansion of Mie scattering matrices in generalized spherical functions*, A&A **131**:237. (Domke corrections that PCW further fixes.)

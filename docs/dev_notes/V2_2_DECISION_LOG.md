@@ -154,7 +154,7 @@ Taken one by one by Suniti; implementation status is tracked in §3/§3.1.
 | 14c | Interior upwelling glint | Keep the Fourier-truncated glint; document that the exact glint is TOA-only. |
 | 14d | Canopy BHR-down | Keep (no direct beam); document. |
 | 14e | 1/(μᵢ − μ₀) cancellation | Implement a limit form in the elemental kernels. |
-| 15 | Sign of ε in B_l | Check against Sanghavi (2014) Eq. 16 before choosing the wording. |
+| 15 | Sign of ε in B_l | Docs follow the papers' printed form (Sanghavi & Stephens 2015, Eq. 22; Siewert's form, used by the vSmartMOM paper): −ε at [3,4], with the mapping to the code's stored γ, ε; no numerical change. |
 | 16 | Q-sign wording in `conventions.md` §1 | Confirmed. |
 
 ## 2. Explanations kept for later decisions
@@ -316,13 +316,18 @@ results or definitions and wait for a decision.
   in Float64, ≈ 2.4e-10/δ in Float32); a full fix needs a limit form in the
   elemental kernels. Radau's own near-coincident sub-interval nodes are
   still merged only when exactly equal.
-- [ ] **Sign of ε in the Greek matrix B_l (wording only).** The code stores
-  `B[3,4] = +ε`, `B[4,3] = −ε` (`construct_B_matrix`), and
-  `concepts/03b_scattering.md` now shows that matrix (2.2.0 docs pass; it
-  previously showed −ε at [3,4]) with a note that Siewert 2000 / de Haan et
-  al. 1987 print −ε at [3,4]. `conventions.md` §2 calls `+ε` at [3,4] "the
-  standard Hovenier convention". Please confirm the matrix against
-  Sanghavi (2014) Mie-Fourier Eq. 16 and whether that wording is right.
+- [x] **Sign of ε in the Greek matrix B_l (decision 15).** `conventions.md`
+  §2 and `concepts/03b_scattering.md` show B_l and Π_l^m as printed by
+  Sanghavi & Stephens (2015, Eqs. 21–22), in Siewert's form, which the
+  vSmartMOM paper uses by reference: −ε at [3,4]. Sanghavi (2014) Eq. 16 was
+  not checked (no copy available). Relative to the Siewert/VLIDORT convention
+  the code's Stokes vector is (I, −Q, −U, −V). The code therefore stores γ and
+  ε with the opposite sign and writes +ε at [3,4], which is numerically
+  Siewert's −ε. Coefficients from the code's own Mie code need no flips.
+  A sign-flip experiment on Siewert's Problem IIA confirms this: the papers'
+  B_l with raw Siewert coefficients reproduces VLIDORT 2.8.3 without flips,
+  and negating ε alone reverses V only. (Evidence:
+  `vsmartmom-release-evidence/2026-10-19/greek_sign_flip_experiment.md`.)
 
 - [x] **MT_CKD density factor (approved by Suniti 2026-10-18, merged).**
   AER's `mt_ckd_h2o` scales both continuum terms with the number-density

@@ -6,8 +6,9 @@ DISORT, …) or importing Greek-coefficient / Stokes data from one.
 **Next:** [Configure a Scene (step by step)](IO/ConfigurationGuide.md), [Vector RTE & Discretization (Concepts)](concepts/02_rt_theory.md), [Benchmarks](benchmarks.md).
 
 Polarized radiative transfer codes have to commit to a specific set of sign,
-phase-matrix, and angle conventions. Different lineages (Hovenier-Sanghavi,
-Mishchenko-VLIDORT, Stamnes-DISORT, …) made different choices, and the
+phase-matrix, and angle conventions. Different lineages (vSmartMOM's
+de Rooij/Hovenier-style code convention, Siewert–Mishchenko–VLIDORT,
+Stamnes–DISORT, …) made different choices, and the
 choices are largely interchangeable *as long as you stay inside one
 convention*. The pain hits when you cross-validate two codes that quietly
 follow different conventions.
@@ -47,9 +48,10 @@ parallel to the meridian plane; the code has always used the convention
 above.)
 
 This is the **Hovenier–van der Mee–Domke convention** (Hovenier &
-van der Mee 1983; Hovenier, van der Mee & Domke 2004). It is the same
-convention used in Sanghavi's vSmartMOM theory papers
-(Sanghavi 2014; Sanghavi & Stephens 2015).
+van der Mee 1983; Hovenier, van der Mee & Domke 2004). The vSmartMOM theory
+papers print the Greek and generalized-spherical-function matrices in
+Siewert's form (§2); relative to that form, with Siewert's (2000) and VLIDORT's
+coefficient signs, the code's γ, ε, Q, U and V carry the opposite sign (§2, §4).
 
 The polarization-type variants `Stokes_I`, `Stokes_IQ`, `Stokes_IQU`,
 `Stokes_IQUV` simply truncate this vector — they don't change the
@@ -61,26 +63,55 @@ in StandaloneSS `ExactSSConfig` runs and the Scattering-level functions.)
 ## 2. Phase matrix and Greek coefficients
 
 The single-scattering phase matrix in vSmartMOM is expanded in
-generalized spherical functions following de Rooij & van der Stap
-(1984). The Greek-coefficient block-diagonal structure is:
+generalized spherical functions following Siewert (1981, 2000) and de Rooij &
+van der Stap (1984). Sanghavi & Stephens (2015, Eqs. 21–22) print the Greek
+matrix and the generalized spherical-function matrix in Siewert's form, and
+the vSmartMOM paper (Sanghavi et al. 2014) uses Siewert's (1982) matrices by
+reference:
 
 ```
-         ⎡ β_l   γ_l    0     0   ⎤
-   B_l = ⎢ γ_l   α_l    0     0   ⎥
-         ⎢  0     0    ζ_l   ε_l ⎥
-         ⎣  0     0   −ε_l   δ_l ⎦
+         ⎡ β_l   γ_l    0     0   ⎤                ⎡ P_l^m   0      0     0   ⎤
+   B_l = ⎢ γ_l   α_l    0     0   ⎥ ,   Π_l^m ∝   ⎢  0    R_l^m  −T_l^m   0   ⎥
+         ⎢  0     0    ζ_l  −ε_l ⎥                ⎢  0   −T_l^m   R_l^m   0   ⎥
+         ⎣  0     0    ε_l   δ_l ⎦                ⎣  0      0      0   P_l^m ⎦
 ```
 
-with ``α_l, β_l, γ_l, δ_l, ε_l, ζ_l ∈ ℝ`` (per Legendre order ``l``).
-This matches the `GreekCoefs` struct in
-[`src/Scattering/types.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types.jl)
-and `construct_B_matrix` in
-[`src/Scattering/mie_helper_functions.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/mie_helper_functions.jl).
+with ``α_l, β_l, γ_l, δ_l, ε_l, ζ_l ∈ ℝ`` (per Legendre order ``l``); this is
+also the convention of VLIDORT and of Siewert's (2000) benchmark tables.
 
-The off-diagonal ``γ_l`` couples ``I↔Q`` (and is therefore the dominant
-driver of single-scattering polarization). ``ε_l`` is **anti-symmetric**
-in the [3,4]/[4,3] block (`B[3,4] = +ε`, `B[4,3] = −ε`), the standard
-Hovenier convention.
+**How the code relates to the papers.** vSmartMOM's `construct_Π_matrix`
+builds exactly the Π_l^m above. Its Stokes vector, however, is
+``(I, -Q, -U, -V)`` relative to the Siewert/VLIDORT convention in which these
+matrices are written (§4.2; this mapping is validated against VLIDORT 2.8.3). With ``D = \mathrm{diag}(1,-1,-1,-1)``
+the Greek matrix transforms as ``B_l \to D B_l D``, which changes the sign of
+the ``[1,2]/[2,1]`` elements and leaves the ``[3,4]/[4,3]`` elements unchanged.
+`construct_B_matrix` (in
+[`src/Scattering/mie_helper_functions.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/mie_helper_functions.jl))
+writes
+
+```
+              ⎡ β_l   γ_l    0     0   ⎤
+   B_l,code = ⎢ γ_l   α_l    0     0   ⎥   with   γ_l(code) = −γ_l(Siewert),
+              ⎢  0     0    ζ_l   ε_l ⎥          ε_l(code) = −ε_l(Siewert),
+              ⎣  0     0   −ε_l   δ_l ⎦
+```
+
+so its ``[3,4]/[4,3]`` block is numerically the block above (``+ε_l(code)``
+at ``[3,4]`` is Siewert's ``-ε_l``), and only γ differs as a matrix element.
+The stored `GreekCoefs.γ` and `GreekCoefs.ϵ` (see
+[`src/Scattering/types.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types.jl))
+are therefore Siewert's coefficients with the opposite sign. Importing
+coefficients in Siewert's (2000) or VLIDORT's convention negates both (§4);
+coefficients from vSmartMOM's own Mie code (NAI2/PCW, de Rooij & van der Stap
+1984 definitions) are already in the code's convention.
+
+The off-diagonal ``γ_l`` couples ``I↔Q`` (and is the dominant driver of
+single-scattering polarization); ``ε_l`` couples ``U↔V``. A check on the
+Siewert (2000) Problem IIA case shows what each sign controls: the papers'
+``B_l`` with Siewert's raw coefficients reproduces VLIDORT 2.8.3 without any
+sign flips (relative errors 7.7e-5 in I, ≤ 3.3e-4 in Q, U, V), exactly as the
+code does with its own convention; negating ε alone reverses V and nothing
+else, while negating γ alone reverses Q, U and V.
 
 **Sign convention for ``γ`` at L=2 (Rayleigh)**: vSmartMOM's
 `get_greek_rayleigh` returns
@@ -168,8 +199,8 @@ truth_V_compare = -truth_V_vlidort
 **Why all three flip together**: the I↔Q coupling (γ) propagates through
 the multi-scatter Mueller matrix to Q↔U (via α) and to V (via ε), so a
 single γ-sign flip cascades to every linear-polarization component.
-Confirmed empirically in Case A (Siewert 2000): symmetric flip preserves
-agreement at ~1e-6 across all four Stokes components.
+Confirmed empirically in Case A (Siewert 2000): with the symmetric flip all
+four Stokes components agree to the level quoted in §4.4.
 
 ### 4.3 Azimuth (RAZ) — same convention
 
@@ -184,14 +215,14 @@ The cross-validation `test/vlidort_baseline/cases/case_A_siewert2000.jl`
 runs Siewert 2000 PROBLEM_IIA against VLIDORT 2.8.3 saved_results.
 Applying:
 
-  1. γ sign-flip on import
-     (`SIEWERT_γ = .-SIEWERT_PROBLEM_IIA.row3`)
+  1. γ and ε sign-flips on import
+     (`SIEWERT_γ = .-SIEWERT_PROBLEM_IIA.row3`, and likewise ε from row 5)
   2. Truth Q/U/V sign-flip at comparison
      (`truth = -truth` for Q, U, V)
 
-vSmartMOM matches VLIDORT to **~1e-6 max relative error across all 4
-Stokes components, all 3 azimuths (0°, 90°, 180°), all 11 viewing
-zenith angles**. This is the empirical validation of the convention
+vSmartMOM matches VLIDORT to **7.7e-5 (I) and ≤ 3.3e-4 (Q, U, V) max
+relative error across all 3 azimuths (0°, 90°, 180°) and all 11 viewing
+zenith angles** (test tolerances 5e-4 for I, U, V and 1e-2 for Q). This is the empirical validation of the convention
 story above.
 
 ---
@@ -220,9 +251,11 @@ truth table:
 | U | **flip sign** |
 | V | **flip sign** |
 
-When the source data is from a **Hovenier-tradition** code (Sanghavi,
-Hovenier, Natraj 1980, …), no flips are needed — vSmartMOM and the
-source already agree.
+When the Greek coefficients come from vSmartMOM's own Mie code (NAI2/PCW)
+or follow the same de Rooij & van der Stap (1984) definitions with this
+page's Stokes convention, no flips are needed. Coefficients in Siewert's or
+VLIDORT's convention (the form in which the vSmartMOM theory papers print
+``B_l``) need the flips above.
 
 ---
 
@@ -333,7 +366,7 @@ The external-solar implementation is deliberately narrow at present:
 
 | Concept | File |
 |---------|------|
-| Hovenier B-matrix construction | [`src/Scattering/mie_helper_functions.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/mie_helper_functions.jl) (`construct_B_matrix`) |
+| B-matrix construction (storage convention, §2) | [`src/Scattering/mie_helper_functions.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/mie_helper_functions.jl) (`construct_B_matrix`) |
 | Rayleigh γ (Hovenier-positive) | [`src/Scattering/mie_helper_functions.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/mie_helper_functions.jl) (`get_greek_rayleigh`) |
 | Mie coefficient sign (compute_NAI2 f₁₂) | [`src/Scattering/compute_NAI2.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/compute_NAI2.jl) |
 | Azimuth weighting (sin/cos by Stokes) | [`src/CoreRT/tools/postprocessing_vza.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/tools/postprocessing_vza.jl) |
@@ -354,11 +387,19 @@ The external-solar implementation is deliberately narrow at present:
   Absorption, and Emission of Light by Small Particles.* CUP.
 - Natraj, V., Hovenier, J.W. (2012). *Polarized light reflected and
   transmitted by thick Rayleigh scattering atmospheres.* ApJ 748, 28.
+- Sanghavi, S., Davis, A.B. & Eldering, A. (2014). *vSmartMOM: A vector
+  matrix operator method-based radiative transfer model linearized with
+  respect to aerosol properties.* JQSRT 133, 412–433.
 - Sanghavi, S. (2014). *Revisiting the Fourier expansion of Mie
   scattering matrices in generalized spherical functions.* JQSRT 136,
   16–27.
-- Sanghavi, S. & Stephens, G. (2015). *Adaptation and use of forward
-  models in retrieval algorithms.* JQSRT 156, 24–37.
+- Sanghavi, S. & Stephens, G. (2015). *Adaptation of the delta-m and
+  δ-fit truncation methods to vector radiative transfer: Effect of
+  truncation on radiative transfer accuracy.* JQSRT 159, 53–68.
+- Siewert, C.E. (1981). *On the equation of transfer relevant to the
+  scattering of polarized light.* Astrophys. J. 245, 1080–1086.
+- Siewert, C.E. (1982). *On the phase matrix basic to the scattering of
+  polarized light.* A&A 109, 195–200.
 - Siewert, C.E. (2000). *A discrete-ordinates solution for radiative
   transfer models that include polarization effects.* JQSRT 64, 227–254.
 - Spurr, R.J.D. (2006). *VLIDORT: A linearized pseudo-spherical
