@@ -562,23 +562,21 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ = added_layer
     @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻, ieR⁻⁺, ieR⁺⁻, ieT⁺⁺, ieT⁻⁻, ieJ₀⁺, ieJ₀⁻ = composite_layer
     # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`
+    # The inelastic temporaries are written only at the active target indices
+    # `i_λ₁λ₀_all` and copied whole into the composite layer, so they start at
+    # zero. The workspace holds only the RRS (per-pass) 4-D buffers, so these
+    # are allocated here; the 3-D temporaries come from the workspace.
+    tmpieJ₀⁻ = zero(ieJ₀⁻); tmpieJ₀⁺ = zero(ieJ₀⁺)
+    tmpieR⁻⁺ = zero(ieR⁻⁺); tmpieR⁺⁻ = zero(ieR⁺⁻)
+    tmpieT⁻⁻ = zero(ieT⁻⁻); tmpieT⁺⁺ = zero(ieT⁺⁺)
     if workspace !== nothing
         reset!(workspace)
         tmp_inv  = workspace.tmp_inv
-        tmpieJ₀⁻ = workspace.tmpieJ₀⁻; tmpieJ₀⁺ = workspace.tmpieJ₀⁺
-        tmpieR⁻⁺ = workspace.tmpieR⁻⁺; tmpieR⁺⁻ = workspace.tmpieR⁺⁻
-        tmpieT⁻⁻ = workspace.tmpieT⁻⁻; tmpieT⁺⁺ = workspace.tmpieT⁺⁺
         tmpJ₀⁻ = workspace.tmpJ₀⁻; tmpJ₀⁺ = workspace.tmpJ₀⁺
         tmpR⁻⁺ = workspace.tmpR⁻⁺; tmpR⁺⁻ = workspace.tmpR⁺⁻
         tmpT⁻⁻ = workspace.tmpT⁻⁻; tmpT⁺⁺ = workspace.tmpT⁺⁺
     else
         tmp_inv = similar(t⁺⁺); tmp_inv.=0;
-        tmpieJ₀⁻ = similar(ieJ₀⁻); tmpieJ₀⁻.=0;
-        tmpieJ₀⁺ = similar(ieJ₀⁺); tmpieJ₀⁺.=0;
-        tmpieR⁻⁺ = similar(ieR⁻⁺); tmpieR⁻⁺.=0;
-        tmpieR⁺⁻ = similar(ieR⁺⁻); tmpieR⁺⁻.=0;
-        tmpieT⁻⁻ = similar(ieT⁻⁻); tmpieT⁻⁻.=0;
-        tmpieT⁺⁺ = similar(ieT⁺⁺); tmpieT⁺⁺.=0;
         tmpJ₀⁻   = similar(J₀⁻); tmpJ₀⁻.=0;
         tmpJ₀⁺   = similar(J₀⁺); tmpJ₀⁺.=0;
         tmpR⁻⁺   = similar(R⁻⁺); tmpR⁻⁺.=0;

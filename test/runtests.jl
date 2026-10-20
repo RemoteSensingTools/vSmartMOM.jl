@@ -137,6 +137,8 @@ end
 # VS Raman path smoke tests — guards the previously-broken VS_0to1/VS_1to0
 # call chain (undefined compute_optical_Rayl!/compute_ϖ_Cabannes! calls).
 @testset "Inelastic VS smoke" begin include("test_inelastic_vs_smoke.jl") end
+# VS_0to1_plus / VS_1to0_plus forward runs over concatenated bands. ~3 min.
+@testset "Raman VS plus" begin include("test_raman_vs_plus.jl") end
 
 # ForwardDiff hybrid-AD path — guards the Dual-safe Dₙ recursion in
 # compute_mie_ab! (Float64-stabilized for plain floats, native for Duals)

@@ -455,15 +455,18 @@ function rt_kernel!(
             workspace::Union{InteractionWorkspace, Nothing}=nothing,
             prepared_sources::AbstractSource = NoSource(),
             dτ_max_threshold::Union{Nothing,Real} = nothing,
-            dτ_min_floor::Union{Nothing,Real} = nothing)  where {FT}
+            dτ_min_floor::Union{Nothing,Real} = nothing,
+            max_τϖ::Union{Nothing,Real} = nothing)  where {FT}
     (; μ₀) = quad_points
     # Just unpack core optical properties from
     (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
     # Centralised dτ/ndoubl: filters zero-weight user-VZA/SZA streams and
     # applies the absolute floor — same formula as the noRS rt_kernel! above.
+    # `max_τϖ` is the caller's m-invariant max(τ·ϖ), as for RRS.
     dτ, ndoubl = get_dtau_ndoubl(computed_layer_properties, quad_points;
                                  dτ_max_threshold = dτ_max_threshold,
-                                 dτ_min_floor = dτ_min_floor)
+                                 dτ_min_floor = dτ_min_floor,
+                                 max_τϖ = max_τϖ)
     scatter = true # edit later
     arr_type = array_type(architecture)
     expk = arr_type(exp.(-dτ /μ₀))
