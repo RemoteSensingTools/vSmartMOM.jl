@@ -72,6 +72,17 @@ Architecturally:
   linear-in-inelastic approximation usable in absorbing bands. Not a
   debug helper; it's the *production* tool for fast O₂ A-band Raman
   corrections.
+- **An `RRS` band must hold rotational lines.** `getRamanSSProp!(rs, λ, ν)`
+  measures the line shifts from the band grid point nearest `λ` (normally
+  the band centre) and keeps only the lines inside the band; `rt_run` then
+  scales them so that together they carry the whole Raman fraction
+  ``1-\varpi_\mathrm{Cab}`` (≈ 3 %) of the Rayleigh scattering. A band whose
+  half-width is below the smallest shifts (±11.9 cm⁻¹ for N₂, ±14.3 cm⁻¹ for
+  O₂) holds no line, and `getRamanSSProp!` throws an `ArgumentError`: widen the
+  band or use `noRS`. A band that holds only some lines conserves the Raman
+  energy but concentrates it on those lines. All lines lie within ±234 cm⁻¹
+  (N₂, J ≤ 28), so a complete RRS band needs a shoulder of that width around
+  every output point.
 - **Raman Jacobians are unsupported**. The `_lin.jl` files
   cover the elastic path only; ``\partial \mathbf{R}/\partial \mathbf{x}`` derivatives
   through inelastic scattering are not yet implemented.

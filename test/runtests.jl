@@ -52,6 +52,7 @@ try
 # Molecular Rayleigh/Cabannes/RRS optical-property identities.
 @testset "Rayleigh/Cabannes Raman" begin include("test_ray_cab_raman.jl") end
 @testset "Raman Placzek–Teller sum rule" begin include("test_raman_placzek_teller.jl") end
+@testset "Raman RRS line weights" begin include("test_raman_rrs_lines.jl") end
 
 # Jacobian unit tests
 @testset "Jacobian Unit" begin include("test_jacobians_unit.jl") end

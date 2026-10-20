@@ -626,6 +626,38 @@ function compute_optical_Rayl(λ₀, n2, o2)
     return atmo_σ_Rayl;
 end
 
+"Smallest and largest |shift| (cm⁻¹) of the populated rotational Raman lines of `mol`."
+function _rrs_shift_range(mol)
+    e = mol.effCoeff
+    Δν = vcat(parent(e.Δν̃_RoRaman_coeff_JtoJp2), parent(e.Δν̃_RoRaman_coeff_JtoJm2))
+    σ = vcat(parent(e.σ_RoRaman_coeff_JtoJp2), parent(e.σ_RoRaman_coeff_JtoJm2))
+    shifts = [abs(Δν[k]) for k in eachindex(Δν, σ) if σ[k] > 0]
+    return extrema(shifts)
+end
+
+"""
+    _no_rrs_line_error(grid, ν₀, n2, o2, raman_fraction)
+
+`ArgumentError` for a rotational Raman band `grid` (cm⁻¹) that holds no N₂/O₂
+rotational line around the reference wavenumber `ν₀`. The elastic part would
+still be reduced to the Cabannes fraction, so the Raman fraction
+`raman_fraction` = 1 − ϖ_Cabannes of the Rayleigh scattering would be lost.
+"""
+function _no_rrs_line_error(grid, ν₀, n2, o2, raman_fraction)
+    min_n2, max_n2 = _rrs_shift_range(n2)
+    min_o2, max_o2 = _rrs_shift_range(o2)
+    fmt(x) = string(round(x, digits = 1))
+    return ArgumentError(
+        "rotational Raman (RRS): the band $(fmt(first(grid)))–$(fmt(last(grid))) cm⁻¹ " *
+        "holds no N₂/O₂ rotational Raman line around ν₀ = $(fmt(ν₀)) cm⁻¹. The smallest " *
+        "shifts are ±$(fmt(min_n2)) cm⁻¹ (N₂) and ±$(fmt(min_o2)) cm⁻¹ (O₂), so the Raman " *
+        "fraction 1 − ϖ_Cabannes = $(round(100 * raman_fraction, sigdigits = 3)) % of the " *
+        "Rayleigh scattering would be removed from the elastic part and not redistributed. " *
+        "Widen the band beyond ±$(fmt(min(min_n2, min_o2))) cm⁻¹ around ν₀ (±$(fmt(max(min_n2, min_o2))) " *
+        "cm⁻¹ for lines of both molecules; all lines lie within ±$(fmt(max(max_n2, max_o2))) cm⁻¹), " *
+        "or use noRS() for this band.")
+end
+
 function compute_optical_RS!(RS_type::RRS, grid_in, λ₀, n2, o2)
     #plotly()
     # grid_in is a uniform wavenumber grid covering the entire band spectrum 

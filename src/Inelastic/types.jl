@@ -643,12 +643,21 @@ needs_rayleigh_expansion(rs::AbstractRamanType) = has_inelastic(rs)
 
 Normalize Raman redistribution weights for modes whose `ϖ_λ₁λ₀` represents a
 rotational Raman fraction. Modes that do not require this normalization are
-left unchanged.
+left unchanged. For `RRS`, throws an `ArgumentError` when the weights sum to
+zero (never filled by `getRamanSSProp!`), since the Raman fraction
+1 − ϖ_Cabannes would otherwise be lost.
 """
 normalize_raman_weights!(::AbstractRamanType, model, iBand) = nothing
 
 function normalize_raman_weights!(rs::RRS, model, iBand)
     iB = iBand[1]
-    rs.ϖ_λ₁λ₀ .*= (1 - model.ϖ_Cabannes[iB]) / sum(rs.ϖ_λ₁λ₀)
+    total = sum(rs.ϖ_λ₁λ₀)
+    # getRamanSSProp! already rejects a band without lines, so zero weights
+    # mean an RRS object whose line weights were never filled.
+    total > 0 || throw(ArgumentError(
+        "rotational Raman (RRS): the line weights ϖ_λ₁λ₀ sum to $(total), so the " *
+        "Raman fraction 1 − ϖ_Cabannes of band $(iB) would be lost. Fill them first " *
+        "with getRamanSSProp!(rs, 1e7 / mean(ν), ν) for this band's grid ν."))
+    rs.ϖ_λ₁λ₀ .*= (1 - model.ϖ_Cabannes[iB]) / total
     return nothing
 end
