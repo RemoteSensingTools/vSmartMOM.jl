@@ -119,12 +119,14 @@ Every claim below has a `file.jl:LINE` next to it. No marketing.
    layers (large ``N_\mathrm{doubl}``) for that approximation to hold.
    vSmartMOM's elemental kernel uses the exact finite-``\delta`` single-scatter
    formulas (Fell 1997 Eqs 1.52–1.56, restated as SF2023-II Eqs 10–11),
-   coded with `-expm1(-x)` and `expdiff_neg(a, b)` for numerical stability
-   in `Float32` on GPU. The elemental layer can be thicker at the same
-   single-scatter accuracy → smaller ``N_\mathrm{doubl}`` → less round-off
-   accumulating through doubling. See [Concepts/04 § Elemental](04_mom_solver.md#Elemental-layer)
+   coded with `-expm1(-x)` and, for the ``\mu_j/(\mu_i-\mu_j)`` term, a
+   divided difference of ``e^{-x}`` that never divides by ``\mu_i-\mu_j``
+   (`elem_trans_factor`), for numerical stability in `Float32` on GPU. The
+   elemental layer can be thicker at the same single-scatter accuracy →
+   smaller ``N_\mathrm{doubl}`` → less round-off accumulating through
+   doubling. See [Concepts/04 § Elemental](04_mom_solver.md#Elemental-layer)
    for the side-by-side equation comparison.
-   *Evidence:* [`src/CoreRT/CoreKernel/elemental.jl:286–331`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental.jl#L286-L331).
+   *Evidence:* [`src/CoreRT/CoreKernel/elemental.jl:290–333`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental.jl#L290-L333).
 
 ## The narrative thread
 

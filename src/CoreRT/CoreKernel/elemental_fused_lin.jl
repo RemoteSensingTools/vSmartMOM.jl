@@ -4,6 +4,9 @@ partials. With j± = wₘ ϖ (Z± F₀) f±, the other partials follow by removi
 one linear factor: ∂j±/∂ϖ = wₘ (Z± F₀) f± and ∂j±/∂(Z±F₀) = wₘ ϖ f±.
 Evaluate these products directly: dividing j by a vanishing factor would
 incorrectly erase a nonzero derivative. The equal-μ limit is regular at τ=0.
+For μᵢ ≠ μ₀, f⁺ and ∂f⁺/∂τ use `elem_trans_factor` and
+`elem_trans_factor_dτ`, which do not divide by μᵢ-μ₀ and are
+therefore accurate for μᵢ close to μ₀.
 """
 @inline function _single_scatter_source_factors(τ, μᵢ, μ₀)
     if μᵢ == μ₀
@@ -11,9 +14,8 @@ incorrectly erase a nonzero derivative. The equal-μ limit is regular at τ=0.
         f⁺ = x * exp(-x)
         df⁺ = exp(-x) * (one(x)-x) / μ₀
     else
-        c = μ₀/(μᵢ-μ₀)
-        f⁺ = c * expdiff_neg(τ/μᵢ,τ/μ₀)
-        df⁺ = c * (-exp(-τ/μᵢ)/μᵢ + exp(-τ/μ₀)/μ₀)
+        f⁺ = elem_trans_factor(τ, μᵢ, μ₀)
+        df⁺ = elem_trans_factor_dτ(τ, μᵢ, μ₀)
     end
     q = inv(μᵢ)+inv(μ₀)
     c = μ₀/(μᵢ+μ₀)
@@ -130,19 +132,14 @@ compatibility with the 3-core doubling path.
                     ϖ_λ[n] * (dτ_λ[n] / qp_μN[i]) * wct[j]
             end
         else
-            t⁺⁺[i,j,n] =
-                ϖ_λ[n] * Z⁺⁺[i,j,n2] *
-                (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] *
-                expdiff_neg(dτ_λ[n] / qp_μN[i], dτ_λ[n] / qp_μN[j])
-            ṫ_tau = -ϖ_λ[n] * Z⁺⁺[i,j,n2] *
-                (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] *
-                (exp(-dτ_λ[n] / qp_μN[i])/ qp_μN[i] -
-                exp(-dτ_λ[n] / qp_μN[j])/ qp_μN[j])
-            ṫ_w = Z⁺⁺[i,j,n2] * (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] *
-                expdiff_neg(dτ_λ[n] / qp_μN[i], dτ_λ[n] / qp_μN[j])
-            ṫ_Z = ϖ_λ[n] *
-                (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] *
-                expdiff_neg(dτ_λ[n] / qp_μN[i], dτ_λ[n] / qp_μN[j])
+            # The angular factor μⱼ/(μᵢ-μⱼ) [exp(-dτ/μᵢ)-exp(-dτ/μⱼ)] and its
+            # dτ-derivative, in forms that do not divide by μᵢ-μⱼ.
+            f_t = elem_trans_factor(dτ_λ[n], qp_μN[i], qp_μN[j])
+            t⁺⁺[i,j,n] = ϖ_λ[n] * Z⁺⁺[i,j,n2] * wct[j] * f_t
+            ṫ_tau = ϖ_λ[n] * Z⁺⁺[i,j,n2] * wct[j] *
+                elem_trans_factor_dτ(dτ_λ[n], qp_μN[i], qp_μN[j])
+            ṫ_w = Z⁺⁺[i,j,n2] * wct[j] * f_t
+            ṫ_Z = ϖ_λ[n] * wct[j] * f_t
         end
 
         # Write 3-core (backward compat)

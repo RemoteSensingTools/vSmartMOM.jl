@@ -153,56 +153,17 @@ single-scattering formulas.
             -expm1(-((dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[j]))) * wct2[j]
 
 
-        if (qp_μN[i] == qp_μN[j])
-            # @show i,j
-            # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
-            #if i == j
-                if abs(dτ_λ[n₀]-dτ_λ[n₁]) > rt_loose_tol(eltype(dτ_λ))
-                    iet⁺⁺[i,j,n₁,Δn] =
-                        ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,j] * wct2[j] *
-                        expdiff_neg(dτ_λ[n₁] / qp_μN[i], dτ_λ[n₀] / qp_μN[j])/
-                        (1 - (dτ_λ[n₁]/dτ_λ[n₀]))
-
-                else
-                    iet⁺⁺[i,j,n₁,Δn] =
-                        (dτ_λ[n₀]/ qp_μN[i]) * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] *
-                        Z⁺⁺_λ₁λ₀[i,j] * wct2[j] *
-                        exp(-dτ_λ[n₀] / qp_μN[j])
-
-                end
-            #else
-            #    iet⁺⁺[i,j,n₁,Δn] =  0.0
-            #end
-        else
-            #@show  qp_μN[i], qp_μN[j]
-            # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
-            # (𝑖 ≠ 𝑗)
-
-            if (abs( (qp_μN[i]/qp_μN[j]) - (dτ_λ[n₁]/dτ_λ[n₀]) ) < rt_close_tol(eltype(dτ_λ)))
-                iet⁺⁺[i,j,n₁,Δn] =
-                (dτ_λ[n₀]/qp_μN[i]) * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,j] *
-                wct2[j] * exp(-dτ_λ[n₀] / qp_μN[j])
-            else
-                iet⁺⁺[i,j,n₁,Δn] =
-                ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,j] *
-                (1 / ( (qp_μN[i]/qp_μN[j]) - (dτ_λ[n₁]/dτ_λ[n₀]) )) *
-                wct2[j] *
-                expdiff_neg(dτ_λ[n₁] / qp_μN[i], dτ_λ[n₀] / qp_μN[j])
-            end
-                #=
-                if (i%3==1)&(j%3==1)&(n₁==200)
-                    @show i, j, n₁, n₀, Δn
-                        @show fscattRayl[n₀]
-                        @show ϖ_λ₁λ₀[Δn]
-                        @show ϖ_λ[n₀]
-                        @show Z⁺⁺_λ₁λ₀[i,j]
-                        @show (1 / ( (qp_μN[i]/qp_μN[j]) - (dτ_λ[n₁]/dτ_λ[n₀]) ))
-                        @show expdiff_neg(dτ_λ[n₁] / qp_μN[i], dτ_λ[n₀] / qp_μN[j])
-                        @show wct2[j]
-                        @show iet⁺⁺[i,j,n₁,Δn]
-                 end
-                 =#
-        end
+        # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇[exp{-dτ₁/μᵢ} - exp{-dτ₀/μⱼ}]/(μᵢ/μⱼ - dτ₁/dτ₀) ̇𝑤ⱼ
+        #             = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(dτ₀/μᵢ) ̇expdiff_ratio(dτ₁/μᵢ, dτ₀/μⱼ) ̇𝑤ⱼ.
+        # The second form is exact for every separation of dτ₁/μᵢ and dτ₀/μⱼ,
+        # including μᵢ = μⱼ and dτ₁ = dτ₀, where it tends continuously to
+        # the limit (dτ₀/μᵢ) exp{-dτ₀/μⱼ}; the first loses about
+        # eps/|μᵢ/μⱼ - dτ₁/dτ₀| to cancellation, which the former tolerance
+        # windows only bridged with that leading-order limit.
+        iet⁺⁺[i,j,n₁,Δn] =
+            ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,j] * wct2[j] *
+            (dτ_λ[n₀] / qp_μN[i]) *
+            expdiff_ratio(dτ_λ[n₁] / qp_μN[i], dτ_λ[n₀] / qp_μN[j])
 
     else
         ier⁻⁺[i,j,n₁,Δn] = zero(FT)
@@ -312,33 +273,15 @@ transmission entries for active quadrature weights.
                 (1/( (qp_μN[i] / qp_μN[j]) + (dτ_λ[n₁]/dτ_λ[n₀]) )) *
                 -expm1(-((dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[j]))) * wct2[j]
 
-        if (qp_μN[i] == qp_μN[j])
-            # @show i,j
-            # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
-            if i == j
-                if abs(dτ_λ[n₀]-dτ_λ[n₁]) > rt_close_tol(eltype(dτ_λ))
-                    iet⁺⁺[i,j,n₁,1] =
-                        ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
-                        expdiff_neg(dτ_λ[n₁] / qp_μN[i], dτ_λ[n₀] / qp_μN[i])/
-                        (1 - (dτ_λ[n₁]/dτ_λ[n₀]))
-                else
-                    iet⁺⁺[i,j,n₁,1] =
-                        (dτ_λ[n₀]/ qp_μN[i]) * ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl[n₀] *
-                        Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
-                        exp(-dτ_λ[n₀] / qp_μN[i])
-                end
-            else
-                iet⁺⁺[i,j,n₁,1] = zero(FT)
-            end
+        if (qp_μN[i] == qp_μN[j]) & (i != j)
+            iet⁺⁺[i,j,n₁,1] = zero(FT)
         else
-            #@show  qp_μN[i], qp_μN[j]
-            # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
-            # (𝑖 ≠ 𝑗)
+            # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(dτ₀/μᵢ) ̇expdiff_ratio(dτ₁/μᵢ, dτ₀/μⱼ) ̇𝑤ⱼ,
+            # exact for every separation (see `get_elem_rt_RRS!`).
             iet⁺⁺[i,j,n₁,1] =
                     ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,j] *
-                    (1 / ( (qp_μN[i]/qp_μN[j]) - (dτ_λ[n₁]/dτ_λ[n₀]) )) *
-                    wct2[j] *
-                    expdiff_neg(dτ_λ[n₁] / qp_μN[i], dτ_λ[n₀] / qp_μN[j])
+                    wct2[j] * (dτ_λ[n₀] / qp_μN[i]) *
+                    expdiff_ratio(dτ_λ[n₁] / qp_μN[i], dτ_λ[n₀] / qp_μN[j])
         end
     else
         ier⁻⁺[i,j,n₁,1] = zero(FT)
@@ -482,19 +425,9 @@ end
     if 1 <= n₀ <= length(dτ)
         μᵢ = μ[i]
         scale = wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀]
-        if μᵢ == μ₀
-            if abs(dτ[n₀]-dτ[n₁]) > rt_close_tol(eltype(dτ))
-                f_t = expdiff_neg(dτ[n₁]/μᵢ, dτ[n₀]/μᵢ) /
-                      (1-(dτ[n₁]/dτ[n₀]))
-            else
-                f_t = (dτ[n₀]/μᵢ) * exp(-dτ[n₀]/μᵢ)
-            end
-        elseif abs((μᵢ/μ₀)-(dτ[n₁]/dτ[n₀])) < rt_close_tol(eltype(dτ))
-            f_t = (dτ[n₀]/μᵢ) * exp(-dτ[n₀]/μ₀)
-        else
-            f_t = expdiff_neg(dτ[n₁]/μᵢ, dτ[n₀]/μ₀) /
-                  ((μᵢ/μ₀)-(dτ[n₁]/dτ[n₀]))
-        end
+        # [exp(-dτ₁/μᵢ) - exp(-dτ₀/μ₀)]/(μᵢ/μ₀ - dτ₁/dτ₀), exact for every
+        # separation including μᵢ = μ₀ and dτ₁ = dτ₀ (see `get_elem_rt_RRS!`).
+        f_t = (dτ[n₀]/μᵢ) * expdiff_ratio(dτ[n₁]/μᵢ, dτ[n₀]/μ₀)
         f_r = -expm1(-(dτ[n₁]/μᵢ + dτ[n₀]/μ₀)) /
               ((μᵢ/μ₀)+(dτ[n₁]/dτ[n₀]))
         t = scale * Z₀⁺⁺[i,s] * f_t
@@ -611,72 +544,14 @@ the upwelling D-matrix sign when needed.
             Z⁺⁺_I₀ += Z⁺⁺_λ₁λ₀[i,ii] * F₀[ii-i_start+1,n₀] #I₀[ii-i_start+1]
             Z⁻⁺_I₀ += Z⁻⁺_λ₁λ₀[i,ii] * F₀[ii-i_start+1,n₀] #I₀[ii-i_start+1]
         end
-        if (i_start <= i) & (i <= i_end)
-            #ctr = i-i_start+1
-            # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
-            if abs(dτ_λ[n₀]-dτ_λ[n₁]) > rt_close_tol(eltype(dτ_λ))
-                ieJ₀⁺[i, 1, n₁, Δn] =
-                        ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_I₀ * wct02 *
-                        expdiff_neg(dτ_λ[n₁] / qp_μN[i], dτ_λ[n₀] / qp_μN[i]) /
-                        (1 - (dτ_λ[n₁]/dτ_λ[n₀]))
-                        #=
-                        if (i%3==1)&(n₁==200)
-                            @show i, n₁, n₀, Δn
-                                #@show fscattRayl[n₀]
-                                @show ϖ_λ₁λ₀[Δn]
-                                #@show ϖ_λ[n₀]
-                                @show Z⁺⁺_I₀
-                                @show (1 - (dτ_λ[n₁]/dτ_λ[n₀]))
-                                @show expdiff_neg(dτ_λ[n₁] / qp_μN[i], dτ_λ[n₀] / qp_μN[i])
-                                #@show wct2[j]
-                                @show ieJ₀⁺[i, 1, n₁, Δn]
-                         end
-                        =#
-            else
-                ieJ₀⁺[i, 1, n₁, Δn] =
-                        (dτ_λ[n₀]/ qp_μN[i]) * wct02 * ϖ_λ₁λ₀[Δn] *
-                        fscattRayl[n₀] *
-                        Z⁺⁺_I₀ *
-                        exp(-dτ_λ[n₀] / qp_μN[i])
-                        #=
-                        if (i%3==1)&(n₁==200)
-                            @show i, n₁, n₀, Δn
-                                #@show fscattRayl[n₀]
-                                @show ϖ_λ₁λ₀[Δn]
-                                #@show ϖ_λ[n₀]
-                                @show Z⁺⁺_I₀
-                                @show (dτ_λ[n₀]/ qp_μN[i_start])
-                                @show exp(-dτ_λ[n₀] / qp_μN[i_start])
-                                #@show wct2[j]
-                                @show ieJ₀⁺[i, 1, n₁, Δn]
-                         end
-                         =#
-            end
-        else
-            # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
-            if (abs( (qp_μN[i]/qp_μN[i_start]) - (dτ_λ[n₁]/dτ_λ[n₀]) ) < rt_close_tol(eltype(dτ_λ)))
-                ieJ₀⁺[i, 1, n₁, Δn] =
-                (dτ_λ[n₀]/qp_μN[i]) * wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_I₀ *
-                exp(-dτ_λ[n₀] / qp_μN[i_start])
-            else
-                ieJ₀⁺[i, 1, n₁, Δn] =
-                    wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_I₀ *
-                    (1 /( (qp_μN[i]/qp_μN[i_start]) - (dτ_λ[n₁]/dτ_λ[n₀]) ) ) *
-                    expdiff_neg(dτ_λ[n₁] / qp_μN[i], dτ_λ[n₀] / qp_μN[i_start])
-            end
-#=
-                    if (i%3==1)&(n₁==200)
-                    @show i, n₁, n₀, Δn
-                                #@show fscattRayl[n₀]
-                                @show ϖ_λ₁λ₀[Δn]
-                                #@show ϖ_λ[n₀]
-                                @show Z⁺⁺_I₀
-                                @show (1 /( (qp_μN[i]/qp_μN[i_start]) - (dτ_λ[n₁]/dτ_λ[n₀]) ) )
-                                @show expdiff_neg(dτ_λ[n₁] / qp_μN[i], dτ_λ[n₀] / qp_μN[i_start])
-                                #@show wct2[j]
-                                @show ieJ₀⁺[i, 1, n₁, Δn]
-                         end=#
-        end
+        # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [exp(-dτ₁/μᵢ) - exp(-dτ₀/μ₀)]/(μᵢ/μ₀ - dτ₁/dτ₀)
+        #     = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ₀/μᵢ) * expdiff_ratio(dτ₁/μᵢ, dτ₀/μ₀),
+        # exact for every separation, including the μ₀ rows (μᵢ = μ₀) and
+        # dτ₁ = dτ₀, where it tends to (dτ₀/μ₀) exp(-dτ₀/μ₀) (Fell Eq. 1.54).
+        ieJ₀⁺[i, 1, n₁, Δn] =
+                wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_I₀ *
+                (dτ_λ[n₀] / qp_μN[i]) *
+                expdiff_ratio(dτ_λ[n₁] / qp_μN[i], dτ_λ[n₀] / qp_μN[i_start])
 
         #TODO
         #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]

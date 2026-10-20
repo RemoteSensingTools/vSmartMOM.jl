@@ -89,25 +89,17 @@ Zero-weight quadrature columns receive Beer-law diagonal transmission only.
     
             # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
             # d𝐓⁺⁺(μᵢ, μⱼ)/dτ_λ = -ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ}/μᵢ - exp{-τ/μⱼ}/μⱼ) ̇𝑤ⱼ
-            # (𝑖 ≠ 𝑗)
-            t⁺⁺[i,j,n] = 
-                ϖ_λ[n] * Z⁺⁺[i,j,n2] * 
-                #Z⁺⁺[i,j] * 
-                (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] * 
-                expdiff_neg(dτ_λ[n] / qp_μN[i], dτ_λ[n] / qp_μN[j])
+            # (𝑖 ≠ 𝑗); the angular factor and its τ-derivative are evaluated
+            # without dividing by μᵢ-μⱼ (`elem_trans_factor[_dτ]`).
+            f_t = elem_trans_factor(dτ_λ[n], qp_μN[i], qp_μN[j])
+            t⁺⁺[i,j,n] = ϖ_λ[n] * Z⁺⁺[i,j,n2] * wct[j] * f_t
             # derivative wrt τ_λ
-            ṫ⁺⁺[i,j,n,1] = -ϖ_λ[n] * Z⁺⁺[i,j,n2] * 
-                (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] * 
-                (exp(-dτ_λ[n] / qp_μN[i])/ qp_μN[i] - 
-                exp(-dτ_λ[n] / qp_μN[j])/ qp_μN[j]) 
+            ṫ⁺⁺[i,j,n,1] = ϖ_λ[n] * Z⁺⁺[i,j,n2] * wct[j] *
+                elem_trans_factor_dτ(dτ_λ[n], qp_μN[i], qp_μN[j])
             # derivative wrt ϖ_λ
-            ṫ⁺⁺[i,j,n,2] = Z⁺⁺[i,j,n2] * (qp_μN[j]/(qp_μN[i]-qp_μN[j])) * wct[j] *
-                expdiff_neg(dτ_λ[n]/qp_μN[i],dτ_λ[n]/qp_μN[j])
-            # derivative wrt Z
+            ṫ⁺⁺[i,j,n,2] = Z⁺⁺[i,j,n2] * wct[j] * f_t
             # derivative wrt Z: direct formula avoids 0/0
-            ṫ⁺⁺[i,j,n,3] = ϖ_λ[n] * 
-                (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] * 
-                expdiff_neg(dτ_λ[n] / qp_μN[i], dτ_λ[n] / qp_μN[j])
+            ṫ⁺⁺[i,j,n,3] = ϖ_λ[n] * wct[j] * f_t
         end
     else
         #r⁻⁺[i,j,n] = 0.0

@@ -365,7 +365,7 @@ with code anchors:
 5. **Optical properties as algebra.** [`src/CoreRT/types.jl:1743–1795`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/types.jl#L1743-L1795).
 6. **GPU backends as package extensions.** [`ext/vSmartMOMCUDAExt.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMCUDAExt.jl) (entire file).
 7. **Three `(τ, ϖ, Z)` core variables per layer for analytic Jacobians.** [`src/CoreRT/types_lin.jl:330–355`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/types_lin.jl#L330-L355).
-8. **Exact finite-δ elemental, not the linear limit.** [`src/CoreRT/CoreKernel/elemental.jl:286–331`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental.jl#L286-L331). See [Concepts/04 § Elemental](04_mom_solver.md#Elemental-layer) for the side-by-side equations.
+8. **Exact finite-δ elemental, not the linear limit.** [`src/CoreRT/CoreKernel/elemental.jl:290–333`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental.jl#L290-L333). See [Concepts/04 § Elemental](04_mom_solver.md#Elemental-layer) for the side-by-side equations.
 
 ## Code anchors
 

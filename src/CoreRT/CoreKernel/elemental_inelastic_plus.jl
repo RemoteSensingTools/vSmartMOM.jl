@@ -285,41 +285,15 @@ arrays.
                     (1/( (qp_μN[i] / qp_μN[j]) + (dτ[n₁]/dτ[n₀]) )) * 
                     -expm1(-((dτ[n₁] / qp_μN[i]) + (dτ[n₀] / qp_μN[j]))) * wct2[j]
             
-            if (qp_μN[i] == qp_μN[j])
-                # @show i,j
-                # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
-                #if i == j       
-                if abs(dτ[n₀]-dτ[n₁]) > rt_close_tol(eltype(dτ))
-                    iet⁺⁺[i,j,n₁,1] += 
-                        ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,j] * wct2[j] *
-                        expdiff_neg(dτ[n₁] / qp_μN[i], dτ[n₀] / qp_μN[j])/
-                        (1 - (dτ[n₁]/dτ[n₀]))  
-                else    
-                    iet⁺⁺[i,j,n₁,1] += 
-                        (dτ[n₀] / qp_μN[i]) * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * 
-                        Z⁺⁺_λ₁λ₀[i,j] * wct2[j] *
-                        exp(-dτ[n₀] / qp_μN[j])   
-                    end
-                #else
-                #    iet⁺⁺[i,j,n₁,1] += 0.0
-                #end
-            else
-                #@show  qp_μN[i], qp_μN[j]  
-                # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
-                # (𝑖 ≠ 𝑗)
-                if (abs( (qp_μN[i]/qp_μN[j]) - (dτ[n₁]/dτ[n₀]) ) < rt_close_tol(eltype(dτ)))
-                    iet⁺⁺[i,j,n₁,1] = 
-                        (dτ[n₀]/qp_μN[i]) * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * 
-                        Z⁺⁺_λ₁λ₀[i,j] * 
-                        wct2[j] * exp(-dτ[n₀] / qp_μN[j])
-                else
-                    iet⁺⁺[i,j,n₁,1] += 
-                            ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,j] * 
-                            (1 / ( (qp_μN[i]/qp_μN[j]) - (dτ[n₁]/dτ[n₀]) )) * 
-                            wct2[j] * 
-                            expdiff_neg(dτ[n₁] / qp_μN[i], dτ[n₀] / qp_μN[j])
-                end
-            end
+            # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(dτ₀/μᵢ) ̇expdiff_ratio(dτ₁/μᵢ, dτ₀/μⱼ) ̇𝑤ⱼ,
+            # i.e. [exp{-dτ₁/μᵢ} - exp{-dτ₀/μⱼ}]/(μᵢ/μⱼ - dτ₁/dτ₀) evaluated
+            # without that cancellation-prone division; exact for every
+            # separation, including μᵢ = μⱼ and dτ₁ = dτ₀ (limit
+            # (dτ₀/μᵢ) exp{-dτ₀/μⱼ}).
+            iet⁺⁺[i,j,n₁,1] += 
+                    ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,j] * wct2[j] *
+                    (dτ[n₀] / qp_μN[i]) *
+                    expdiff_ratio(dτ[n₁] / qp_μN[i], dτ[n₀] / qp_μN[j])
         else
             ier⁻⁺[i,j,n₁,1] += zero(FT)
             if i==j
@@ -444,35 +418,13 @@ source vectors for that wavelength.
             Z⁻⁺_I₀ += Z⁻⁺_λ₁λ₀[i,ii] * F₀[ii-i_start+1, n₀] #I₀[ii-i_start+1] 
         end
         
-        if (i_start <= i) & (i <= i_end)
-            #ctr = i-i_start+1
-            # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
-            if abs(dτ[n₀]-dτ[n₁]) > rt_close_tol(eltype(dτ))
-                ieJ₀⁺[i, 1, n₁, 1] = 
-                        ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_I₀ * wct02 *
-                        expdiff_neg(dτ[n₁] / qp_μN[i], dτ[n₀] / qp_μN[i]) /
-                        (1-(dτ[n₁]/dτ[n₀])) 
-                        
-            else
-                ieJ₀⁺[i, 1, n₁, 1] = 
-                        (dτ[n₀]/qp_μN[i]) *  wct02 * ϖ_λ₁λ₀[Δn] * 
-                        fscattRayl[n₀] * Z⁺⁺_I₀ * 
-                        exp(-dτ[n₀] / qp_μN[i])
-            end
-        else
-            # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
-            if (abs( (qp_μN[i]/qp_μN[i_start]) - (dτ[n₁]/dτ[n₀]) ) < rt_close_tol(eltype(dτ)))
-                ieJ₀⁺[i, 1, n₁, 1] = 
-                    (dτ[n₀]/qp_μN[i]) * wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * 
-                    Z⁺⁺_I₀ * 
-                    exp(-dτ[n₀] / qp_μN[i_start])
-            else
-            ieJ₀⁺[i, 1, n₁, 1] = 
-                        wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_I₀ * 
-                        (1 /( (qp_μN[i]/qp_μN[i_start]) - (dτ[n₁]/dτ[n₀]) ) ) * 
-                        expdiff_neg(dτ[n₁] / qp_μN[i], dτ[n₀] / qp_μN[i_start])
-            end
-        end
+        # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ₀/μᵢ) * expdiff_ratio(dτ₁/μᵢ, dτ₀/μ₀),
+        # i.e. [exp(-dτ₁/μᵢ) - exp(-dτ₀/μ₀)]/(μᵢ/μ₀ - dτ₁/dτ₀) without that
+        # division; exact for every separation, including the μ₀ rows.
+        ieJ₀⁺[i, 1, n₁, 1] = 
+                    wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_I₀ *
+                    (dτ[n₀] / qp_μN[i]) *
+                    expdiff_ratio(dτ[n₁] / qp_μN[i], dτ[n₀] / qp_μN[i_start])
         #TODO
         #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]                    
         ieJ₀⁻[i, 1, n₁, 1] = 

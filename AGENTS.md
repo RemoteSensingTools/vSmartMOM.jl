@@ -113,7 +113,9 @@ with these:
    stop there and need very thin elemental layers (large `N_doubl`) for that
    approximation to hold. vSmartMOM's `elemental.jl::get_elem_rt!` instead uses
    `1 − exp(−δτ(1/μᵢ+1/μⱼ))` and `exp(−δτ/μᵢ) − exp(−δτ/μⱼ)` written via
-   `-expm1(-x)` and `expdiff_neg(a,b)` for numerical stability. Result:
+   `-expm1(-x)` and, for the `μⱼ/(μᵢ−μⱼ)`-weighted difference, the divided
+   difference `elem_trans_factor` (`expdiff_ratio`, accurate however close
+   μᵢ and μⱼ are) for numerical stability. Result:
    thicker elemental layer at the same single-scatter accuracy → smaller
    `N_doubl` → less doubling round-off, stable in `Float32`.
 

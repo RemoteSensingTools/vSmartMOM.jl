@@ -98,12 +98,13 @@ and stream denominators.
         else
     
             # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
-            # (𝑖 ≠ 𝑗)
+            # (𝑖 ≠ 𝑗), with path factors G: μⱼ/(μᵢGⱼ-μⱼGᵢ) [exp(-a)-exp(-b)]
+            # = (dτ/μᵢ) expdiff_ratio(a, b) for a = dτGᵢ/μᵢ, b = dτGⱼ/μⱼ,
+            # which does not divide by μᵢGⱼ-μⱼGᵢ.
             t⁺⁺[i,j,n] = 
-                ϖ_λ[n] * G[j] * Z⁺⁺[i,j,n2] * 
-                (μ[j] / (μ[i]*G[j] - μ[j]*G[i])) * wct[j] * 
-                expdiff_neg(dτ_λ[n] * G[i] / μ[i], dτ_λ[n] * G[j] / μ[j])
-                #(exp(-dτ_λ[n] * G[j] / μ[j]) - exp(-dτ_λ[n] * G[i] / μ[i]))  
+                ϖ_λ[n] * G[j] * Z⁺⁺[i,j,n2] * wct[j] *
+                (dτ_λ[n] / μ[i]) *
+                expdiff_ratio(dτ_λ[n] * G[i] / μ[i], dτ_λ[n] * G[j] / μ[j])
         end
     else
         r⁻⁺[i,j,n] = zero(FT)
@@ -157,12 +158,12 @@ applies the upwelling D-matrix sign when required.
         J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (G[i] * dτ_λ[n] / μ[i]) * exp(-dτ_λ[n] *  G[i] / μ[i])
     else
         # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
-        # 1.53 in Fell; 2.14 in Myneni Book 
+        # 1.53 in Fell; 2.14 in Myneni Book. With path factors G the
+        # bracketed product is (dτ/μᵢ) expdiff_ratio(dτGᵢ/μᵢ, dτG₀/μ₀),
+        # evaluated without dividing by μᵢG₀-μ₀Gᵢ.
         J₀⁺[i, 1, n] = 
-        wct02 * ϖ_λ[n] * G[i_start] * Z⁺⁺_I₀ * 
-        (μ[i_start] / (μ[i]*G[i_start] - μ[i_start]*G[i])) * 
-        expdiff_neg(dτ_λ[n] * G[i] / μ[i], dτ_λ[n] * G[i_start] / μ[i_start])
-        #(exp(-dτ_λ[n] * G[i_start] / μ[i_start]) - exp(-dτ_λ[n] * G[i] / μ[i]))
+        wct02 * ϖ_λ[n] * G[i_start] * Z⁺⁺_I₀ * (dτ_λ[n] / μ[i]) *
+        expdiff_ratio(dτ_λ[n] * G[i] / μ[i], dτ_λ[n] * G[i_start] / μ[i_start])
     end
     #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]
     # 1.52 in Fell

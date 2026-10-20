@@ -61,7 +61,7 @@ passages only, no benchmarks/intros). Updated 2026-08-07.
 | **S2014 (22)** | Elemental-thickness bound `0 < δ < min(μ_i)/(1 − ϖ₀/2)` — guarantees non-negative operators. | `src/CoreRT/tools/rt_helper_functions.jl::doubling_number`, consumed in `rt_kernel.jl::get_dtau_ndoubl` (lines 245–253) |
 | **S2014 §2.2** | **Historical paper design choice**: the 2014 formulation does *not* include solar single scatter in `J`. Trade-off: simpler doubling/adding, with off-quadrature geometry recovered through Block-Radau (App. B). Do not state this as a limitation of the current solver, whose SFI kernel operates with either an embedded or external `μ₀` representation. | Historical rationale for the DNI/Block-Radau lineage; current SFI is `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt_SFI!`. |
 | **SF2023-II (8)–(9)** | **Constant-`N_doubl` trick** for absorbing bands: `δτ = δτ_abs + δτ_scatt`; doubling sized by `δτ_scatt` only, so `N_doubl` is held constant across the spectral grid even when `τ_abs` swings over orders of magnitude. | `src/CoreRT/tools/atmo_prof.jl::construct_atm_layer` lines ~340–376; `rt_kernel.jl::get_dtau_ndoubl` lines 245–253 |
-| **SF2023-II (10)–(11)** | Explicit elastic R, T, J for elemental layer with absorption baked into `δτ = δτ_abs + δτ_scatt`. Includes `1 − exp(−δτ(1/μ_i+1/μ_j))` and `exp(−δτ/μ_i) − exp(−δτ/μ_j)` factors. | `src/CoreRT/CoreKernel/elemental.jl` lines 207–252 (the `expm1` / `expdiff_neg` numerical-stability forms) |
+| **SF2023-II (10)–(11)** | Explicit elastic R, T, J for elemental layer with absorption baked into `δτ = δτ_abs + δτ_scatt`. Includes `1 − exp(−δτ(1/μ_i+1/μ_j))` and `exp(−δτ/μ_i) − exp(−δτ/μ_j)` factors. | `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt!` (the `expm1` form, and `elem_trans_factor`/`expdiff_ratio` in `rt_helpers.jl` for the `μⱼ/(μᵢ−μⱼ)` term) |
 | **Fell 1997 Eqs. 1.52–1.56** | Single-scatter elemental r/t/J formulas in the form vSmartMOM implements (matches SF2023-II (10)–(11)). The direct-solar `J₀±` terms use scalar `μ₀` and exact `Zₘ(μᵢ,μ₀)` coupling, including the `μᵢ=μ₀` L'Hôpital limit. | `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt_SFI!` |
 
 ### C. Doubling and adding (S2014 §2.1, Eqs. 23–32; SF2023-II §3.3) → Concepts/04
@@ -253,7 +253,9 @@ is shaped as it is:
    t⁺⁺[i,j] = ϖ_λ·Z⁺⁺[i,j]·(μⱼ/(μᵢ−μⱼ))·wⱼ·(exp(−δτ/μᵢ) − exp(−δτ/μⱼ))   (i ≠ j)
    t⁺⁺[i,i] = exp(−δτ/μᵢ)·(1 + ϖ_λ·Z⁺⁺[i,i]·(δτ/μᵢ)·wᵢ)                  (i = j L'Hôpital limit)
    ```
-   coded with `-expm1(-x)` and `expdiff_neg(a, b)` for numerical stability
+   coded with `-expm1(-x)` and, for the `μⱼ/(μᵢ−μⱼ)` term, the divided
+   difference `elem_trans_factor(δτ, μᵢ, μⱼ) = (δτ/μᵢ)·expdiff_ratio(δτ/μᵢ, δτ/μⱼ)`
+   (no division by `μᵢ−μⱼ`; `rt_helpers.jl`) for numerical stability
    in optically thin layers and especially in `Float32`. This means the
    elemental layer can be **thicker at the same single-scatter accuracy**
    → fewer doublings, less round-off accumulation. It compounds with the

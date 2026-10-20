@@ -248,12 +248,16 @@ round-off through doubling, stable in Float32 on GPU.
 
 The numerical-stability discipline:
 - `1 - exp(-x)` is computed as `-expm1(-x)`, accurate when x is small.
-- `exp(-a) - exp(-b)` is computed as `expdiff_neg(a, b)`, accurate when
-  a ≈ b. This case occurs when nearby μ_i, μ_j make the difference of
-  exponentials catastrophically cancel in the naive evaluation.
+- `(μⱼ/(μᵢ-μⱼ)) · (exp(-δτ/μᵢ) - exp(-δτ/μⱼ))` is computed as
+  `elem_trans_factor(δτ, μᵢ, μⱼ) = (δτ/μᵢ) · expdiff_ratio(δτ/μᵢ, δτ/μⱼ)`,
+  which never divides by `μᵢ - μⱼ`. Dividing `expdiff_neg(a, b)` by
+  `μᵢ - μⱼ` instead would amplify the rounding of `δτ/μᵢ` and `δτ/μⱼ` by
+  `μ/|μᵢ - μⱼ|` (an error of about `eps·μ/|μᵢ - μⱼ|`), which matters for a
+  VZA or Radau node close to another ordinate.
 - The `μ[i] == μ[j]` branch handles the diagonal limit where the i ≠ j
   formula has an `(μⱼ/(μᵢ-μⱼ))` apparent singularity. The L'Hôpital limit
-  used here is the closed-form replacement.
+  used here is the closed-form replacement; `elem_trans_factor` tends to
+  it continuously.
 
 Streams with quadrature weight below `eps(FT)` (e.g. zero-weight viewing
 nodes appended for direct ray-tracing in the Block-Radau scheme) get
@@ -312,12 +316,10 @@ worked-example O₂ A-band layer, and the `expm1`/`expdiff_neg` rationale.
         else
     
             # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
-            # (𝑖 ≠ 𝑗)
+            # (𝑖 ≠ 𝑗), with the angular factor in its cancellation-free form.
             t⁺⁺[i,j,n] = 
-                ϖ_λ[n] * Z⁺⁺[i,j,n2] * 
-                #Z⁺⁺[i,j] * 
-                (μ[j] / (μ[i] - μ[j])) * wct[j] * 
-                expdiff_neg(dτ_λ[n] / μ[i], dτ_λ[n] / μ[j])
+                ϖ_λ[n] * Z⁺⁺[i,j,n2] * wct[j] *
+                elem_trans_factor(dτ_λ[n], μ[i], μ[j])
         end
     else
         r⁻⁺[i,j,n] = zero(FT)
@@ -376,10 +378,10 @@ applies the D-matrix sign required by the doubling path.
         J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (dτ_λ[n] / μ₀) * exp(-dτ_λ[n] / μ₀)
     else
         # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
-        # See Eq. 1.53 in Fell
+        # See Eq. 1.53 in Fell; `elem_trans_factor` evaluates the bracketed
+        # product without dividing by μᵢ - μ₀ (accurate for μᵢ near μ₀).
         J₀⁺[i, 1, n] = 
-        wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (μ₀ / (μ[i] - μ₀)) *
-        expdiff_neg(dτ_λ[n] / μ[i], dτ_λ[n] / μ₀)
+        wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * elem_trans_factor(dτ_λ[n], μ[i], μ₀)
     end
     #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]
     # See Eq. 1.52 in Fell
@@ -419,8 +421,7 @@ symmetry as the square diffuse operators.
     t = if μᵢ == μ₀
         wct02 * ϖ[n] * Z₀⁺[i,s,iz] * (dτ[n]/μ₀) * exp(-dτ[n]/μ₀)
     else
-        wct02 * ϖ[n] * Z₀⁺[i,s,iz] * (μ₀/(μᵢ-μ₀)) *
-            expdiff_neg(dτ[n]/μᵢ, dτ[n]/μ₀)
+        wct02 * ϖ[n] * Z₀⁺[i,s,iz] * elem_trans_factor(dτ[n], μᵢ, μ₀)
     end
     r = wct02 * ϖ[n] * Z₀⁻[i,s,iz] * (μ₀/(μᵢ+μ₀)) *
         (-expm1(-dτ[n] * ((1/μᵢ) + (1/μ₀))))

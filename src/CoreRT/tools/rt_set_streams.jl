@@ -24,11 +24,13 @@ Two stream counts live on the resulting `QuadPoints`:
 =#
 
 # Ordinates closer than `_NODE_MERGE_ULPS · eps(1)` (absolute, on μ ∈ [0, 1])
-# are treated as one direction. Distinct but numerically equal ordinates are
-# harmful: kernels with 1/(μᵢ − μⱼ) or 1/(μᵢ − μ₀) cancellation lose all
-# precision, so a μ₀ or VZA one rounding error from a node would give a
-# visibly different answer from both the on-node and the clearly-off cases
-# (e.g. `sza = acosd(node)`, whose cosine is not exactly `node`).
+# are treated as one direction, so a μ₀ or VZA one rounding error from a node
+# (e.g. `sza = acosd(node)`, whose cosine is not exactly `node`) gives exactly
+# the on-node grid and result instead of a numerically duplicate ordinate.
+# The elemental kernels no longer need the merge for accuracy: they evaluate
+# their μⱼ/(μᵢ − μⱼ)-type factors without dividing by the cosine difference
+# (`elem_trans_factor`), so near-coincident ordinates outside this window,
+# including Radau weighted nodes merged only when exactly equal, are accurate.
 const _NODE_MERGE_ULPS = 4
 
 _nodes_coincide(a, b) = abs(a - b) <=
@@ -54,9 +56,8 @@ coincide (`_nodes_coincide`) and `μ₀` is kept exact:
 
 1. unless `μ₀` is already a node, a node coinciding with `μ₀` is moved onto
    `μ₀`, keeping its weight, so the kernels see `μᵢ == μ₀` exactly, as for an
-   SZA exactly on the node, instead of a rounding-error difference that their
-   `1/(μᵢ − μ₀)` terms cannot resolve (the node moves by at most
-   `_NODE_MERGE_ULPS · eps(1)`);
+   SZA exactly on the node, instead of a rounding-error difference (the node
+   moves by at most `_NODE_MERGE_ULPS · eps(1)`);
 2. each VZA coinciding with `μ₀` is represented by `μ₀` itself; a VZA
    coinciding with a node already present is skipped (served by that node
    through `nearest_point`); any other VZA is appended;

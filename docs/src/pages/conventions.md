@@ -313,7 +313,14 @@ Appended ordinates (VZAs and, when embedded, μ₀) that lie within
 than added as a numerically coincident second ordinate, and a node that
 close to μ₀ is moved onto the exact μ₀ (keeping its weight). A cosine one rounding error from a node (for
 example `sza = acosd(node)`) therefore gives the on-node result; grids
-without such a near-coincidence are unchanged.
+without such a near-coincidence are unchanged. Outside this window the
+elemental kernels stay accurate however close two ordinates are: they
+evaluate the ``\mu_j/(\mu_i-\mu_j)\,(e^{-\delta\tau/\mu_i}-e^{-\delta\tau/\mu_j})``
+transmission and direct-solar source factors as a divided difference of
+``e^{-x}`` and never divide by ``\mu_i-\mu_j`` (`elem_trans_factor`;
+[The MOM Solver](concepts/04_mom_solver.md)). This also covers Radau's own
+weighted sub-interval nodes for a near-overhead sun, which can lie a few ulps
+apart and are merged only when exactly equal.
 
 All representations report:
 

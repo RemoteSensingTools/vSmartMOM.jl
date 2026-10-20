@@ -112,7 +112,7 @@ consequences:
   ``e^{-a} - e^{-b}`` lose precision when ``x`` is small or ``a \approx b``.
 
 The numerical-stability discipline shows up in the actual code
-([`src/CoreRT/CoreKernel/elemental.jl:286–331`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental.jl#L286-L331)):
+([`src/CoreRT/CoreKernel/elemental.jl:290–333`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental.jl#L290-L333)):
 
 ```julia
 # inside the @kernel function get_elem_rt!
@@ -125,15 +125,28 @@ if μ[i] == μ[j]
     t⁺⁺[i,j,n] = exp(-dτ_λ[n]/μ[i]) *
                  ((i == j) + ϖ_λ[n] * Z⁺⁺[i,j,n2] * (dτ_λ[n]/μ[i]) * wct[j])
 else
-    t⁺⁺[i,j,n] = ϖ_λ[n] * Z⁺⁺[i,j,n2] *
-                 (μ[j] / (μ[i] - μ[j])) * wct[j] *
-                 expdiff_neg(dτ_λ[n]/μ[i], dτ_λ[n]/μ[j])  # exp(-a)-exp(-b), stable
+    # (μⱼ/(μᵢ-μⱼ)) (exp(-a) - exp(-b)), a = dτ/μᵢ, b = dτ/μⱼ, without 1/(μᵢ-μⱼ)
+    t⁺⁺[i,j,n] = ϖ_λ[n] * Z⁺⁺[i,j,n2] * wct[j] *
+                 elem_trans_factor(dτ_λ[n], μ[i], μ[j])
 end
 ```
 
 `-expm1(-x)` computes ``1 - e^{-x}`` to full machine precision when ``x``
-is small. `expdiff_neg(a, b)` computes ``e^{-a} - e^{-b}`` to full machine
-precision when ``a \approx b``. Both replace error-prone direct evaluations.
+is small. The transmission factor
+``\frac{\mu_j}{\mu_i-\mu_j}\left(e^{-a}-e^{-b}\right)`` equals
+``a\,\frac{e^{-a}-e^{-b}}{b-a}`` with ``a = \delta\tau/\mu_i`` and
+``b = \delta\tau/\mu_j``. `elem_trans_factor` evaluates the divided
+difference ``(e^{-a}-e^{-b})/(b-a)`` (`expdiff_ratio`) in the midpoint form
+``e^{-(a+b)/2}\,\sinh(x)/x``, ``x=(b-a)/2``, when ``|b-a|\le 2``, so it
+never divides by ``\mu_i-\mu_j``. Dividing ``e^{-a}-e^{-b}`` (however
+accurately computed) by ``\mu_i-\mu_j`` would amplify the rounding of
+``a`` and ``b`` by ``\mu/|\mu_i-\mu_j|``: a relative error of about
+``\epsilon\,\mu/|\mu_i-\mu_j|``, e.g. ``10^{-2}`` in `Float32` for a
+viewing or solar cosine ``10^{-6}`` from a node. The same factor (with its
+``\delta\tau``-derivative `elem_trans_factor_dτ`) is used by the solar
+source ``J_0^+``, the linearized kernels, the canopy kernels, and, with
+``a = \delta\tau_1/\mu_i``, ``b = \delta\tau_0/\mu_j``, the Raman
+kernels.
 
 ### 2. Scattering-only δτ for sizing, total δτ_λ for transmission
 
@@ -176,7 +189,7 @@ Eqs. 23–28), simplified by the homogeneity:
 \quad\text{is the matrix geometric series capturing all internal reflections.}
 ```
 
-In code ([`src/CoreRT/CoreKernel/rt_helpers.jl:129–242`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_helpers.jl#L129-L242)):
+In code ([`src/CoreRT/CoreKernel/rt_helpers.jl:210–323`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_helpers.jl#L210-L323)):
 
 ```julia
 @inline function compute_geometric_progression!(gp_refl, tt_gp, r⁻⁺, t⁺⁺, I_static, temp2, ...)
@@ -339,10 +352,10 @@ construction — for instance, `_00` is just a transmission cascade
 |---|---|
 | Per-layer kernel dispatch | [`src/CoreRT/CoreKernel/rt_kernel.jl:186–285`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_kernel.jl#L186-L285) |
 | Elemental kernel (driver) | [`src/CoreRT/CoreKernel/elemental.jl:63–139`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental.jl#L63-L139) |
-| `@kernel get_elem_rt!` (exact finite-δ formulas) | [`src/CoreRT/CoreKernel/elemental.jl:286–331`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental.jl#L286-L331) |
+| `@kernel get_elem_rt!` (exact finite-δ formulas) | [`src/CoreRT/CoreKernel/elemental.jl:290–333`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental.jl#L290-L333) |
 | `init_layer` / `get_dtau_ndoubl` | [`src/CoreRT/CoreKernel/rt_kernel.jl:301–396`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_kernel.jl#L301-L396) |
 | Doubling driver | [`src/CoreRT/CoreKernel/doubling.jl:38–107`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/doubling.jl#L38-L107) |
-| Geometric series + RT updates | [`src/CoreRT/CoreKernel/rt_helpers.jl:129–242`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_helpers.jl#L129-L242) |
+| Geometric series + RT updates | [`src/CoreRT/CoreKernel/rt_helpers.jl:210–323`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_helpers.jl#L210-L323) |
 | `@kernel apply_D!` | [`src/CoreRT/CoreKernel/doubling.jl:186–208`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/doubling.jl#L186-L208) |
 | Interaction (4 cases) | [`src/CoreRT/CoreKernel/interaction.jl:52–410`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/interaction.jl#L52-L410) |
 | `ScatteringInterface_*` types | `src/CoreRT/types.jl::AbstractScatteringInterface` |

@@ -9,7 +9,8 @@
 # with a slightly oblique sun and agree with Gauss quadrature. A slightly
 # oblique sun can make the Radau sub-interval [μ₀, 1] narrower than the node
 # spacing representable in FT; coincident nodes must then be merged (they
-# used to make `rt_set_streams` throw).
+# used to make `rt_set_streams` throw), and nodes a few ulps apart must not
+# cost the elemental kernels accuracy.
 # =========================================================================
 
 using Test
@@ -69,19 +70,26 @@ const _RADAU_YAML = joinpath(@__DIR__, "test_parameters", "PureRayleighParameter
         end
         R0, T0 = run(CoreRT.RadauQuad(), 0.0)
         Rδ, Tδ = run(CoreRT.RadauQuad(), 1e-6)
+        Rν, Tν = run(CoreRT.RadauQuad(), 1e-5)
         Rε, Tε = run(CoreRT.RadauQuad(), 1e-4)
         Rg, Tg = run(CoreRT.GaussLegQuad(), 0.0)
         @test all(>(0), R0[:, 1, :])
         @test all(>(0), T0[:, 1, :])
         # vza = 0 resolves to the solar ordinate only at SZA = 0, where BOA
         # also carries the unscattered beam; compare the other views. At
-        # SZA = 1e-6 the vza = 0 ordinate (μ = 1) and μ₀ = 1 - 1.1e-16 are
-        # distinct but one ulp apart, which costs the elemental exp-difference
-        # formulas some accuracy in that row only.
-        for (R, T) in ((Rδ, Tδ), (Rε, Tε))
+        # SZA = 1e-6, μ₀ is within 4 eps of the fixed node μ = 1, which is
+        # moved onto μ₀ (single-interval grid). At SZA = 1e-5 and 1e-4 the
+        # sub-interval [μ₀, 1] is 1.5e-14 and 1.5e-12 wide, so its weighted
+        # nodes are one to a few ulps apart (merged only when exactly equal).
+        # The elemental factors do not divide by the node difference (limit
+        # form, decision 14e), so the nadir view (μ = 1 node) stays continuous:
+        # its change from SZA = 0 is ≈ 1e-11 here, against 2e-6 at SZA = 1e-5
+        # with the former 1/(μᵢ - μⱼ) expression.
+        for (R, T) in ((Rδ, Tδ), (Rν, Tν), (Rε, Tε))
             @test R[2:end, :, :] ≈ R0[2:end, :, :] rtol=1e-6
             @test T[2:end, :, :] ≈ T0[2:end, :, :] rtol=1e-6
-            @test R ≈ R0 rtol=1e-4
+            @test R ≈ R0 rtol=1e-6
+            @test R[1, :, :] ≈ R0[1, :, :] rtol=1e-9
         end
         # Different quadrature, same physics.
         @test R0[:, 1, :] ≈ Rg[:, 1, :] rtol=2e-3

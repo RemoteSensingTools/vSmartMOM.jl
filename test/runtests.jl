@@ -58,6 +58,8 @@ try
 @testset "Jacobian Unit" begin include("test_jacobians_unit.jl") end
 @testset "Batched Jacobians" begin include("test_jacobian_batched.jl") end
 @testset "Elemental boundary Jacobians" begin include("test_elemental_boundary_jacobians.jl") end
+# Elemental t⁺⁺/J₀⁺ factors near coincident ordinates (limit form, decision 14e).
+@testset "Elemental limit form" begin include("test_elemental_limit_form.jl") end
 @testset "CUDA Jacobian plans" begin include("test_jacobian_vendor.jl") end
 if get(ENV,"VSMARTMOM_JACOBIAN_GPU_TEST","false") == "true"
     @testset "CUDA Jacobian tiles" begin include("test_jacobian_tiled.jl") end
