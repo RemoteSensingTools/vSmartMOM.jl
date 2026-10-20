@@ -71,6 +71,15 @@ review of General's sequential-version rule.
   Habitable Worlds Observatory branch. Model defaults are unchanged: Bodhaine
   (1999) optical depth, with depolarization from the polarizability constants
   when `depol: -1`.
+- Raman: each per-J Q-branch line (ΔJ = 0) weights the anisotropy by the
+  Placzek–Teller coefficient b_JJ instead of b_JJ², so Q + S + O lines sum to
+  the Rayleigh (or vibrational-band) total for every J and the summed Cabannes
+  lines agree with Sanghavi (2026, Table 1) to within 1.5 %. The vibrational Raman
+  (VS) Q-branch cross section rises by 13.3 % (O₂) and 5.9 % (N₂), which
+  changes VS / VS_plus runs, their Cabannes fractions and the stellar H₂ VS
+  path; RRS, Rayleigh and all noRS/RRS results are unchanged. Derivation and
+  references:
+  `docs/dev_notes/raman_q_branch_placzek_teller.md`.
 - HITRAN cache: `artifact(molecule)` under a downloaded edition now uses the
   cached file only if it is a verified full dataset (0–150000 cm⁻¹, all
   isotopologues, SHA-256 matching its metadata); otherwise it downloads the

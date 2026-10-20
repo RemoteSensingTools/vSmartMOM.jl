@@ -136,7 +136,7 @@ Taken one by one by Suniti; implementation status is tracked in §3/§3.1.
 | 3c | Desert solves at the 7-iteration limit | Raise the limit for the reruns and repeat the five solves. |
 | 3d | "Release adds dσ/dp" wording | Correct it: dσ/dp is in the core since `36e7d1e0`; only Round 4 and Round 3 SIF-on lacked it. |
 | 4 | R1: RRS band without rotational lines | Raise an `ArgumentError`. |
-| 5 | R2: VS Q-branch Placzek–Teller factor | Check the reference derivation first, then decide. |
+| 5 | R2: VS Q-branch Placzek–Teller factor | After the reference check: Placzek–Teller weight b_JJ to first power (applied; `raman_q_branch_placzek_teller.md`). |
 | 6 | R3: VS elastic phase matrix vs SSA | Make them consistent (Cabannes in both). |
 | 7 | R4–R8 | Fix all as cleanup. |
 | 8 | VS `_plus` builder | Use the resolved depolarization; do not mutate `params`. |
@@ -347,10 +347,12 @@ results or definitions and wait for a decision.
   not help. Every RT model build now rejects `Stokes_IQ`
   (`_require_rt_polarization` in `rt_set_streams`); the parser, the
   Scattering-level type and StandaloneSS `ExactSSConfig` runs keep it.
-- [ ] **Raman.** R1: a narrow RRS band with no rotational line inside gets
+- [ ] **Raman.** (R2 done 2026-10-19: Q-branch weight b_JJ, see
+  `raman_q_branch_placzek_teller.md`.) R1: a narrow RRS band with no
+  rotational line inside gets
   `n_Raman = 0` and loses the Raman energy silently (warn/error?). R2: the VS
   Q-branch Placzek–Teller factor uses `(α′/(b γ′))²` where `α′²/(b γ′²)`
-  appears intended (Q-branch low by 5.6 % N₂, 11.8 % O₂). R3: VS uses the
+  appears intended (Q-branch low by 5.6 % N₂, 11.7 % O₂). R3: VS uses the
   RRS-free Cabannes Greek coefficients for the elastic part while keeping RRS
   in the elastic SSA (probable inconsistency). R4–R8 minor (band-depolarized
   Q-branch phase, VS_0to1_plus applies no source depletion (~8e-4 of the

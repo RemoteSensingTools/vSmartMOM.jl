@@ -17,6 +17,17 @@ molecular cross-section precomputations.
 @inline _rayleigh_prefactor64() = 128 * Float64(π)^5
 
 """
+    _q_branch_depolarization(α, γ, b_JJ)
+
+Chandrasekhar depolarization factor γ_C = 3·b_JJ·γ²/(45α² + 4·b_JJ·γ²) of a
+Q-branch (ΔJ = 0) line whose anisotropic part carries the Placzek–Teller
+weight `b_JJ` (to first power; see `compute_σ_Rayl_VibRaman_coeff_hires!`).
+Written with the dimensionless ratio α/γ so that Float32 polarizabilities of
+order 1e-24 cm³ do not underflow; `b_JJ = 0` (J = 0) gives γ_C = 0.
+"""
+@inline _q_branch_depolarization(α, γ, b_JJ) = 3 / (4 + 45 * (α / γ)^2 / b_JJ)
+
+"""
     _rovib_prefactor64()
 
 Return the rotational/rovibrational Raman coefficient prefactor in Float64 for
@@ -92,6 +103,15 @@ function compute_σ_Rayl_VibRaman_coeff_hires!(T, mol::MolecularConstants{FT}; J
     #σ_Rayl_coeff_hires = 128π^5 * α̅^2 * (1+2*γ_C_Rayl)/(3-4*γ_C_Rayl)# * ν^4
     Z_pf = 0
     for Ji in 0:Jmax   
+        # Placzek–Teller coefficient of the Q branch (ΔJ = 0), Sanghavi (2022)
+        # Eq. 31: the squared Clebsch–Gordan coefficient ⟨J0;20|J0⟩². With the
+        # O/S coefficients b_{J∓2,J} of the RRS/RVRS lines below (Eq. 19) it
+        # sums to 1, so the anisotropic scattering γ² is shared out exactly
+        # between the branches, while the isotropic part α² stays in Q. A Q
+        # line therefore carries α²/3 + (2/27)·b_JJ·γ² (b to the first power),
+        # and Rayleigh = Cabannes + RRS line by line (Sanghavi & Frankenberg
+        # 2023, Eq. 3; Placzek & Teller 1933; Long 1977). See
+        # docs/dev_notes/raman_q_branch_placzek_teller.md.
         b_JJ   = Ji*(Ji+1)/((2Ji-1)*(2Ji+3))
         g_N = gₛ[2-Ji%2]    
 
@@ -100,7 +120,9 @@ function compute_σ_Rayl_VibRaman_coeff_hires!(T, mol::MolecularConstants{FT}; J
         vf = 0 
         #Ni_by_N = exp(-h*c*E_vJ[vi,Ji]/(k_B*T))  
         Ni_by_N = exp(-h*c*E_vJ[0,Ji]/(k_B*T)) + exp(-h*c*E_vJ[1,Ji]/(k_B*T)) + exp(-h*c*E_vJ[2,Ji]/(k_B*T)) 
-        γ_C = 3/(4+45(α̅/(b_JJ*γ̅))^2)
+        # Cabannes line; the prefactor (1+2γ_C)/(3-4γ_C) below then gives
+        # ᾱ²/3 + (2/27)·b_JJ·γ̄².
+        γ_C = _q_branch_depolarization(α̅, γ̅, b_JJ)
         Z_pf += g_N * (2Ji+1) * (exp(-h*c*E_vJ[0,Ji]/(k_B*T)) + exp(-h*c*E_vJ[1,Ji]/(k_B*T))) #accounting for both the ground- and the first excited vibrational state - depending on the ambient temperature (e.g. on hot exoplanets), more states may have to be accounted for   
         # Molecular energy level
         Δν =  E_vJ[vi, Ji]
@@ -116,7 +138,8 @@ function compute_σ_Rayl_VibRaman_coeff_hires!(T, mol::MolecularConstants{FT}; J
         vi = 0
         vf = 1 
         Ni_by_N = exp(-h*c*E_vJ[vi,Ji]/(k_B*T))  
-        γ_C = 3/(4+45(α_prime/(b_JJ*γ_prime))^2)
+        # Same Q-branch weight for the vibrational transition (α′, γ′).
+        γ_C = _q_branch_depolarization(α_prime, γ_prime, b_JJ)
         # Molecular energy level
         Δν =  E_vJ[vf, Ji] - E_vJ[vi, Ji]
         # Wavenumber change of scattered light

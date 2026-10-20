@@ -103,6 +103,7 @@ CPU; they do not add cases.
 | `test_quality.jl` | active | Taplo schema configuration |
 | `test_radau_overhead_sun.jl` | active | RadauQuad near an overhead sun: weights and geometry at SZA 0 in Float32/Float64, and continuity from SZA 0 to 1e-6, 1e-4 and Gauss |
 | `test_ray_cab_raman.jl` | active | Rayleigh/Cabannes/RRS identities |
+| `test_raman_placzek_teller.jl` | active | Placzek–Teller sum rule of the per-J Q/S/O lines; per-J Cabannes depolarization |
 | `test_rt_entry_guards.jl` | active | Solve-boundary guards: reused-RS F₀, HDR/BHR direct beam, TMS streams/bands, multisensor Cox–Munk TOA, U/V beams, thermal paths, linearized surfaces |
 | `test_scenario_sweep.jl` | active | Scenario sweeps vs monolithic `rt_run` |
 | `test_schema_docs.jl` | active | Schema documentation invariants |
