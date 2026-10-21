@@ -204,9 +204,31 @@ output selection, and the model's embedded or external-solar representation.
 properties by method: `UsingRefInd()` (refractive index plus King factor; He,
 Ar, N₂, O₂, CO₂; `RefractiveIndexRayleigh` is an alias, and the forms without
 a method argument use it) or
-`UsingPolTen()` (Raman-module polarizability tensors; N₂, O₂, H₂).
+`UsingPolTen()` (polarizability tensors; N₂, O₂, H₂).
 `molecular_rayleigh_provenance(UsingRefInd(), species)` covers Ar and CO₂.
-Model defaults are unchanged.
+
+The N₂ and O₂ refractive-index fits now extend through the NIR: Peck and
+Khanna (1966) for N₂ beyond 436 nm and Egan (2026) for O₂ beyond 467 nm, joined
+to the previous fits where they agree. Beyond those wavelengths σ(N₂) rises by
+up to 0.21 % and σ(O₂) falls by up to 0.89 % at 2 µm; air changes by less than
+0.03 %. The O₂ King factor keeps the He et al. (2021) constant 1.09.
+
+The N₂/O₂ polarizability anisotropy now disperses with wavelength
+(`DispersiveAnisotropy()`, from the refractive-index fits and King factors).
+It is the default of `UsingPolTen()` and of the automatic `depol: -1` Rayleigh
+depolarization, which now falls with wavelength as the King factors do: for
+air it is 0.0277 at 400 nm and 0.0254 at 1.6 µm. v2.1.0 gave about 0.0281
+from 400 nm to 2 µm, because it evaluated the molecular constants at 300 K and
+left 2π out of the Buldakov dispersion pole of the mean polarizability; with the
+column-weighted temperature and the 2π, but a constant anisotropy, the v2.2
+pre-releases gave 0.0263 and 0.0280. Against v2.1.0 the Rayleigh optical depth
+changes by −0.06 % at 400 nm and −0.46 % at 1.6 µm. Set
+`radiative_transfer.rayleigh_anisotropy: ConstantAnisotropy()` for the
+constant anisotropy (the v2.2 pre-release depolarization, bit for bit), and
+`UsingPolTen(ConstantAnisotropy())` for the pre-release `UsingPolTen()`
+values; neither restores v2.1.0, and the new N₂/O₂ fits of `UsingRefInd()`
+have no switch. Raman and Cabannes cross sections keep the constant
+Raman-module tensor.
 
 ### New guide
 

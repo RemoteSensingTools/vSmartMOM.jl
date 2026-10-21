@@ -90,7 +90,8 @@ CPU; they do not add cases.
 | `test_m_invariant_dtau.jl` | active | m-invariant dτ cache, bitwise A/B |
 | `test_mie_nodes.jl` | active + flagged | Caller-defined-node Mie API; CUDA arm under `CUDA`, Metal arms under `Metal` |
 | `test_mie_nodes_batched.jl` | active + flagged | Batched caller-node Mie API; CUDA arm under `CUDA` |
-| `test_molecular_rayleigh.jl` | active | Molecular Rayleigh optical properties |
+| `test_molecular_rayleigh.jl` | active | Molecular Rayleigh optical properties; N₂/O₂ NIR dispersion fits, dispersive tensor, H₂ refractivity check |
+| `test_rayleigh_anisotropy.jl` | active | `rayleigh_anisotropy` parsing; `depol: -1` Rayleigh depolarization in the forward, linearized and batch builders |
 | `test_multisensor_heights.jl` | active | Observer heights and interior levels |
 | `test_nonscattering_layers.jl` | active | Layers with zero scattering optical depth: equality with vanishing scattering and with the merged column at TOA and BOA, and with vanishing scattering at interior levels (IQU, albedo 0 and 0.3), the pure-absorber thermal closed form, Float32/Float64 thermal parity, and linearized parity |
 | `test_parameters_parser.jl` | active | Parameter parser regressions |

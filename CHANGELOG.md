@@ -66,11 +66,48 @@ review of General's sequential-version rule.
   `AbstractMolecularRayleighMethod`. `UsingRefInd()` is the refractive-index
   plus King-factor method for He, Ar, N₂, O₂ and CO₂ (`RefractiveIndexRayleigh`
   is kept as an alias, and the forms without a method argument use it);
-  `UsingPolTen()` uses the Raman-module polarizability tensors for N₂, O₂ and
-  H₂. `molecular_rayleigh_provenance` covers `UsingRefInd()` for Ar and CO₂. The refractive-index part is ported from Suniti Sanghavi's
-  Habitable Worlds Observatory branch. Model defaults are unchanged: Bodhaine
-  (1999) optical depth, with depolarization from the polarizability constants
-  when `depol: -1`.
+  `UsingPolTen()` uses the polarizability tensors of N₂, O₂ and H₂.
+  `molecular_rayleigh_provenance` covers `UsingRefInd()` for Ar and CO₂. The
+  refractive-index part is ported from Suniti Sanghavi's Habitable Worlds
+  Observatory branch. The Rayleigh optical depth is still Bodhaine (1999),
+  rescaled by the King factor of the depolarization in use.
+- N₂ and O₂ refractive-index fits extend through the NIR: Peck & Khanna
+  (1966) for N₂ beyond 436 nm and Egan (2026) for O₂ beyond 467 nm, joined to
+  the Bates (1984) fits where the two agree, so σ is continuous. σ(N₂) rises
+  by up to 0.21 % and σ(O₂) falls by up to 0.89 % at 2 µm; air changes by
+  less than 0.03 %. The O₂ King factor stays 1.09 (He et al. 2021). Sources,
+  joins and numbers: `docs/dev_notes/molecular_rayleigh_dispersion.md`.
+- **Results change for every `depol: -1` model** built by
+  `model_from_parameters(params)`, `model_from_parameters(LinMode(), params)`
+  or `update_model!` (the VS `_plus` builder still takes `depol` as given). The
+  N₂/O₂ polarizability anisotropy now varies with wavelength
+  (`DispersiveAnisotropy()`, implied by the refractive-index fits and King
+  factors). It is the default of `UsingPolTen()` and of the automatic
+  `depol: -1` Rayleigh depolarization, which sets the Rayleigh Greek
+  coefficients and τ_Rayleigh. For air the depolarization is 0.0277 at
+  400 nm and 0.0254 at 1.6 µm (v2.2 pre-releases 0.0263 and 0.0280; v2.1.0
+  about 0.0281 at both), and τ_Rayleigh changes by +0.25 % at 400 nm and −0.44 %
+  at 1.6 µm against the pre-releases (−0.06 % and −0.46 % against v2.1.0).
+  `radiative_transfer.rayleigh_anisotropy: ConstantAnisotropy()` (params
+  field `rayleigh_anisotropy`) keeps the constant anisotropy, the v2.2
+  pre-release depolarization bit for bit, and
+  `UsingPolTen(ConstantAnisotropy())` the pre-release `UsingPolTen()` values;
+  neither restores v2.1.0 (see the next item), and the new `UsingRefInd()`
+  fits have no switch. The
+  Raman and Cabannes quantities (ϖ_Cabannes, the Cabannes depolarization,
+  RRS and VS cross sections) keep the constant Raman-module tensor of the
+  published tables. Paired noRS/RRS runs (Ring or filling-in spectra) should
+  set `ConstantAnisotropy()` until the Raman side is decided.
+- Molecular constants of `depol: -1` and of the Cabannes fraction (Suniti
+  Sanghavi, `817d93cb`): the N₂/O₂ constants are evaluated at the
+  dry-column-weighted mean temperature of the profile instead of 300 K, and
+  the Buldakov et al. dispersion pole of the mean polarizability uses the
+  angular frequency 2πcν̃ (v2.1.0 used cν̃). The 2π dominates. With the
+  constant anisotropy, the air depolarization becomes 0.0263 at 400 nm,
+  0.0276 at 760 nm and 0.0280 at 1.6 µm (v2.1.0: about 0.0281 from 400 nm
+  to 2 µm), τ_Rayleigh changes by −0.31 % at 400 nm and −0.09 % at 760 nm,
+  and the RRS share 1 − ϖ_Cabannes falls by about 6 % at 400 nm and 2 % at
+  760 nm.
 - Raman: each per-J Q-branch line (ΔJ = 0) weights the anisotropy by the
   Placzek–Teller coefficient b_JJ instead of b_JJ², so Q + S + O lines sum to
   the Rayleigh (or vibrational-band) total for every J and the summed Cabannes

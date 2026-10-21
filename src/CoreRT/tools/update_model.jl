@@ -605,12 +605,8 @@ function update_model!(ctx::BatchContext;
 
         νₘ  = FT(0.5) * (params.spec_bands[i_band][1] + params.spec_bands[i_band][end])
         λₘ  = FT(1.0e7) / νₘ
-        _n2, _o2 = InelasticScattering.getRamanAtmoConstants(FT(1.0e7) / λₘ, FT(rayleigh_molecular_T))
-        ϖ_Cab         = InelasticScattering.compute_ϖ_Cabannes(λₘ, _n2, _o2)
-        γ_air_Cab, _  = InelasticScattering.compute_γ_air_Cabannes!(λₘ, _n2, _o2)
-        γ_air_Ray, _  = InelasticScattering.compute_γ_air_Rayleigh!(λₘ, _n2, _o2)
-        depol_air_Cab = 2γ_air_Cab / (1 + γ_air_Cab)
-        depol_air_Ray = 2γ_air_Ray / (1 + γ_air_Ray)
+        ϖ_Cab, depol_air_Cab, depol_air_Ray = _auto_molecular_depolarizations(
+            params.rayleigh_anisotropy, λₘ, FT(rayleigh_molecular_T))
         depol_use_Cab = params.depol < 0 ? FT(depol_air_Cab) : FT(params.depol)
         depol_use_Ray = params.depol < 0 ? FT(depol_air_Ray) : FT(params.depol)
 

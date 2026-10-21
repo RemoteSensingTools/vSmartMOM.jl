@@ -37,19 +37,55 @@ CPU-side molecular cross-section precomputations.
 
 """
     compute_effective_coefficents!(ν_eff, T, mol)
+    compute_effective_coefficents!(ν_eff, T, mol, molecule, anisotropy)
 
 Update molecular effective polarizability, anisotropy, depolarization, and
 Greek-coefficient factors at effective wavenumber `ν_eff` and temperature `T`.
+
+The three-argument form (and `anisotropy =` [`ConstantAnisotropy`](@ref)) uses
+the Raman-module tensor: the Buldakov et al. mean polarizability
+``\\bar\\alpha(\\nu, T)`` and the wavelength-independent anisotropy
+``\\bar\\gamma_{00}``. These are the constants of the published Raman tables.
+With `anisotropy =` [`DispersiveAnisotropy`](@ref), `molecule ∈ (N₂(), O₂())`
+takes ``\\bar\\alpha(\\nu, T)`` and ``\\gamma(\\nu)`` from the `UsingRefInd`
+refractivity and King factor (see `Scattering._dispersive_polarizability_tensor`);
+H₂ has no such data and keeps the Raman-module tensor. The derivative terms
+`α_prime` and `γ_prime` (vibrational Raman) are the Raman-module constants in
+both cases.
 """
 function compute_effective_coefficents!(ν_eff, T, mol::MolecularConstants{FT}) where {FT}#molecules::Array{MolecularConstants{FT}}) where {FT}   
-    #@unpack Y = mol
-    @unpack α̅,  γ̅, α_prime, γ_prime, ϵ, ϵ_prime = mol.effCoeff
-    @unpack α̅₀₀, γ̅₀₀, ω₀, α_b, α_c, α₀₀_prime, γ₀₀_prime = mol.PolTensor
+    @unpack α̅₀₀, γ̅₀₀, ω₀, α_b, α_c = mol.PolTensor
     #Computing α̅
     # Buldakov et al. define ω as angular frequency, while ν_eff is a
     # wavenumber in cm⁻¹. Convert with ω = 2πcν_eff.
     α̅ = α̅₀₀*(1 + α_b*T + α_c*T^2)/(1-(2π*c*ν_eff/ω₀)^2)
     γ̅ = γ̅₀₀
+    return _set_effective_coefficients!(mol, α̅, γ̅)
+end
+
+compute_effective_coefficents!(ν_eff, T, mol::MolecularConstants,
+                               ::AbstractMolecule, ::ConstantAnisotropy) =
+    compute_effective_coefficents!(ν_eff, T, mol)
+
+function compute_effective_coefficents!(ν_eff, T, mol::MolecularConstants,
+                                        molecule::Union{N₂, O₂},
+                                        ::DispersiveAnisotropy)
+    @unpack α_b, α_c = mol.PolTensor
+    gas = molecule isa N₂ ? :N2 : :O2
+    tensor = Scattering._dispersive_polarizability_tensor(
+        gas, Float64(ν_eff), Float64(T), Float64(α_b), Float64(α_c))
+    return _set_effective_coefficients!(mol, tensor.α̅, tensor.γ̅)
+end
+
+# H₂ has no refractive-index fit in `UsingRefInd`: keep the Raman-module tensor.
+compute_effective_coefficents!(ν_eff, T, mol::MolecularConstants, ::H₂,
+                               ::DispersiveAnisotropy) =
+    compute_effective_coefficents!(ν_eff, T, mol)
+
+# Store α̅, γ̅ and every quantity derived from them (and from the
+# Raman-module derivatives α₀₀′, γ₀₀′) on `mol.effCoeff`.
+function _set_effective_coefficients!(mol::MolecularConstants, α̅, γ̅)
+    @unpack α₀₀_prime, γ₀₀_prime = mol.PolTensor
     ϵ = α̅/γ̅ 
     α_prime = α₀₀_prime * sqrt(mol.Y[1,2]/mol.Y[2,1]) # see Eqs (36a-39b) of Buldakov et al. 1996 (Spectrochimica Acta Part A) 
     γ_prime = γ₀₀_prime * sqrt(mol.Y[1,2]/mol.Y[2,1]) # see Eqs (36a-39b) of Buldakov et al. 1996 (Spectrochimica Acta Part A) 

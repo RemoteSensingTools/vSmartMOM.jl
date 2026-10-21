@@ -104,6 +104,18 @@ const QUAD_MAP = Dict(
 )
 
 """
+RAYLEIGH_ANISOTROPY_MAP
+
+String → polarizability-tensor dispersion for the automatic (`depol < 0`)
+Rayleigh depolarization. Keys: "DispersiveAnisotropy" (default),
+"ConstantAnisotropy".
+"""
+const RAYLEIGH_ANISOTROPY_MAP = Dict(
+    "DispersiveAnisotropy" => ()->Scattering.DispersiveAnisotropy(),
+    "ConstantAnisotropy"   => ()->Scattering.ConstantAnisotropy(),
+)
+
+"""
 DECOMP_MAP
 
 String → Fourier decomposition method mapping for scattering.
@@ -579,7 +591,8 @@ const _KNOWN_CONFIG_KEYS = (
            "scattering", "canopy", "_metadata"),
     radiative_transfer = ("architecture", "depol", "float_type", "greek_beta_cutoff",
                           "l_trunc", "m_max", "max_m", "nstreams", "numerics",
-                          "polarization_type", "quadrature_type", "spec_bands",
+                          "polarization_type", "quadrature_type",
+                          "rayleigh_anisotropy", "spec_bands",
                           "surface", "truncation", "Δ_angle"),
     geometry = ("obs_alt", "sza", "vaz", "vza"),
 )
@@ -648,6 +661,9 @@ function validate_yaml_parameters(params)
         (["radiative_transfer", "nstreams"], Integer),           # Phase D primary knob
         (["radiative_transfer", "m_max"], Union{Integer, Nothing}),  # Phase D explicit override
         (["radiative_transfer", "greek_beta_cutoff"], Union{Real, Nothing}),
+        (["radiative_transfer", "rayleigh_anisotropy"], String,
+         ["DispersiveAnisotropy()", "ConstantAnisotropy()",
+          "DispersiveAnisotropy", "ConstantAnisotropy"]),
     ]
     section_fields = [
         (["absorption", "vmr"], Dict),
@@ -960,6 +976,23 @@ function _parse_quadrature(params_dict::Dict)
     qkey = replace(String(rt["quadrature_type"]),"()"=>"")
     _require_config(haskey(QUAD_MAP, qkey), "Unknown quadrature_type $(qkey).")
     return QUAD_MAP[qkey]()
+end
+
+"""
+    _parse_rayleigh_anisotropy(params_dict)
+
+Parse the optional `radiative_transfer.rayleigh_anisotropy`
+(`"DispersiveAnisotropy()"`, the default, or `"ConstantAnisotropy()"`): the
+wavelength dependence of the N₂/O₂ polarizability tensor behind the automatic
+(`depol < 0`) Rayleigh depolarization.
+"""
+function _parse_rayleigh_anisotropy(params_dict::Dict)
+    rt = params_dict["radiative_transfer"]
+    haskey(rt, "rayleigh_anisotropy") || return Scattering.DispersiveAnisotropy()
+    key = replace(String(rt["rayleigh_anisotropy"]), "()" => "")
+    _require_config(haskey(RAYLEIGH_ANISOTROPY_MAP, key),
+                    "Unknown rayleigh_anisotropy $(key); use DispersiveAnisotropy() or ConstantAnisotropy().")
+    return RAYLEIGH_ANISOTROPY_MAP[key]()
 end
 
 function _parse_polarization(params_dict::Dict, FT)
@@ -1320,7 +1353,7 @@ function parameters_from_dict(params_dict::Dict)
         T, p, q, profile_reduction,
         absorption_params, scattering_params,
         res.nstreams, res.m_max_override, res.stream_l_cap, res.legacy_l_cap_override,
-        greek_beta_cutoff,
+        greek_beta_cutoff, _parse_rayleigh_anisotropy(params_dict),
     )
 end
 

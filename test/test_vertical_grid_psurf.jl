@@ -204,6 +204,11 @@ end
                                   "vertical_grid_fixed_pressure_7acab570.txt"))
     for kind in (:line, :absco)
         params = _vg_parameters(Float64, kind; water=true, aerosols=true)
+        # 7acab570 derived the automatic (depol: -1) Rayleigh depolarization
+        # from the constant Raman-module anisotropy; v2.2 defaults to the
+        # dispersive anisotropy (decision 13c), which moves τ_rayl at
+        # 1613 nm by -0.4 %. Select the formulation of the golden values.
+        params.rayleigh_anisotropy = ConstantAnisotropy()
         model, implicit = model_from_parameters(LinMode(), params;
             compute_aerosol_microphysics_jacobians=false,
             abundance_jacobians=:frozen_cross_section)

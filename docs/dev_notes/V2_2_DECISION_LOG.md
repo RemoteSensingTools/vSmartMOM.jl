@@ -20,7 +20,7 @@ is ported with two method types:
 | Type | Physics | Species available now |
 |---|---|---|
 | `UsingRefInd()` | refractive index + (effective) King factor | He, Ar, N₂, O₂, CO₂ |
-| `UsingPolTen()` | polarizability tensor (mean polarizability ᾱ, anisotropy γ) | N₂, O₂, H₂ (constants from the Raman module) |
+| `UsingPolTen()` | polarizability tensor (mean polarizability ᾱ, anisotropy γ) | N₂, O₂ (dispersive by default, decision 13c), H₂ (Raman-module constants) |
 
 `RefractiveIndexRayleigh` stays as an alias of `UsingRefInd` so existing
 ExoOptics code keeps working. The two-argument call
@@ -33,9 +33,11 @@ p_surf/1013.25 and rescaled by the ratio of King factors that takes
 Bodhaine's built-in depolarization (0.0279) to the configured one
 (`getRayleighLayerOptProp`).
 With the default `depol: -1`, that depolarization — which also sets the
-Rayleigh Greek coefficients — comes from the N₂/O₂ polarizability constants
-of the Raman module (`model_from_parameters.jl`, `getRamanAtmoConstants`).
-The Cabannes/RRS/VRS paths use the polarizability tensors directly.
+Rayleigh Greek coefficients — comes from the N₂/O₂ polarizability tensors
+selected by `params.rayleigh_anisotropy` (default `DispersiveAnisotropy()`,
+decision 13c; `_auto_molecular_depolarizations` in `model_from_parameters.jl`).
+ϖ_Cabannes, the Cabannes depolarization and the RRS/VRS paths use the
+Raman-module constants (`getRamanAtmoConstants`).
 
 ### 1.2 Common names between vSmartMOM and ExoOptics
 
@@ -144,11 +146,11 @@ Taken one by one by Suniti; implementation status is tracked in §3/§3.1.
 | 10 | Ross–Li 80° zenith cap | Make it a parameter, default 80°; off reproduces MODIS/VLIDORT. |
 | 11 | NAI2 size-parameter Jacobians | Fixed radius grid (nodes independent of the distribution parameters). |
 | 12 | p_surf tangent of `depol: -1` | Document as neglected (~1e-5 relative) (done, `jacobians.md`). |
-| 13a | O₂ King factor | Keep 1.09 (He et al. 2021). |
-| 13b | Refractive-index fits beyond 468/546 nm | Switch to fits valid through the NIR where the current ones are extrapolated. |
-| 13c | Anisotropy γ | Add the wavelength dependence (N₂, O₂). |
-| 13d | `UsingPolTen` default T | Keep 288.15 K. |
-| 13e | H₂ refractive-index check | Add a test. |
+| 13a | O₂ King factor | Keep 1.09 (He et al. 2021) (done; cited, with the 1.096 alternative). |
+| 13b | Refractive-index fits beyond 468/546 nm | Switch to fits valid through the NIR where the current ones are extrapolated (done: Peck & Khanna 1966 for N₂, Egan 2026 for O₂, continuous joins). |
+| 13c | Anisotropy γ | Add the wavelength dependence (N₂, O₂) (done: `DispersiveAnisotropy()`, default for `depol: -1` and `UsingPolTen()`; Raman side unchanged, see §3). |
+| 13d | `UsingPolTen` default T | Keep 288.15 K (done; reasons documented). |
+| 13e | H₂ refractive-index check | Add a test (done: Peck & Huang 1977 and Raj et al. 2018). |
 | 14a | Solar F₀ precedence | Keep kwarg > preset > `model.sources`; a `sources=` call no longer overwrites the preset. |
 | 14b | `rt_run_ss` `hem_T` | Keep diffuse-only. |
 | 14c | Interior upwelling glint | Keep the Fourier-truncated glint; document that the exact glint is TOA-only. |
@@ -224,13 +226,27 @@ decided after comparing the pilot with Round 7 (§3.1).
 
 ## 3. Open items / TODO
 
-- [ ] **For Suniti (molecular Rayleigh, from the port review):**
-  (1) O₂ King-factor constant 1.09 (He et al. 2021, as ported) vs 1.096
-  (Bates 1984/Bodhaine 1999; +0.54 % in σ); (2) the RI fits are extrapolated
-  beyond 468 nm (N₂) and 546 nm (O₂); (3) the Raman-module anisotropy γ has no
-  wavelength or temperature dependence, which also affects the default
-  `depol: -1`; (4) UsingPolTen default temperature 288.15 K; (5) H₂ has no
-  independent refractive-index check here.
+- [x] **Molecular Rayleigh port review** (decisions 13a–13e): done; formulas,
+  sources, joins and before/after numbers in
+  `docs/dev_notes/molecular_rayleigh_dispersion.md`. The golden test in
+  `test/test_vertical_grid_psurf.jl` and the Phase 1b RRS reference test
+  select `ConstantAnisotropy()`, the formulation their stored values were
+  made with; the stored files are unchanged.
+- [ ] **For Suniti (follow-ups of decision 13):**
+  (1) Raman side: with the dispersive Rayleigh default, an elastic-only run
+  and a Raman run no longer share one elastic + RRS decomposition (implied
+  depolarization differs by up to ≈10 % in the NIR). Options: keep the Raman
+  constants and recommend `ConstantAnisotropy()` for paired noRS/RRS runs;
+  switch the Raman cross sections too (σ_RRS −6.6 % at 760 nm, +6.3 % at
+  395 nm); or make the Rayleigh default constant again.
+  (2) The dispersive O₂ anisotropy follows the 1.09 King factor; Hohm (1994)
+  supports 1.096 (γ 3 % higher). (3) Bodhaine Eq. 30 τ_Rayleigh is +1.0 %
+  high at 1.6 µm and +3.6 % at 2.06 µm against Peck–Reeder/Ciddor
+  refractivity, and the King rescaling uses a constant ρ₀ = 0.0279 (τ 0.3 %
+  high at 400 nm); option: an RI-based air σ for τ_Rayleigh. (4) The
+  Raman-module H₂ anisotropy is 8.5 % below the ab initio value (σ_RRS(H₂)
+  ≈16 % low). (5) N₂ join kept at 436.3 nm (continuous) rather than 468 nm
+  (2.85×10⁻⁴ jump in σ).
 - [ ] **Polarizability tensors for more species.** Populate ᾱ and γ (and
   their wavelength dependence) for as many species as possible — at least
   Ar, CO₂, He, H₂O, CH₄ — for use in Rayleigh (`UsingPolTen`) and Raman

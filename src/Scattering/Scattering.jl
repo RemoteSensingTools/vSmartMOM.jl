@@ -54,6 +54,8 @@ export make_mie_model, reconstruct_phase, greek_coefficients,
        phase_matrix_first_column, scattering_matrix,
        AbstractMolecularRayleighMethod, UsingRefInd, UsingPolTen,
        RefractiveIndexRayleigh,
+       AbstractPolarizabilityDispersion, ConstantAnisotropy,
+       DispersiveAnisotropy,
        molecular_rayleigh_properties, molecular_rayleigh_cross_section_ratio,
        molecular_rayleigh_provenance
 

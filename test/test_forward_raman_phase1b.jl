@@ -39,6 +39,10 @@ if !PHASE1B_RUN_CPU
 else
 
     params = parameters_from_yaml("test_parameters/Phase1b_RRS_761-764nm.yaml")
+    # The reference predates the dispersive anisotropy (decision 13c), which
+    # moves the depol: -1 τ_rayl at 763 nm by -0.3 %. Select the constant
+    # anisotropy of the reference.
+    params.rayleigh_anisotropy = ConstantAnisotropy()
     model = model_from_parameters(params)
 
     iBand = 1

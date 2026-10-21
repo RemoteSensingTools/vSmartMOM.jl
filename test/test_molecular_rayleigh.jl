@@ -151,6 +151,14 @@ end
     @test UsingRefInd() isa AbstractMolecularRayleighMethod
     @test UsingPolTen() isa AbstractMolecularRayleighMethod
     @test !(UsingPolTen() isa UsingRefInd)
+    # The tensor dispersion is a dispatch parameter; the dispersive anisotropy
+    # is the default (decision 13c), the Raman-module constants stay available.
+    @test UsingPolTen() === UsingPolTen(DispersiveAnisotropy())
+    @test UsingPolTen(ConstantAnisotropy()) isa UsingPolTen
+    @test UsingPolTen(ConstantAnisotropy()) != UsingPolTen()
+    @test DispersiveAnisotropy() isa AbstractPolarizabilityDispersion
+    @test ConstantAnisotropy() isa AbstractPolarizabilityDispersion
+    @test vSmartMOM.Scattering.DispersiveAnisotropy === DispersiveAnisotropy
     # The same names are reachable through the Scattering submodule.
     @test vSmartMOM.Scattering.UsingRefInd === UsingRefInd
     @test vSmartMOM.Scattering.UsingPolTen === UsingPolTen
@@ -238,16 +246,37 @@ end
     @test molecular_rayleigh_properties(pt, :H₂, 500.0).species === :H2
     @test molecular_rayleigh_properties(pt, :oxygen, 500.0).species === :O2
 
-    # Exactly the Raman-module numbers that feed the RT model's default
-    # (`depol: -1`) molecular depolarization path.
+    # Exactly the Raman-module numbers: ConstantAnisotropy is the tensor of
+    # the Raman/Cabannes cross sections (`getRamanAtmoConstants`), and
+    # DispersiveAnisotropy the tensor of the RT model's automatic
+    # (`depol: -1`) Rayleigh depolarization.
     IS = vSmartMOM.InelasticScattering
-    for λ in (350.0, 532.0, 760.0), T in (220.0, 288.15)
+    ptc = UsingPolTen(ConstantAnisotropy())
+    for λ in (350.0, 532.0, 760.0, 1600.0), T in (220.0, 288.15)
         ν = 1.0e7 / λ
-        n2, o2 = IS.getRamanAtmoConstants(ν, T)
-        for (gas, mol) in ((:N2, n2), (:O2, o2))
-            p = molecular_rayleigh_properties(pt, gas, λ; temperature_K = T)
-            @test p.depolarization == mol.effCoeff.rho_depol_Rayl
-            @test p.cross_section_cm2 ≈ mol.effCoeff.σ_Rayl_coeff * ν^4 rtol = 1e-14
+        for (method, (n2, o2)) in ((ptc, IS.getRamanAtmoConstants(ν, T)),
+                                   (pt, IS.getRamanAtmoConstants(ν, T, DispersiveAnisotropy())))
+            for (gas, mol) in ((:N2, n2), (:O2, o2))
+                p = molecular_rayleigh_properties(method, gas, λ; temperature_K = T)
+                @test p.depolarization == mol.effCoeff.rho_depol_Rayl
+                @test p.cross_section_cm2 ≈ mol.effCoeff.σ_Rayl_coeff * ν^4 rtol = 1e-14
+            end
+        end
+        # The automatic depolarization helper of the RT model.
+        λ64 = Float64(λ)
+        for a in (ConstantAnisotropy(), DispersiveAnisotropy())
+            n2, o2 = IS.getRamanAtmoConstants(ν, T, a)
+            γ, σ = IS.compute_γ_air_Rayleigh!(λ64, n2, o2)
+            depol, σ_air = IS.rayleigh_air_depolarization(a, λ64, T)
+            @test depol ≈ 2γ / (1 + γ) rtol = 1e-14
+            @test σ_air ≈ σ rtol = 1e-14
+        end
+        for (a, b) in zip(IS.getRamanAtmoConstants(ν, T, ConstantAnisotropy()),
+                          IS.getRamanAtmoConstants(ν, T))
+            for f in (:α̅, :γ̅, :rho_depol_Rayl, :σ_Rayl_coeff,
+                      :σ_RoRaman_coeff_JtoJp2, :σ_Rayl_coeff_hires)
+                @test getfield(a.effCoeff, f) == getfield(b.effCoeff, f)
+            end
         end
     end
 
@@ -284,30 +313,41 @@ end
             ρ = 6γ^2 / (45α̅^2 + 7γ^2)
             F = 1 + 2γ^2 / (9α̅^2)
             σ = 128 / 3 * π^5 * ν^4 * α̅^2 * F
-            p = molecular_rayleigh_properties(pt, gas, λ; temperature_K = T)
+            p = molecular_rayleigh_properties(ptc, gas, λ; temperature_K = T)
             @test p.cross_section_cm2 ≈ σ rtol = 1e-12
             @test p.depolarization ≈ ρ rtol = 1e-12
             @test p.king_factor ≈ F rtol = 1e-12
         end
-        p400 = molecular_rayleigh_properties(pt, gas, 400.0)
+        p400 = molecular_rayleigh_properties(ptc, gas, 400.0)
         @test p400.cross_section_cm2 ≈ getproperty(pinned_400, gas).σ rtol = 1e-4
         @test p400.depolarization ≈ getproperty(pinned_400, gas).ρ rtol = 1e-4
     end
 
-    # The tensor anisotropy is λ- and T-independent; only α̅ carries the
-    # Buldakov dispersion and temperature dependence.
+    # The Raman-module (constant) anisotropy is λ- and T-independent; only α̅
+    # carries the Buldakov dispersion and temperature dependence. The
+    # dispersive anisotropy depends on λ only; H₂ keeps the Raman-module tensor.
     hook = vSmartMOM.Scattering._poltensor_rayleigh_coefficients
+    points = ((1.0e7 / 350.0, 200.0), (1.0e7 / 532.0, 288.15),
+              (1.0e7 / 800.0, 300.0), (25_000.0, 1000.0))
     for gas in (:N2, :O2, :H2)
-        samples = [hook(gas, ν, T) for (ν, T) in ((1.0e7 / 350.0, 200.0),
-                                                   (1.0e7 / 532.0, 288.15),
-                                                   (1.0e7 / 800.0, 300.0),
-                                                   (25_000.0, 1000.0))]
+        samples = [hook(gas, ν, T) for (ν, T) in points]
+        @test samples == [hook(gas, ν, T, ConstantAnisotropy()) for (ν, T) in points]
         @test all(c.γ̅ == first(samples).γ̅ for c in samples)
         @test first(samples).γ̅ == getproperty(raw, gas).γ̅₀₀
         @test length(unique(c.α̅ for c in samples)) == length(samples)
+        dispersive = [hook(gas, ν, T, DispersiveAnisotropy()) for (ν, T) in points]
+        if gas === :H2
+            @test dispersive == samples
+        else
+            @test length(unique(c.γ̅ for c in dispersive)) == length(points)
+            @test hook(gas, 1.0e7 / 532.0, 200.0, DispersiveAnisotropy()).γ̅ ==
+                  hook(gas, 1.0e7 / 532.0, 300.0, DispersiveAnisotropy()).γ̅
+        end
     end
-    @test molecular_rayleigh_properties(pt, :N2, 500.0; temperature_K = 200.0).cross_section_cm2 !=
-          molecular_rayleigh_properties(pt, :N2, 500.0; temperature_K = 300.0).cross_section_cm2
+    for method in (pt, ptc)
+        @test molecular_rayleigh_properties(method, :N2, 500.0; temperature_K = 200.0).cross_section_cm2 !=
+              molecular_rayleigh_properties(method, :N2, 500.0; temperature_K = 300.0).cross_section_cm2
+    end
 
     # Unsupported species: clear ArgumentError naming the species and the
     # RI alternative.
@@ -333,25 +373,26 @@ end
 end
 
 @testset "molecular Rayleigh PolTen vs RefInd intercomparison" begin
-    # The two methods use independent data: RI fits (N2: Bates 1984 /
-    # Peck & Khanna UV dispersion with the Bates King factor; O2: He et al.
-    # 2021 Table 1, dispersion fit at 273.15 K and Bates-type King factor)
-    # versus the Raman-module polarizability tensor (Buldakov-type α̅(ν,T),
-    # wavelength-independent γ). At 288.15 K and 350-800 nm the observed
-    # differences are (PolTen/RI - 1):
-    #   N2: σ  -0.51 % (350 nm) ... +0.46 % (800 nm); n-1 within 0.14 %;
-    #       F_K within 0.27 %; ρ -7.3 % (350 nm) ... +5.2 % (800 nm).
-    #   O2: σ  -1.54 % (350 nm) ... +0.05 % (800 nm); n-1 within 0.46 %;
+    # The RI method and the Raman-module polarizability tensor
+    # (UsingPolTen(ConstantAnisotropy()): Buldakov-type α̅(ν,T),
+    # wavelength-independent γ) use independent data: RI fits (N2: Bates 1984
+    # below 436.3 nm, Peck & Khanna 1966 above, Bates King factor; O2: He et
+    # al. 2021 Table 1 below 466.7 nm, Egan 2026 above, He et al. King
+    # factor). At 288.15 K and 350-800 nm the observed differences are
+    # (PolTen/RI - 1):
+    #   N2: σ  -0.51 % (350 nm) ... +0.30 % (800 nm); n-1 within 0.12 %;
+    #       F_K within 0.26 %; ρ -7.3 % (350 nm) ... +5.2 % (800 nm).
+    #   O2: σ  -1.54 % (350 nm) ... +0.63 % (800 nm); n-1 within 0.18 %;
     #       F_K -1.60 % ... +0.98 %; ρ -15 % (350 nm) ... +11 % (800 nm).
     # The thresholds below are sanity/regression bounds informed by the
     # literature; they are NOT derived error bounds of either method. He et
     # al. (2021) state that the N2 Rayleigh cross section "is validated up
     # to 468 nm with an uncertainty of 1 %", and report average agreement of
     # measured O2 cross sections with n-based values of 1.2 % (pure O2) and
-    # (2.8 ± 1.2) % (extinction), over a range ending at 725 nm. The test
-    # extends to 800 nm, beyond both RI fit domains (N2 254-468 nm, O2
-    # 288-546 nm per He et al. Table 1), so it compares two extrapolations
-    # there. We therefore require σ to agree within 1 % (N2) and 2 % (O2),
+    # (2.8 ± 1.2) % (extinction), over a range ending at 725 nm. Beyond the
+    # visible the King factors of both gases are extrapolations (their
+    # dispersion fits now extend to 2059 nm for N2 and 1542 nm for O2).
+    # We therefore require σ to agree within 1 % (N2) and 2 % (O2),
     # i.e. within the size of the literature RI-vs-measurement differences.
     # The same thresholds are applied to F_K. The refractivity threshold is
     # half of that (σ ∝ (n-1)² F_K to first order), but the n-1 and F_K
@@ -369,7 +410,7 @@ end
     for gas in (:N2, :O2), λ in 350.0:50.0:800.0
         tol = getproperty(tolerances, gas)
         ri = molecular_rayleigh_properties(UsingRefInd(), gas, λ)
-        pt = molecular_rayleigh_properties(UsingPolTen(), gas, λ;
+        pt = molecular_rayleigh_properties(UsingPolTen(ConstantAnisotropy()), gas, λ;
                                            temperature_K = 288.15,
                                            number_density_cm3 =
                                                getproperty(reference_density, gas))
@@ -377,5 +418,186 @@ end
         @test abs(pt.king_factor / ri.king_factor - 1) < tol.F
         @test abs((pt.refractive_index - 1) / (ri.refractive_index - 1) - 1) < tol.n
         @test abs(pt.depolarization / ri.depolarization - 1) < 0.2
+    end
+end
+
+@testset "N2 and O2 refractive-index fits through the NIR" begin
+    # Closed forms written here from the primary sources (s = 1/λ in µm⁻¹):
+    #   Bates (1984) N2, 288.15 K and O2, 273.15 K (He et al. 2021, Table 1);
+    #   Peck & Khanna (1966) N2, 0 °C and 760 Torr, in the wavelength form
+    #     of the refractiveindex.info record N2/nk/Peck-0C.yml (commit
+    #     37773dce): n - 1 = 6.8552e-5 + 3.243157e-2/(144 - s²);
+    #   Egan (2026), Eq. (8), O2, 20 °C and 100 kPa:
+    #     1e8(n - 1) = 5627886.8/(281.0 - s²) + 197258.6/(45.4 - s²).
+    LL(x) = (m = x * (2 + x); m / (3 + m))
+    N288, N273 = 2.546899e19, 2.68678e19
+    N_egan = 1.0e5 / (1.380649e-23 * 293.15) * 1.0e-6
+    σ_fit(x, N, ν, F) = 24π^3 * (ν^2 / N)^2 * LL(x)^2 * F
+    F_N2(ν) = 1.034 + 3.17e-12 * ν^2
+    F_O2(ν) = 1.09 + 1.385e-11 * ν^2 + 1.448e-20 * ν^4
+    bates_n2(ν) = 1e-8 * (5677.465 + 318.81874e12 / (1.44e10 - ν^2))
+    bates_o2(ν) = 1e-8 * (20564.8 + 2.480899e13 / (4.09e9 - ν^2))
+    peck_khanna(λ) = (s² = (1000 / λ)^2; 6.8552e-5 + 3.243157e-2 / (144 - s²))
+    egan(λ) = (s² = (1000 / λ)^2;
+               1e-8 * (5627886.8 / (281.0 - s²) + 197258.6 / (45.4 - s²)))
+    n_minus_1(L) = (m = 3L / (1 - L); m / (sqrt(1 + m) + 1))
+
+    for λ in (500.0, 632.9908, 760.0, 1542.383, 1600.0, 2058.0)
+        ν = 1e7 / λ
+        p = molecular_rayleigh_properties(UsingRefInd(), :N2, λ)
+        @test p.cross_section_cm2 ≈ σ_fit(peck_khanna(λ), N273, ν, F_N2(ν)) rtol = 1e-12
+        # n is reported at the N2 reference density (288.15 K); L ∝ N.
+        @test p.refractive_index - 1 ≈
+              n_minus_1(LL(peck_khanna(λ)) * N288 / N273) rtol = 1e-10
+        q = molecular_rayleigh_properties(UsingRefInd(), :O2, λ)
+        @test q.cross_section_cm2 ≈ σ_fit(egan(λ), N_egan, ν, F_O2(ν)) rtol = 1e-12
+        @test q.refractive_index - 1 ≈
+              n_minus_1(LL(egan(λ)) * N273 / N_egan) rtol = 1e-10
+        @test q.king_factor ≈ F_O2(ν) rtol = 1e-14
+    end
+    # Float32 on both new branches (and across the joins).
+    for gas in (:N2, :O2), λ in (430.0f0, 440.0f0, 460.0f0, 470.0f0, 760.0f0, 1600.0f0, 2060.0f0)
+        p32 = molecular_rayleigh_properties(UsingRefInd(), gas, λ)
+        p64 = molecular_rayleigh_properties(UsingRefInd(), gas, Float64(λ))
+        @test p32.cross_section_cm2 isa Float32
+        @test p32.cross_section_cm2 ≈ Float32(p64.cross_section_cm2) rtol = 5f-6
+        @test p32.refractive_index - 1 ≈ Float32(p64.refractive_index - 1) rtol = 2f-3
+        @test p32.depolarization ≈ Float32(p64.depolarization) rtol = 5f-6
+        pt32 = molecular_rayleigh_properties(UsingPolTen(), gas, λ)
+        @test pt32.cross_section_cm2 isa Float32
+        @test pt32.cross_section_cm2 ≈ Float32(molecular_rayleigh_properties(
+            UsingPolTen(), gas, Float64(λ)).cross_section_cm2) rtol = 1f-6
+    end
+    # The original fits are kept where they are valid, up to the joins.
+    for λ in (300.0, 400.0, 436.0)
+        ν = 1e7 / λ
+        p = molecular_rayleigh_properties(UsingRefInd(), :N2, λ)
+        @test p.cross_section_cm2 ≈ σ_fit(bates_n2(ν), N288, ν, F_N2(ν)) rtol = 1e-12
+        @test p.refractive_index - 1 ≈ bates_n2(ν) rtol = 1e-12
+    end
+    for λ in (300.0, 400.0, 466.0)
+        ν = 1e7 / λ
+        q = molecular_rayleigh_properties(UsingRefInd(), :O2, λ)
+        @test q.cross_section_cm2 ≈ σ_fit(bates_o2(ν), N273, ν, F_O2(ν)) rtol = 1e-12
+        @test q.refractive_index - 1 ≈ bates_o2(ν) rtol = 1e-12
+    end
+
+    # The fits are joined where they agree: no jump in n - 1 or σ.
+    S = vSmartMOM.Scattering
+    for (gas, ν_join) in ((:N2, S._N2_RI_JOIN_CM1), (:O2, S._O2_RI_JOIN_CM1))
+        uv = molecular_rayleigh_properties(UsingRefInd(), gas, 1e7 / (ν_join * (1 + 1e-12)))
+        ir = molecular_rayleigh_properties(UsingRefInd(), gas, 1e7 / (ν_join * (1 - 1e-12)))
+        @test uv.cross_section_cm2 ≈ ir.cross_section_cm2 rtol = 1e-9
+        @test uv.refractive_index - 1 ≈ ir.refractive_index - 1 rtol = 1e-9
+    end
+    @test 1e7 / S._N2_RI_JOIN_CM1 ≈ 436.309 atol = 1e-3
+    @test 1e7 / S._O2_RI_JOIN_CM1 ≈ 466.678 atol = 1e-3
+    # Jumps that joining at the nominal fit limits would have left
+    # (documented in the docstring): N2 at 21360 cm⁻¹ (468 nm), O2 at
+    # 18315 cm⁻¹ (546 nm); (old fit)/(new fit) - 1 in σ.
+    ν = 21360.0
+    @test σ_fit(bates_n2(ν), N288, ν, 1.0) / σ_fit(peck_khanna(1e7 / ν), N273, ν, 1.0) - 1 ≈
+          -2.85e-4 atol = 1e-6
+    ν = 18315.0
+    @test σ_fit(bates_o2(ν), N273, ν, 1.0) / σ_fit(egan(1e7 / ν), N_egan, ν, 1.0) - 1 ≈
+          2.08e-3 atol = 1e-5
+
+    # Egan's measured molar refractivity A_R(T) = A303[1 + Aθ(T/K - 303)]
+    # (Sec. 4.2): the ideal-gas per-molecule polarizability used here exceeds
+    # the measured one by the compressibility and refractivity-virial terms,
+    # (1 + b_R ρ)/Z, with B(293.15 K) = -17.0 cm³/mol (Table 2) and
+    # b_R = (0.194 + 0.00641 s²)[1 + 1.4e-3 (T/K - 303)] cm³/mol (Sec. 4.3).
+    N_A, R = 6.02214076e23, 8.314462618
+    ρ_ideal = 1.0e5 / (R * 293.15) * 1.0e-6               # mol cm⁻³
+    Z = 1 + (-17.0) * ρ_ideal
+    for (λ, A303, Aθ) in ((632.9908, 4.027716, 2.11e-6), (1542.383, 3.968990, 2.02e-6))
+        q = molecular_rayleigh_properties(UsingRefInd(), :O2, λ)
+        α̅_here = 3 * LL(q.refractive_index - 1) / (4π * N273)
+        α̅_measured = 3 * A303 * (1 + Aθ * (293.15 - 303)) / (4π * N_A)
+        b_R = (0.194 + 0.00641 * (1000 / λ)^2) * (1 + 1.4e-3 * (293.15 - 303))
+        @test α̅_here / α̅_measured ≈ (1 + b_R * ρ_ideal / Z) / Z rtol = 5e-6
+    end
+end
+
+@testset "UsingPolTen dispersive anisotropy" begin
+    # DispersiveAnisotropy reproduces the RI cross section and depolarization
+    # at the reference temperature of the dispersion fit; elsewhere only the
+    # small Buldakov temperature factor on α̅ differs.
+    pt = UsingPolTen()
+    for (gas, λs, T_fit) in ((:N2, (300.0, 400.0, 436.0), 288.15),
+                             (:N2, (437.0, 550.0, 760.0, 1600.0, 2060.0), 273.15),
+                             (:O2, (300.0, 400.0, 466.0), 273.15),
+                             (:O2, (467.0, 550.0, 760.0, 1600.0, 2060.0), 293.15))
+        for λ in λs
+            ri = molecular_rayleigh_properties(UsingRefInd(), gas, λ)
+            p = molecular_rayleigh_properties(pt, gas, λ; temperature_K = T_fit)
+            @test p.cross_section_cm2 ≈ ri.cross_section_cm2 rtol = 1e-12
+            @test p.depolarization ≈ ri.depolarization rtol = 1e-12
+            @test p.king_factor ≈ ri.king_factor rtol = 1e-12
+        end
+    end
+    for gas in (:N2, :O2), λ in 300.0:100.0:2400.0, T in (200.0, 250.0, 300.0)
+        ri = molecular_rayleigh_properties(UsingRefInd(), gas, λ)
+        p = molecular_rayleigh_properties(pt, gas, λ; temperature_K = T)
+        @test abs(p.cross_section_cm2 / ri.cross_section_cm2 - 1) < 4e-4
+        @test abs(p.depolarization / ri.depolarization - 1) < 4e-4
+    end
+    # The published constant anisotropies agree with the King-factor
+    # anisotropy near 488 nm (Ar⁺ line) to 0.03 % (N2) and 0.3 % (O2).
+    hook = vSmartMOM.Scattering._poltensor_rayleigh_coefficients
+    ν488 = 1e7 / 488.0
+    @test hook(:N2, ν488, 288.15, DispersiveAnisotropy()).γ̅ ≈ 0.71e-24 rtol = 1e-3
+    @test hook(:O2, ν488, 288.15, DispersiveAnisotropy()).γ̅ ≈ 1.080e-24 rtol = 5e-3
+    # The anisotropy disperses faster than α̅: the depolarization falls with
+    # wavelength (the constant anisotropy makes it rise).
+    for gas in (:N2, :O2)
+        ρ_disp = [molecular_rayleigh_properties(pt, gas, λ).depolarization
+                  for λ in (400.0, 550.0, 760.0, 1600.0)]
+        ρ_const = [molecular_rayleigh_properties(UsingPolTen(ConstantAnisotropy()), gas, λ).depolarization
+                   for λ in (400.0, 550.0, 760.0, 1600.0)]
+        @test issorted(ρ_disp; rev = true)
+        @test issorted(ρ_const)
+    end
+    @test_throws ArgumentError vSmartMOM.Scattering._dispersive_polarizability_tensor(
+        :H2, 2.0e4, 288.15, 0.0, 0.0)
+end
+
+@testset "H2 tensor vs Peck & Huang refractivity and ab initio King factor" begin
+    # Independent H2 check of the Raman-module tensor, UsingPolTen() (for H2
+    # the dispersive anisotropy uses the Raman-module tensor unchanged).
+    # Refractivity: Peck & Huang (1977), JOSA 67, 1550, at 0 °C and 760 Torr,
+    # 168-1695 nm, as recorded by refractiveindex.info (H2/nk/Peck.yml):
+    #   n - 1 = 0.0148956/(180.7 - s²) + 0.0049037/(92 - s²), s in µm⁻¹.
+    # King factor: Raj, Hamaguchi & Witek (2018), J. Chem. Phys. 148, 104308
+    # (https://doi.org/10.1063/1.5011433): ⟨v=0,J=1|α̅|v=0,J=1⟩ and
+    # ⟨v=0,J=1|γ|v=0,J=1⟩ in atomic units, obtained by integrating their
+    # published distance- and wavelength-dependent polarizabilities over the
+    # v=0, J=1 wavefunction (data of the authors' repository
+    # github.com/ankit7540/H2-PolarizabilityMatrixElements; J=1 is the most
+    # populated level near 288 K; J=0 gives F_K lower by 1.4e-4).
+    # F_K = 1 + 2γ²/(9α̅²). Observed: Peck & Huang α̅ is 3.2e-4 below the
+    # ab initio J=1 value; the Raman-module γ (Asawaroengchai & Rosenblatt
+    # 1980) gives F_K = 1.0258-1.0281 against 1.0333-1.0316, i.e. ρ
+    # 11-22 % low, and σ is 0.37 % (400 nm) to 0.07 % (1064 nm) below the
+    # refractivity-based value.
+    raj_J1 = ((400.0, 5.70098, 2.20617), (488.0, 5.60787, 2.14864),
+              (532.0, 5.57837, 2.13054), (632.8, 5.53317, 2.10295),
+              (760.0, 5.50029, 2.08296), (1000.0, 5.46930, 2.06420),
+              (1064.0, 5.46439, 2.06124))
+    bohr³_cm³ = 1.4818471e-25
+    LL(x) = (m = x * (2 + x); m / (3 + m))
+    N273 = 2.68678e19
+    for (λ, α̅_au, γ_au) in raj_J1
+        s² = (1000 / λ)^2
+        x = 0.0148956 / (180.7 - s²) + 0.0049037 / (92 - s²)
+        ℓ = LL(x) / N273                       # (4π/3) α̅, cm³
+        F = 1 + 2γ_au^2 / (9α̅_au^2)
+        ν = 1e7 / λ
+        σ_ri = 24π^3 * ν^4 * ℓ^2 * F
+        @test abs(3ℓ / (4π) / (α̅_au * bohr³_cm³) - 1) < 1e-3
+        p = molecular_rayleigh_properties(UsingPolTen(), :H2, λ)
+        @test abs(p.cross_section_cm2 / σ_ri - 1) < 5e-3
+        @test abs(p.refractive_index - 1 - x * 2.546899e19 / N273) / x < 3e-3
+        @test abs(p.king_factor / F - 1) < 1e-2
     end
 end

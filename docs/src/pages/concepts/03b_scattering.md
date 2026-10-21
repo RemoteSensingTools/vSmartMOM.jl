@@ -186,7 +186,7 @@ available, selected by dispatch on an `AbstractMolecularRayleighMethod`:
 | Method | Physics | Species |
 |---|---|---|
 | `UsingRefInd()` | refractive index plus (effective) King factor | He, Ar, N₂, O₂, CO₂ |
-| `UsingPolTen()` | molecular polarizability tensor (mean polarizability ``\bar\alpha``, anisotropy ``\gamma``) from the Raman-module constants | N₂, O₂, H₂ |
+| `UsingPolTen()` | molecular polarizability tensor (mean polarizability ``\bar\alpha``, anisotropy ``\gamma``); the tensor dispersion is a dispatch parameter | N₂, O₂, H₂ |
 
 ```julia
 method = UsingRefInd()            # RefractiveIndexRayleigh() is an alias
@@ -196,6 +196,8 @@ source = molecular_rayleigh_provenance(method, :CO2)
 
 q = molecular_rayleigh_properties(UsingPolTen(), :N2, wavelength_nm;
                                   temperature_K = 288.15)
+r = molecular_rayleigh_properties(UsingPolTen(ConstantAnisotropy()), :N2,
+                                  wavelength_nm)   # Raman-module tensor
 ```
 
 Both return the same named-tuple fields: `species`, `wavelength_nm`,
@@ -278,11 +280,25 @@ The primary-measurement range, adopted dispersion envelope, King-factor
 support, and direct-scattering checks are not interchangeable; dispersion and
 King-factor extrapolation should be reported separately.
 
-The N₂ and O₂ RI coefficient sets are those listed in
-[He et al. (2021)](https://doi.org/10.5194/acp-21-14927-2021), Table 1, which
-gives their dispersion-fit domains as 21 360--39 370 cm⁻¹ (254--468 nm) for N₂
-and 18 315--34 722 cm⁻¹ (288--546 nm) for O₂. At longer wavelengths both are
-dispersion extrapolations.
+The N₂ and O₂ refractivities each join two dispersion fits at the
+wavenumber where they agree, so ``n-1`` and ``\sigma`` have no jump:
+
+| Gas | Short wavelengths | Long wavelengths | Join |
+|---|---|---|---|
+| N₂ | Bates (1984), 288.15 K, fitted 254--468 nm ([He et al. 2021](https://doi.org/10.5194/acp-21-14927-2021), Table 1) | [Peck and Khanna (1966)](https://doi.org/10.1364/JOSA.56.001059), 0 °C, measured 467.9--2058.7 nm | 436.309 nm |
+| O₂ | Bates (1984), 273.15 K, fitted 288--546 nm (He et al. 2021, Table 1) | [Egan (2026)](https://doi.org/10.1088/1361-6501/ae6e94), Eq. (8), 20 °C and 100 kPa, constrained at 0.254--1.542 µm | 466.678 nm |
+
+Joining at the nominal limits instead would leave jumps of 2.8×10⁻⁴ (N₂,
+468 nm) and 2.1×10⁻³ (O₂, 546 nm) in ``\sigma``. Compared with the previous
+single fits extrapolated into the NIR, ``\sigma_{N_2}`` rises by 0.08 %
+(550 nm) to 0.21 % (2060 nm) and ``\sigma_{O_2}`` falls by 0.22 % to 0.89 %;
+for air the two nearly cancel (< 0.03 %). The King factors are those of He et
+al. (2021): N₂ from Bates (1984), and O₂ with the constant 1.09. Bates (1984)
+and Bodhaine et al. (1999) use 1.096 for O₂, which gives a 0.54 % larger O₂
+cross section. Every fit is used with the ideal-gas number density of its
+reference state; gas compressibility (5--10×10⁻⁴ in ``n-1`` per molecule) is
+neglected, as in the cited compilations. Details and numbers are in
+`docs/dev_notes/molecular_rayleigh_dispersion.md`.
 
 This API performs no explicit frequency redistribution. Its conventional
 Rayleigh cross section and effective King factor are not a separately computed
@@ -291,64 +307,98 @@ tensor/Raman machinery in `InelasticScattering`.
 
 #### Polarizability tensor (`UsingPolTen`)
 
-`UsingPolTen()` uses the polarizability tensors that the Raman module already
-carries for N₂, O₂, and H₂ (`getMolecularConstants` in
-`src/Inelastic/src/molecular_constructors.jl`). It calls the same routines as
-the RT model's molecular-depolarization path (`compute_effective_coefficents!`,
-`compute_σ_Rayl_coeff!`). No new spectroscopic constants are introduced.
+`UsingPolTen(anisotropy)` builds the Rayleigh properties from the mean
+polarizability ``\bar\alpha`` and anisotropy ``\gamma`` of N₂, O₂ and H₂,
+through the Raman-module routines (`getMolecularConstants`,
+`compute_effective_coefficents!`, `compute_σ_Rayl_coeff!`). The
+`anisotropy` argument selects the wavelength dependence of the tensor:
 
-- Mean polarizability: the Buldakov et al. single-pole dispersion and
-  temperature dependence,
+- `DispersiveAnisotropy()` (default, `UsingPolTen()`): for N₂ and O₂,
+  ``\bar\alpha(\nu)`` from the `UsingRefInd` refractivity through
+  Lorentz--Lorenz, ``(n^2-1)/(n^2+2) = 4\pi N\bar\alpha/3``, and
+  ``\gamma(\nu) = \bar\alpha_\mathrm{fit}\sqrt{9(F_K-1)/2}`` from its King factor
+  (``\bar\alpha_\mathrm{fit}`` at the fit's reference temperature), i.e. the
+  anisotropy implied by the measured depolarization ratios behind the King
+  factors (Bates 1984). The Buldakov temperature factor
+  ``(1+\alpha_b T+\alpha_c T^2)`` scales ``\bar\alpha`` relative to the
+  reference temperature of the dispersion fit. At that temperature the cross
+  section and depolarization equal the `UsingRefInd` values; between 200 and
+  300 K they differ by less than 4×10⁻⁴. H₂ has no `UsingRefInd` fit and
+  keeps the Raman-module tensor.
+- `ConstantAnisotropy()`: the Raman-module tensor, the Buldakov et al.
+  single-pole dispersion and temperature dependence
   ``\bar\alpha(\nu,T) = \bar\alpha_{00}(1+\alpha_b T+\alpha_c T^2)
-  /(1-(2\pi c\nu/\omega_0)^2)``, evaluated at ``\nu = 10^7/\lambda``
-  cm⁻¹ and `temperature_K` (default 288.15 K, the reference temperature of
-  the He, Ar, N₂ and CO₂ RI fits).
-- Anisotropy: ``\gamma = \bar\gamma_{00}``, which is **independent of
-  wavelength and temperature** in the Raman-module constants.
-- Derived quantities:
-  ``\rho = 6\gamma^2/(45\bar\alpha^2+7\gamma^2)`` (the same convention as
-  the RI method), ``F_K = 1 + 2\gamma^2/(9\bar\alpha^2)``, and
+  /(1-(2\pi c\nu/\omega_0)^2)`` and a wavelength- and temperature-independent
+  anisotropy ``\gamma = \bar\gamma_{00}``. These constants produced the
+  published Raman tables and remain the default of the Raman and Cabannes
+  cross sections. Their ``\gamma`` equals the dispersive one near 488 nm
+  (within 0.03 % for N₂ and 0.32 % for O₂); it is 2 % (N₂) and 4 % (O₂) low at 400 nm and
+  4 % and 8 % high at 2060 nm.
+- Derived quantities: ``\rho = 6\gamma^2/(45\bar\alpha^2+7\gamma^2)`` (the same
+  convention as the RI method), ``F_K = 1 + 2\gamma^2/(9\bar\alpha^2)``, and
   ``\sigma = \tfrac{128}{3}\pi^5\nu^4\bar\alpha^2F_K``.
-- `refractive_index` is the Lorentz--Lorenz equivalent,
-  ``(n^2-1)/(n^2+2) = 4\pi N\bar\alpha/3``, at `number_density_cm3`
-  (default 2.546899×10¹⁹ cm⁻³). Pass `number_density_cm3 = nothing` to get
-  `refractive_index = nothing`.
+- `refractive_index` is the Lorentz--Lorenz equivalent at
+  `number_density_cm3` (default 2.546899×10¹⁹ cm⁻³). Pass
+  `number_density_cm3 = nothing` to get `refractive_index = nothing`.
+- `temperature_K` defaults to 288.15 K, the temperature of that default
+  density and of the standard state of the He, Ar, N₂ (short-wavelength) and
+  CO₂ RI fits and of the Bates (1984) and Bodhaine et al. (1999) cross
+  sections, so the tensor is compared with those data at their own state. It
+  enters only through the small temperature factor on ``\bar\alpha``.
 
 Other species raise an `ArgumentError` that suggests `UsingRefInd()`.
 `molecular_rayleigh_provenance` is currently defined only for the RI method.
+The H₂ tensor is checked against the Peck and Huang (1977) refractivity with
+the King factor of the ab initio anisotropy of Raj, Hamaguchi and Witek (2018):
+the cross sections agree to 0.4 % over 400--1064 nm, the mean polarizabilities
+to 0.2 %, and the Raman-module H₂ anisotropy gives a King factor 0.35--0.73 % lower.
 
-At 288.15 K over 350--800 nm the two methods differ, as PolTen/RI − 1, by
-the amounts below. Refractivities are compared at the density of each RI fit:
-2.546899×10¹⁹ cm⁻³ for N₂ and 2.68678×10¹⁹ cm⁻³ (273.15 K) for O₂. The O₂ RI
-`refractive_index` refers to that denser state, so comparing it with the
-PolTen default density would show a spurious ≈5 % difference in ``n-1``.
-The cross sections, King factors and depolarizations are per molecule and do
-not depend on density.
+At 288.15 K over 350--800 nm the constant tensor and the RI method differ, as
+PolTen/RI − 1, by the amounts below. Refractivities are compared at the
+reference density of each gas: 2.546899×10¹⁹ cm⁻³ for N₂ and
+2.68678×10¹⁹ cm⁻³ (273.15 K) for O₂. The O₂ RI `refractive_index` refers to
+that denser state, so comparing it with the PolTen default density would show
+a spurious ≈5 % difference in ``n-1``. The cross sections, King factors and
+depolarizations are per molecule and do not depend on density.
 
 | Quantity | N₂ | O₂ |
 |---|---|---|
-| ``\sigma`` | −0.51 % (350 nm) to +0.46 % (800 nm) | −1.54 % (350 nm) to +0.05 % |
-| ``n-1`` | within ±0.14 % | within ±0.46 % |
+| ``\sigma`` | −0.51 % (350 nm) to +0.30 % (800 nm) | −1.54 % (350 nm) to +0.63 % |
+| ``n-1`` | within ±0.12 % | within ±0.18 % |
 | ``F_K`` | −0.26 % to +0.18 % | −1.60 % to +0.98 % |
 | ``\rho`` | −7.3 % to +5.2 % | −15 % to +11 % |
 
-The depolarization differences arise mainly because the tensor anisotropy has
-no dispersion: ``\rho_\mathrm{PolTen}`` rises with wavelength, while the RI
-King factors fall. ``\rho \propto F_K - 1`` turns small King-factor
-differences into percent-level ``\rho`` differences.
+The depolarization differences arise mainly because the constant tensor
+anisotropy has no dispersion: ``\rho_\mathrm{PolTen}`` rises with wavelength,
+while the RI King factors fall. ``\rho \propto F_K - 1`` turns small
+King-factor differences into percent-level ``\rho`` differences.
 
 #### Model defaults
 
-These helpers do **not** change any model default. The automatic
-`model_from_parameters` elastic Rayleigh optical depth remains the terrestrial
-Bodhaine et al. (1999) air formula, scaled by surface pressure and rescaled by
-King factor to the configured depolarization. With the default `depol: -1`,
-that depolarization and the Rayleigh/Cabannes Greek coefficients come from
-the N₂/O₂ polarizability constants (`getRamanAtmoConstants`), evaluated at the
-band-centre wavenumber and the column-weighted mean temperature. Using these
-pure-gas helpers inside an RT run requires setting the optical-depth profile
-and the Greek source explicitly. Atmospheric composition is not yet connected
-to molecular columns and scattering-weighted phase-matrix mixing.
+The automatic `model_from_parameters` elastic Rayleigh optical depth remains
+the terrestrial Bodhaine et al. (1999) air formula, scaled by surface pressure
+and rescaled by King factor to the configured depolarization. With the default
+`depol: -1`, the Rayleigh depolarization (which sets that King factor and the
+Rayleigh Greek coefficients) comes from the N₂/O₂ polarizability tensors at
+the band-centre wavenumber and the column-weighted mean temperature, with the
+tensor dispersion `radiative_transfer.rayleigh_anisotropy` (default
+`DispersiveAnisotropy()`; `ConstantAnisotropy()` reproduces the v2.2
+pre-release depolarization bit for bit). Its variation across bands now follows the King
+factors and falls with wavelength; with the constant anisotropy only ``\bar\alpha``
+dispersed and ρ rose with wavelength. For air
+(VMR 0.8/0.2, 257 K) ρ is 0.0277 at 400 nm, 0.0264 at 550 nm, 0.0259 at 760 nm and
+0.0254 at 1.6 µm (v2.2 pre-releases: 0.0263, 0.0271, 0.0276, 0.0280;
+v2.1.0, at 300 K and without 2π in the Buldakov pole: about 0.0281 from 400 nm to 2 µm). The Cabannes
+fraction ``\varpi_\mathrm{Cab}`` always, and the Cabannes depolarization with
+`depol: -1`, use the Raman-module constants (`getRamanAtmoConstants`), as the Raman cross sections
+do. Under the dispersive default, a pure-elastic (`noRS`) run and a Raman run
+therefore no longer share the same elastic-plus-RRS decomposition (the
+implied ρ differs by up to ~10 % in the NIR); workflows that difference the two
+(Ring or filling-in spectra) should set `rayleigh_anisotropy:
+ConstantAnisotropy()`. Using the pure-gas helpers inside an RT run requires setting the
+optical-depth profile and the Greek source explicitly. Atmospheric composition
+is not yet connected to molecular columns and scattering-weighted
+phase-matrix mixing.
 
 ### Elastic Rayleigh vs Cabannes in RT runs
 

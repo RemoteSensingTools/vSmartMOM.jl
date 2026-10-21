@@ -25,23 +25,31 @@ function get_n₀_n₁(ieJ₁⁺, Δ)
     return n₀, n₁
 end
 # Currently assuming same T for all vertical atmospheric layers (so that a uniform Raman wavelength grid can be assumed for rt_interactions)
+"""
+    getRamanAtmoConstants(ν̃, T, [vmr_n2, vmr_o2], [anisotropy])
+
+Return the N₂ and O₂ `MolecularConstants` (VMR 0.8 and 0.2 unless given) with
+effective polarizabilities, energy levels, and Rayleigh, Cabannes, rotational
+and vibrational Raman coefficients at wavenumber `ν̃` (cm⁻¹) and temperature
+`T` (K).
+
+Without `anisotropy` (or with [`ConstantAnisotropy`](@ref)) the Raman-module
+tensor is used: the constants of the published Raman tables (Sanghavi 2022,
+JQSRT 291, 108328; Sanghavi 2026, Table 1). `DispersiveAnisotropy()` instead
+takes the mean polarizability and anisotropy from the `UsingRefInd`
+refractivity and King factor (see [`compute_effective_coefficents!`](@ref));
+it changes the rotational Raman line strengths (∝ γ²) and the Cabannes
+fractions and is not used by default by any RT path.
+"""
 function getRamanAtmoConstants(ν̃::AbstractFloat, T::AbstractFloat)
     ν̃, T = promote(ν̃, T)
     n2 = InelasticScattering.getMolecularConstants(InelasticScattering.N₂(), (0.8));
     compute_effective_coefficents!(ν̃, T, n2)
-    compute_energy_levels!(n2)
-    compute_σ_Rayl_coeff!(n2)
-    compute_σ_Rayl_VibRaman_coeff_hires!(T, n2)
-    compute_σ_VibRaman_coeff!(T, n2)
-    compute_σ_RoVibRaman_coeff!(T, n2)
+    _compute_raman_coefficients!(T, n2)
 
     o2 = InelasticScattering.getMolecularConstants(InelasticScattering.O₂(), (0.2));
     compute_effective_coefficents!(ν̃, T, o2)
-    compute_energy_levels!(o2)
-    compute_σ_Rayl_coeff!(o2)
-    compute_σ_Rayl_VibRaman_coeff_hires!(T, o2)
-    compute_σ_VibRaman_coeff!(T, o2)
-    compute_σ_RoVibRaman_coeff!(T, o2)
+    _compute_raman_coefficients!(T, o2)
 
     return n2,o2
 end
@@ -51,21 +59,72 @@ function getRamanAtmoConstants(ν̃::AbstractFloat, T::AbstractFloat, vmr_n2::Ab
     @assert 0<=vmr_n2+vmr_o2<=1
     n2 = InelasticScattering.getMolecularConstants(InelasticScattering.N₂(), vmr_n2);
     compute_effective_coefficents!(ν̃, T, n2)
-    compute_energy_levels!(n2)
-    compute_σ_Rayl_coeff!(n2)
-    compute_σ_Rayl_VibRaman_coeff_hires!(T, n2)
-    compute_σ_VibRaman_coeff!(T, n2)
-    compute_σ_RoVibRaman_coeff!(T, n2)
+    _compute_raman_coefficients!(T, n2)
 
     o2 = InelasticScattering.getMolecularConstants(InelasticScattering.O₂(), vmr_o2);
     compute_effective_coefficents!(ν̃, T, o2)
-    compute_energy_levels!(o2)
-    compute_σ_Rayl_coeff!(o2)
-    compute_σ_Rayl_VibRaman_coeff_hires!(T, o2)
-    compute_σ_VibRaman_coeff!(T, o2)
-    compute_σ_RoVibRaman_coeff!(T, o2)
+    _compute_raman_coefficients!(T, o2)
 
     return n2,o2
+end
+
+getRamanAtmoConstants(ν̃::AbstractFloat, T::AbstractFloat, ::ConstantAnisotropy) =
+    getRamanAtmoConstants(ν̃, T)
+
+getRamanAtmoConstants(ν̃::AbstractFloat, T::AbstractFloat, vmr_n2::AbstractFloat,
+                      vmr_o2::AbstractFloat, ::ConstantAnisotropy) =
+    getRamanAtmoConstants(ν̃, T, vmr_n2, vmr_o2)
+
+getRamanAtmoConstants(ν̃::AbstractFloat, T::AbstractFloat, a::DispersiveAnisotropy) =
+    getRamanAtmoConstants(ν̃, T, 0.8, 0.2, a)
+
+function getRamanAtmoConstants(ν̃::AbstractFloat, T::AbstractFloat,
+                               vmr_n2::AbstractFloat, vmr_o2::AbstractFloat,
+                               anisotropy::DispersiveAnisotropy)
+    ν̃, T, vmr_n2, vmr_o2 = promote(ν̃, T, vmr_n2, vmr_o2)
+    @assert 0<=vmr_n2+vmr_o2<=1
+    n2 = InelasticScattering.getMolecularConstants(InelasticScattering.N₂(), vmr_n2);
+    compute_effective_coefficents!(ν̃, T, n2, InelasticScattering.N₂(), anisotropy)
+    _compute_raman_coefficients!(T, n2)
+
+    o2 = InelasticScattering.getMolecularConstants(InelasticScattering.O₂(), vmr_o2);
+    compute_effective_coefficents!(ν̃, T, o2, InelasticScattering.O₂(), anisotropy)
+    _compute_raman_coefficients!(T, o2)
+
+    return n2,o2
+end
+
+# Everything `getRamanAtmoConstants` derives after the effective polarizabilities.
+function _compute_raman_coefficients!(T, mol)
+    compute_energy_levels!(mol)
+    compute_σ_Rayl_coeff!(mol)
+    compute_σ_Rayl_VibRaman_coeff_hires!(T, mol)
+    compute_σ_VibRaman_coeff!(T, mol)
+    compute_σ_RoVibRaman_coeff!(T, mol)
+    return mol
+end
+
+"""
+    rayleigh_air_depolarization(anisotropy, λ₀, T) -> (depol, σ_air)
+
+Depolarization ratio (in the convention of `get_greek_rayleigh`) and cross
+section (cm² molecule⁻¹) of the N₂/O₂ Rayleigh mixture (VMR 0.8/0.2, as in
+`getRamanAtmoConstants`) at wavelength `λ₀` (nm) and temperature `T` (K), with
+the tensor dispersion `anisotropy`. This is the depolarization the RT model
+uses for `depol: -1`. Only the Rayleigh coefficients are computed.
+"""
+function rayleigh_air_depolarization(anisotropy::Scattering.AbstractPolarizabilityDispersion,
+                                     λ₀, T)
+    λ = float(λ₀)
+    ν̃, T′ = promote(oftype(λ, 1.0e7) / λ, T)
+    n2 = InelasticScattering.getMolecularConstants(InelasticScattering.N₂(), (0.8))
+    compute_effective_coefficents!(ν̃, T′, n2, InelasticScattering.N₂(), anisotropy)
+    compute_σ_Rayl_coeff!(n2)
+    o2 = InelasticScattering.getMolecularConstants(InelasticScattering.O₂(), (0.2))
+    compute_effective_coefficents!(ν̃, T′, o2, InelasticScattering.O₂(), anisotropy)
+    compute_σ_Rayl_coeff!(o2)
+    γ_air, σ_air = compute_γ_air_Rayleigh!(λ, n2, o2)
+    return 2γ_air / (1 + γ_air), σ_air
 end
 
 function compute_ϖ_Cabannes(RS_type::noRS, depol, λ₀)

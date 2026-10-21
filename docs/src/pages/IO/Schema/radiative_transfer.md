@@ -27,6 +27,21 @@ defaults are, and which legacy aliases still work.
   from the N₂/O₂ molecular constants; a value `≥ 0` is used uniformly for the
   Rayleigh and Cabannes Greek coefficients and the Rayleigh optical depth
   (0 = no depolarization, the Natraj-2009 idealization).
+- **`rayleigh_anisotropy`** — *optional `String`, default
+  `"DispersiveAnisotropy()"`*. Wavelength dependence of the N₂/O₂
+  polarizability tensor behind the automatic (`depol < 0`) Rayleigh
+  depolarization, which sets the Rayleigh Greek coefficients and rescales the
+  Rayleigh optical depth. `"DispersiveAnisotropy()"` takes the mean
+  polarizability and anisotropy from the refractive-index fits and King
+  factors of `UsingRefInd` (the depolarization then falls from 0.028 at
+  400 nm to 0.025 at 2 µm for air); `"ConstantAnisotropy()"` uses the
+  Raman-module constants with a wavelength-independent anisotropy and
+  reproduces the v2.2 pre-release automatic depolarization bit for bit. The Cabannes
+  fraction always, and the Cabannes depolarization when `depol < 0`, use the
+  Raman-module constants, so use
+  `"ConstantAnisotropy()"` when an elastic-only run is compared with or
+  subtracted from a Raman run (Ring/filling-in spectra). Ignored when
+  `depol ≥ 0`.
 - **`float_type`** — `String`. `"Float64"` or `"Float32"`. Float32 is
   fine for most retrievals and gives a ~2× speedup on large spectral
   windows; Float64 is required for reproducing published benchmarks at

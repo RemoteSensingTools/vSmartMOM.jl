@@ -64,6 +64,8 @@ export HenyeyGreensteinPhaseFunction,
        phase_matrix_first_column,
        AbstractMolecularRayleighMethod, UsingRefInd, UsingPolTen,
        RefractiveIndexRayleigh,
+       AbstractPolarizabilityDispersion, ConstantAnisotropy,
+       DispersiveAnisotropy,
        molecular_rayleigh_properties, molecular_rayleigh_cross_section_ratio,
        molecular_rayleigh_provenance
 
@@ -88,6 +90,8 @@ using .Scattering: HenyeyGreensteinPhaseFunction,
                    AbstractMolecularRayleighMethod,
                    UsingRefInd, UsingPolTen,
                    RefractiveIndexRayleigh,
+                   AbstractPolarizabilityDispersion, ConstantAnisotropy,
+                   DispersiveAnisotropy,
                    molecular_rayleigh_properties,
                    molecular_rayleigh_cross_section_ratio,
                    molecular_rayleigh_provenance

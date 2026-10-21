@@ -309,12 +309,9 @@ function model_from_parameters(lin::LinMode,
         # taken from the molecular path; the depol values feed greek coefs and
         # τ_rayl only when params.depol < 0 (auto). See model_from_parameters.jl
         # for the full rule.
-        _n2, _o2 = InelasticScattering.getRamanAtmoConstants(FT(1.0e7) / λₘ, FT(rayleigh_molecular_T))
-        ϖ_Cabannes[i_band] = InelasticScattering.compute_ϖ_Cabannes(λₘ, _n2, _o2)
-        γ_air_Cabannes, _ = InelasticScattering.compute_γ_air_Cabannes!(λₘ, _n2, _o2)
-        γ_air_Rayleigh, _ = InelasticScattering.compute_γ_air_Rayleigh!(λₘ, _n2, _o2)
-        depol_air_Cabannes = 2γ_air_Cabannes/(1+γ_air_Cabannes)
-        depol_air_Rayleigh = 2γ_air_Rayleigh/(1+γ_air_Rayleigh)
+        ϖ_Cabannes[i_band], depol_air_Cabannes, depol_air_Rayleigh =
+            _auto_molecular_depolarizations(params.rayleigh_anisotropy, λₘ,
+                                            FT(rayleigh_molecular_T))
 
         depol_use_Cab = params.depol < 0 ? FT(depol_air_Cabannes) : FT(params.depol)
         depol_use_Ray = params.depol < 0 ? FT(depol_air_Rayleigh) : FT(params.depol)

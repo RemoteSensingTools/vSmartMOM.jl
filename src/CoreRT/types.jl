@@ -1348,6 +1348,30 @@ mutable struct vSmartMOM_Parameters{FT<:Real}
     the previously selected quadrature. `nothing` disables the cutoff."
     greek_beta_cutoff::Union{FT, Nothing}
 
+    "Wavelength dependence of the N₂/O₂ polarizability tensor used for the
+    automatic (`depol < 0`) Rayleigh depolarization of `greek_rayleigh` and
+    `τ_rayl`: `DispersiveAnisotropy()` (default) or `ConstantAnisotropy()`
+    (the Raman-module constants with a wavelength-independent anisotropy,
+    the v2.2 pre-release behaviour). The Cabannes fractions and
+    Raman cross sections always use the Raman-module constants. YAML key
+    `radiative_transfer.rayleigh_anisotropy`."
+    rayleigh_anisotropy::Scattering.AbstractPolarizabilityDispersion
+
+end
+
+# Positional constructor without `rayleigh_anisotropy` (the field list of the
+# v2.2 pre-releases), so those positional calls keep working; the default is the
+# dispersive anisotropy.
+function vSmartMOM_Parameters(args::Vararg{Any, N}) where {N}
+    N == fieldcount(vSmartMOM_Parameters) - 1 || throw(MethodError(
+        vSmartMOM_Parameters, args))
+    return vSmartMOM_Parameters(args..., Scattering.DispersiveAnisotropy())
+end
+
+function vSmartMOM_Parameters{FT}(args::Vararg{Any, N}) where {FT, N}
+    N == fieldcount(vSmartMOM_Parameters) - 1 || throw(MethodError(
+        vSmartMOM_Parameters{FT}, args))
+    return vSmartMOM_Parameters{FT}(args..., Scattering.DispersiveAnisotropy())
 end
 
 """

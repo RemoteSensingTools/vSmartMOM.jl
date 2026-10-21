@@ -29,6 +29,7 @@ try
 @testset "H2O self broadening" begin include("test_h2o_self_broadening.jl") end
 @testset "Scattering" begin include("test_Scattering.jl") end
 @testset "Molecular Rayleigh" begin include("test_molecular_rayleigh.jl") end
+@testset "Rayleigh tensor dispersion (depol: -1)" begin include("test_rayleigh_anisotropy.jl") end
 
 # Caller-defined-node bulk Mie API (Sol plan phase 1) -- caller-node
 # compute_aerosol_optical_properties_nodes/_gpu; delegation refactor of the

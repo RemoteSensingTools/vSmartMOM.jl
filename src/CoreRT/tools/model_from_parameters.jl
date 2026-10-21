@@ -217,6 +217,37 @@ function _analytic_aerosol_optics(c_aero::RT_Aerosol, params, truncation_type,
 end
 
 """
+    _auto_molecular_depolarizations(anisotropy, λₘ, T) -> (ϖ_Cabannes, depol_Cabannes, depol_Rayleigh)
+
+Molecular quantities of one band for the automatic depolarization rule
+(`params.depol < 0`) at band-centre wavelength `λₘ` (nm) and column-weighted
+temperature `T` (K): the Cabannes fraction and Cabannes depolarization from the
+Raman-module constants (`getRamanAtmoConstants`, the tensor of the published
+Raman tables), and the Rayleigh depolarization of the N₂/O₂ mixture with the
+tensor dispersion `anisotropy` (`params.rayleigh_anisotropy`). With
+`ConstantAnisotropy()` the Rayleigh depolarization also comes from the Raman
+constants, which reproduces the v2.2 pre-release values bit for bit.
+"""
+function _auto_molecular_depolarizations(anisotropy::Scattering.AbstractPolarizabilityDispersion,
+                                         λₘ::AbstractFloat, T::AbstractFloat)
+    _n2, _o2 = InelasticScattering.getRamanAtmoConstants(oftype(λₘ, 1.0e7) / λₘ, T)
+    ϖ_Cab = InelasticScattering.compute_ϖ_Cabannes(λₘ, _n2, _o2)
+    γ_air_Cab, _ = InelasticScattering.compute_γ_air_Cabannes!(λₘ, _n2, _o2)
+    depol_air_Cab = 2γ_air_Cab / (1 + γ_air_Cab)
+    depol_air_Ray = _auto_rayleigh_depolarization(anisotropy, λₘ, T, _n2, _o2)
+    return ϖ_Cab, depol_air_Cab, depol_air_Ray
+end
+
+function _auto_rayleigh_depolarization(::Scattering.ConstantAnisotropy, λₘ, T, n2, o2)
+    γ_air_Ray, _ = InelasticScattering.compute_γ_air_Rayleigh!(λₘ, n2, o2)
+    return 2γ_air_Ray / (1 + γ_air_Ray)
+end
+
+_auto_rayleigh_depolarization(anisotropy::Scattering.AbstractPolarizabilityDispersion,
+                              λₘ, T, _, _) =
+    first(InelasticScattering.rayleigh_air_depolarization(anisotropy, λₘ, T))
+
+"""
     model_from_parameters(params::vSmartMOM_Parameters;
                           sources=SolarBeam(), external_solar=false) -> RTModel
 
@@ -301,11 +332,16 @@ function model_from_parameters(params::vSmartMOM_Parameters;
 
     # Rayleigh optical depth per spectral point per layer (uses reduced profile size).
     #
-    # Depolarization sourcing rule (2026-04-24):
+    # Depolarization sourcing rule (2026-04-24; tensor dispersion v2.2):
     #   params.depol < 0  → "auto": derive both Rayleigh (greek_rayleigh, τ_rayl)
     #                       and Cabannes (greek_cabannes) depolarizations per
-    #                       band from the N₂/O₂ molecular constants (sanghavi
-    #                       convention; appropriate for Earth atmospheres).
+    #                       band from the N₂/O₂ polarizability tensors (sanghavi
+    #                       convention; appropriate for Earth atmospheres). The
+    #                       Rayleigh one uses params.rayleigh_anisotropy
+    #                       (default DispersiveAnisotropy(): γ(λ), ᾱ(λ) from the
+    #                       refractive-index fits and King factors); the
+    #                       Cabannes one and ϖ_Cabannes the Raman-module
+    #                       constants (see _auto_molecular_depolarizations).
     #   params.depol ≥ 0  → "explicit": use params.depol uniformly for
     #                       greek_rayleigh, greek_cabannes, AND τ_rayl. Required
     #                       for idealizations such as Natraj (1980) which fix
@@ -334,13 +370,9 @@ function model_from_parameters(params::vSmartMOM_Parameters;
         # used as the depol values when params.depol < 0).
         νₘ = FT(0.5) * (params.spec_bands[i_band][1] + params.spec_bands[i_band][end])
         λₘ = FT(1.0e7) / νₘ
-        _n2, _o2 = InelasticScattering.getRamanAtmoConstants(FT(1.0e7) / λₘ, FT(rayleigh_molecular_T))
-        ϖ_Cab = InelasticScattering.compute_ϖ_Cabannes(λₘ, _n2, _o2)
-        γ_air_Cab, _ = InelasticScattering.compute_γ_air_Cabannes!(λₘ, _n2, _o2)
-        γ_air_Ray, _ = InelasticScattering.compute_γ_air_Rayleigh!(λₘ, _n2, _o2)
+        ϖ_Cab, depol_air_Cab, depol_air_Ray = _auto_molecular_depolarizations(
+            params.rayleigh_anisotropy, λₘ, FT(rayleigh_molecular_T))
         ϖ_Cabannes[i_band] = FT(ϖ_Cab)
-        depol_air_Cab = 2γ_air_Cab / (1 + γ_air_Cab)
-        depol_air_Ray = 2γ_air_Ray / (1 + γ_air_Ray)
 
         # Apply the auto vs. explicit depol rule (see comment above the loop).
         depol_use_Cab = params.depol < 0 ? FT(depol_air_Cab) : FT(params.depol)

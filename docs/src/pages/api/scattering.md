@@ -88,6 +88,9 @@ for the physics and provenance.
 vSmartMOM.Scattering.AbstractMolecularRayleighMethod
 vSmartMOM.Scattering.UsingRefInd
 vSmartMOM.Scattering.UsingPolTen
+vSmartMOM.Scattering.AbstractPolarizabilityDispersion
+vSmartMOM.Scattering.DispersiveAnisotropy
+vSmartMOM.Scattering.ConstantAnisotropy
 vSmartMOM.Scattering.molecular_rayleigh_properties
 vSmartMOM.Scattering.molecular_rayleigh_cross_section_ratio
 vSmartMOM.Scattering.molecular_rayleigh_provenance
