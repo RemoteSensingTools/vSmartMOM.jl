@@ -164,6 +164,14 @@ Frankenberg 2022, [doi:10.21105/joss.04575](https://doi.org/10.21105/joss.04575)
 and the method papers relevant to your work. BibTeX for all of them is in
 [`CITATION.bib`](CITATION.bib).
 
+vSmartMOM is open-source research software developed through substantial
+scientific and programming effort. If the model contributes substantially to a
+study, we kindly ask that you contact the original developer(s) before
+submitting the manuscript. This provides an opportunity to discuss whether the
+model has been applied and its results interpreted appropriately, and to
+consider appropriate scientific credit, including co-authorship where warranted
+by the developers’ contributions.
+
 Gas absorption is computed from [HITRAN](https://hitran.org) line parameters.
 If your results use them, please also cite the HITRAN edition you used:
 
