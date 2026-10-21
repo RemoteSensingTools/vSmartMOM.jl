@@ -7,16 +7,21 @@ using vSmartMOM.CoreRT
 # multiple scattering between atmosphere and surface exercises every element
 # of the surface Mueller matrix and its Fourier moments, off the principal
 # plane. Surfaces: GISS Cox–Munk (with VLIDORT's exact direct bounce, matched
-# by vSmartMOM's glint correction), Lambertian, and Ross–Li with vSmartMOM's
-# 80° kernel zenith cap.
+# by vSmartMOM's glint correction), Lambertian, and Ross–Li both with
+# vSmartMOM's default 80° kernel zenith cap (VLIDORT kernels evaluated at
+# capped angles) and without a cap (`zenith_cap_deg = nothing`, stock VLIDORT /
+# MODIS kernels). The two Ross–Li definitions differ by up to 0.8 % (TOA) and
+# 1.1 % (BOA) in I, so each must match its own reference.
 include(joinpath(REF_DIR, "rayleigh_brdf_coupled_truth.jl"))
+include(joinpath(REF_DIR, "rayleigh_brdf_coupled_rossli_nocap_truth.jl"))
 
 function coupled_surface(s)
     s.kind == :coxmunk && return CoxMunkSurface(wind_speed = s.wind_speed,
         n_water = complex(s.n_water, 0.0), include_whitecaps = false,
         shadowing = s.shadowing)
     s.kind == :lambertian && return LambertianSurfaceScalar(s.albedo)
-    s.kind == :rossli && return CoreRT.RossLiSurfaceScalar(s.fvol, s.fgeo, s.fiso)
+    s.kind == :rossli && return CoreRT.RossLiSurfaceScalar(s.fvol, s.fgeo, s.fiso;
+        zenith_cap_deg = get(s, :zenith_cap_deg, 80))
     error("unknown surface $(s.kind)")
 end
 
@@ -56,7 +61,7 @@ end
 
 @testset "VLIDORT baseline: Case D — Rayleigh layer over BRDF surfaces" begin
     flip = reshape([1.0, -1.0, -1.0], 1, 1, 1, 3)      # VLIDORT → vSmartMOM Q, U signs
-    for case in COUPLED_CASES
+    for case in vcat(COUPLED_CASES, COUPLED_CASES_NOCAP)
         @testset "$(case.name)" begin
             toa, boa = coupled_run(case)
             for (label, model, truth) in (("TOA", toa, case.toa_up .* flip),
@@ -76,6 +81,18 @@ end
                 @test rel_I < 2e-4
                 @test err_QU < 5e-5
             end
+        end
+    end
+    # Control: the default 80° cap is a different surface definition; it does
+    # not reproduce the uncapped VLIDORT kernels.
+    @testset "Ross–Li 80° cap vs uncapped VLIDORT" begin
+        for case in COUPLED_CASES_NOCAP
+            capped = merge(case, (surface = merge(case.surface, (zenith_cap_deg = 80,)),))
+            toa, _ = coupled_run(capped)
+            truth = case.toa_up .* flip
+            rel_I = maximum(abs.(toa[:, :, :, 1] .- truth[:, :, :, 1]) ./ truth[:, :, :, 1])
+            @info "Case D $(case.name): 80° cap vs uncapped VLIDORT" rel_I
+            @test rel_I > 2e-3
         end
     end
 end

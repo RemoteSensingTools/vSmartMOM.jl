@@ -59,7 +59,8 @@ function Base.show(io::IO, s::rpvSurfaceScalar)
 end
 
 function Base.show(io::IO, s::RossLiSurfaceScalar)
-    print(io, "RossLi(fvol=$(s.fvol), fgeo=$(s.fgeo), fiso=$(s.fiso))")
+    cap = s.zenith_cap_deg == 80 ? "" : ", zenith_cap_deg=$(something(s.zenith_cap_deg, "nothing"))"
+    print(io, "RossLi(fvol=$(s.fvol), fgeo=$(s.fgeo), fiso=$(s.fiso)$cap)")
 end
 
 function Base.show(io::IO, s::CoxMunkSurface)

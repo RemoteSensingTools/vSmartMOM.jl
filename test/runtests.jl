@@ -154,6 +154,7 @@ end
 @testset "Cox-Munk RT contract" begin include("test_coxmunk_rt_contract.jl") end
 @testset "Cox-Munk polarization" begin include("test_coxmunk_polarization.jl") end
 @testset "Cox-Munk spectral water index" begin include("test_coxmunk_spectral.jl") end
+@testset "Ross-Li zenith cap" begin include("test_rossli_zenith_cap.jl") end
 
 # Linearized RT solves one band per call.
 @testset "Linearized band selection" begin include("test_lin_band_selection.jl") end

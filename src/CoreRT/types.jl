@@ -807,8 +807,15 @@ Ross-Li kernel-based BRDF (Lucht, Schaaf & Strahler, 2000).  Decomposes
 the surface reflectance into three semi-physical kernels: isotropic,
 RossThick (volumetric canopy scattering), and LiSparse (geometric
 mutual shadowing).  Standard MODIS/RAMI parameterization.  Scalar only
-(Stokes-I); no built-in linearization. Kernel zenith angles are capped at
-80°, a vSmartMOM regularization of grazing nodes rather than MODIS practice.
+(Stokes-I); no built-in linearization.
+
+By default the incident and reflected zenith angles are capped at 80°
+before the kernels are evaluated (`zenith_cap_deg = 80`), a vSmartMOM
+regularization of grazing quadrature nodes, where the LiSparse kernel
+becomes large and negative. `zenith_cap_deg = nothing` evaluates the kernels
+at the true angles, as MODIS (MCD43) and VLIDORT do.
+
+    RossLiSurfaceScalar(fvol, fgeo, fiso; zenith_cap_deg = 80)
 
 # Fields
 $(DocStringExtensions.FIELDS)
@@ -820,6 +827,22 @@ struct RossLiSurfaceScalar{FT} <: AbstractSurfaceType
     fgeo::FT
     "Isotropic reflectance fraction"
     fiso::FT
+    "Kernel zenith-angle cap [deg]; `nothing` = no cap (MODIS/VLIDORT definition)"
+    zenith_cap_deg::Union{Nothing, FT}
+end
+
+RossLiSurfaceScalar(fvol::FT, fgeo::FT, fiso::FT;
+                    zenith_cap_deg = 80) where {FT} =
+    RossLiSurfaceScalar{FT}(fvol, fgeo, fiso; zenith_cap_deg)
+
+RossLiSurfaceScalar{FT}(fvol, fgeo, fiso; zenith_cap_deg = 80) where {FT} =
+    RossLiSurfaceScalar{FT}(fvol, fgeo, fiso, _rossli_zenith_cap(FT, zenith_cap_deg))
+
+_rossli_zenith_cap(::Type{FT}, ::Nothing) where {FT} = nothing
+function _rossli_zenith_cap(::Type{FT}, cap::Real) where {FT}
+    !(cap isa Bool) && 0 < cap <= 90 || throw(ArgumentError(
+        "RossLiSurfaceScalar: zenith_cap_deg must lie in (0°, 90°] or be nothing; got $cap"))
+    return FT(cap)
 end
 
 """
@@ -874,6 +897,12 @@ Composite lower boundary: a vegetation canopy (one or more scattering layers)
 backed by a soil BRDF. When used as the surface in `rt_run`, the canopy
 sub-layers are processed internally via the adding-doubling method before
 interacting with the soil, producing an effective canopy+soil reflectance.
+
+The direct beam enters the effective layer only through its reflected source
+(`j₀⁺ = 0`), so `rt_run`'s BHR-down output `bhr_dw` is the diffuse
+downwelling flux for a canopy (no direct solar term), and the forward BOA
+radiance carries no collimated beam at a view on the solar ordinate. TOA
+radiances include the reflected direct beam.
 
 Requires `CanopyOptics.jl` for leaf-angle distribution and scattering models.
 """

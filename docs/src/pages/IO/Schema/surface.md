@@ -43,7 +43,24 @@ instead of using a YAML/TOML string.
 | Constructor | Source | Use case |
 |---|---|---|
 | `rpvSurfaceScalar(ρ₀, ρ_c, k, Θ)` | Rahman-Pinty-Verstraete | Vegetation BRDF; common in canopy retrievals. |
-| `RossLiSurfaceScalar(fvol, fgeo, fiso)` | Roujean / Wanner | MODIS BRDF kernel decomposition. Three-parameter linear model. Kernel zenith angles are capped at 80°, a vSmartMOM regularization of grazing nodes rather than MODIS practice.|
+| `RossLiSurfaceScalar(fvol, fgeo, fiso)` | Roujean / Wanner | MODIS BRDF kernel decomposition. Three-parameter linear model. By default the kernel zenith angles are capped at 80° (see `zenith_cap_deg` below).|
+
+`RossLiSurfaceScalar` takes the three kernel weights positionally (or as
+`fvol=`, `fgeo=`, `fiso=` keywords) and one optional keyword:
+
+- `zenith_cap_deg` *(default `80`)* — the incident and reflected zenith
+  angles are capped at this value before the RossThick and LiSparse kernels
+  are evaluated, so the BRDF beyond the cap equals its value at the cap. This
+  is a vSmartMOM regularization of the grazing quadrature nodes, where the
+  LiSparse kernel turns strongly negative (for example ρ = −2.55 at θ = 89.7°
+  for `fiso, fvol, fgeo = 0.12, 0.05, 0.02`), not MODIS practice.
+  `zenith_cap_deg=nothing` (or `null`) evaluates the kernels at the true
+  angles: the MODIS (MCD43) kernel definition, as in VLIDORT. Allowed values:
+  `(0, 90]` or `nothing`. The two definitions differ in the multiply scattered
+  field: in the VLIDORT comparison of `test/vlidort_baseline` (Case D, a
+  Rayleigh layer with τ = 0.1–0.3) by up to 0.8 % in TOA and 1.1 % in BOA
+  intensity. With the cap off, vSmartMOM matches stock VLIDORT 2.8.3 to
+  ≤ 7e-5 in I.
 
 ### Ocean (full Fourier + sun-glint; trait: `m_max = user_l_cap`)
 
@@ -63,8 +80,8 @@ instead of using a YAML/TOML string.
   to the whole band. In Julia, a vector gives one index per spectral point
   and is used element-wise; its length must equal the number of spectral
   points of the band (otherwise an `ArgumentError`). The YAML/TOML string
-  form accepts only a real number here (stored with zero imaginary part); set
-  a complex or spectral `n_water` in Julia.
+  form accepts only a real number here (stored with zero imaginary part) or
+  `nothing`; set a complex or spectral `n_water` in Julia.
 - `whitecap_albedo` *(default `0.22`)* — Lambertian whitecap albedo
   (Koepke 1984).
 - `include_whitecaps` *(default `true`)* — whether to include the
@@ -111,6 +128,14 @@ radiative_transfer:
 radiative_transfer:
   spec_bands: ["[18867 18870]"]
   surface:    ["CoxMunkSurface(wind_speed=5.0)"]
+```
+
+### Ross–Li without the zenith cap (MODIS/VLIDORT kernels)
+
+```yaml
+radiative_transfer:
+  spec_bands: ["[15000 15003]"]
+  surface:    ["RossLiSurfaceScalar(0.05, 0.02, 0.12, zenith_cap_deg=nothing)"]
 ```
 
 ### Multiband (one BRDF per band)

@@ -56,7 +56,7 @@ The implemented BRDFs and where to find them:
 | `LambertianSurfaceScalar` | albedo (single) | featureless reference, calibration scenes | `Surfaces/lambertian_surface.jl` |
 | `LambertianSurfaceSpectrum` | albedo vector | spectrally-varying surface | same |
 | `rpvSurfaceScalar` | ρ₀, ρ_c, k, Θ | semi-arid land with hot-spot | `Surfaces/rpv_surface.jl` |
-| `RossLiSurfaceScalar` | f_iso, f_vol, f_geo | MODIS-style kernel-driven BRDF | `Surfaces/rossli_surface.jl` |
+| `RossLiSurfaceScalar` | f_iso, f_vol, f_geo, `zenith_cap_deg` (80° by default; `nothing` = MODIS/VLIDORT kernels) | MODIS-style kernel-driven BRDF | `Surfaces/rossli_surface.jl` |
 | `CoxMunkSurface` | wind speed, n_water | sun glint over ocean (polarized) | `Surfaces/coxmunk_surface.jl` |
 | `CanopySurface` | LAI, leaf R/T, soil, n_layers | vegetation canopies | `Surfaces/canopy_surface.jl` |
 
@@ -112,6 +112,14 @@ interior observer heights carry the Fourier-series glint, in the forward and
 the linearized solvers alike, so their radiances and Jacobians stay
 consistent.
 
+**Ross–Li zenith cap.** `RossLiSurfaceScalar` caps both kernel zenith angles
+at `zenith_cap_deg = 80` by default: the LiSparse kernel turns strongly
+negative at grazing quadrature nodes, and beyond the cap the BRDF keeps its
+value at the cap. This is a vSmartMOM regularization; `zenith_cap_deg =
+nothing` evaluates the MODIS (MCD43) kernels at the true angles, as VLIDORT
+does. The choice changes TOA intensities by up to 0.8 % and BOA intensities
+by up to 1.1 % in the VLIDORT comparison of `test/vlidort_baseline` (Case D).
+
 ## Canopy surfaces
 
 `CanopySurface` is a *pre-solver* — it solves a discrete-ordinate problem
@@ -151,6 +159,17 @@ there (only the `m=0` moment contributes). They are **not** normalized by
 the incident solar flux: for a Lambertian surface of albedo `A` under a
 vacuum, `hdr = μ₀ F₀ A/π`, `bhr_dw = μ₀ F₀` and `bhr_uw = A μ₀ F₀`. Divide
 by `μ₀ F₀/π` (HDRF) or by `bhr_dw` (BHR) to form reflectance factors.
+
+**Canopy surfaces: `bhr_dw` is diffuse only.** A `CanopySurface` folds the
+direct beam into its reflected source `j₀⁻` and sets its `j₀⁺ = 0`, so the
+direct term `j₀⁺[iμ₀] μ₀` above is zero: for canopies `bhr_dw` is the
+diffuse (sky) downwelling flux at the canopy top, without the attenuated
+direct beam `μ₀ F₀ e^{−τ/μ₀}`. `hdr`, `bhr_uw` and the TOA radiance include
+the reflected direct beam. To form a canopy BHR, add the direct flux to
+`bhr_dw` before dividing. With `j₀⁺ = 0` the forward BOA downwelling
+radiance likewise has no collimated-beam term at a view on the solar
+ordinate, which bare surfaces carry and the linearized solver adds for every
+surface.
 
 ## Sweeping surfaces over a cached atmosphere
 

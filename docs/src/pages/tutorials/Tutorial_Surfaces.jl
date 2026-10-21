@@ -149,8 +149,14 @@ rpv = rpvSurfaceScalar(0.15, 0.1, 0.7, -0.3)  ## ρ₀, ρ_c, k, Θ
 # | Geometric | $f_\text{geo}$ | 0 - 0.1 | Mutual shadowing |
 #
 # Ross-Li is scalar-only: it returns zero for Stokes components beyond $I$.
+#
+# By default both kernel zenith angles are capped at 80° (`zenith_cap_deg =
+# 80`), a vSmartMOM regularization of the grazing quadrature nodes, where the
+# Li-sparse kernel turns strongly negative. `zenith_cap_deg = nothing` uses the
+# true angles, i.e. the MODIS kernel definition that VLIDORT implements.
 
 rossli = RossLiSurfaceScalar(0.05, 0.03, 0.1)  ## fvol, fgeo, fiso
+rossli_modis = RossLiSurfaceScalar(0.05, 0.03, 0.1; zenith_cap_deg = nothing)
 
 # ---
 

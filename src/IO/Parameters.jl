@@ -158,7 +158,8 @@ Supported:
 - LambertianSurfaceSpectrum([albedo_per_band])
 - LambertianSurfaceLegendre([coefficients])
 - rpvSurfaceScalar(ρ₀, ρ_c, k, Θ)
-- RossLiSurfaceScalar(fvol, fgeo, fiso)
+- RossLiSurfaceScalar(fvol, fgeo, fiso), optionally with `zenith_cap_deg=θ`
+  (default 80) or `zenith_cap_deg=nothing`/`null` (no cap)
 - CoxMunkSurface(wind_speed=U) or CoxMunkSurface(U)
 """
 const BRDF_MAP = Dict{String, Function}(
@@ -294,17 +295,25 @@ function _split_args(args_str::AbstractString)
     return args
 end
 
-"Parse a single argument into a number, boolean, or a vector of numbers (no eval)"
-function _parse_arg(arg::AbstractString, FT)
+"""
+    _parse_arg(arg, FT; allow_nothing = false)
+
+Parse a single argument into a number, boolean or vector of numbers (no
+eval). With `allow_nothing = true` (surface specifications), `nothing`,
+`null` and `none` parse to `nothing`.
+"""
+function _parse_arg(arg::AbstractString, FT; allow_nothing::Bool = false)
     a = strip(arg)
     if isempty(a)
         return nothing
     end
-    # Boolean literals
+    # Boolean and empty-value literals (`null` is the YAML/JSON spelling)
     if lowercase(a) == "true"
         return true
     elseif lowercase(a) == "false"
         return false
+    elseif allow_nothing && lowercase(a) in ("nothing", "null", "none")
+        return nothing
     end
     if startswith(a, "[") && endswith(a, "]")
         inner = strip(a[2:end-1])
@@ -355,8 +364,29 @@ function _construct_surface(::Val{:rpvSurfaceScalar}, FT, args)
 end
 
 function _construct_surface(::Val{:RossLiSurfaceScalar}, FT, args)
-    _require_nargs("RossLiSurfaceScalar", args, 3, "fvol, fgeo, fiso")
-    return CoreRT.RossLiSurfaceScalar(FT(args[1]), FT(args[2]), FT(args[3]))
+    # Forms: (fvol, fgeo, fiso); (fvol, fgeo, fiso, zenith_cap_deg=θ); or all
+    # keywords. `zenith_cap_deg=nothing` (or `null`) removes the 80° cap.
+    kw = !isempty(args) && last(args) isa AbstractDict ? last(args) : Dict{Symbol,Any}()
+    positional = !isempty(args) && last(args) isa AbstractDict ? args[1:end-1] : args
+    names = (:fvol, :fgeo, :fiso)
+    unknown = setdiff(keys(kw), (names..., :zenith_cap_deg))
+    _require_config(isempty(unknown),
+        "RossLiSurfaceScalar: unknown keyword argument(s) $(join(unknown, ", ")).")
+    if isempty(positional)
+        _require_config(all(k -> haskey(kw, k), names),
+            "RossLiSurfaceScalar keyword arguments require fvol, fgeo and fiso.")
+        coeffs = [kw[k] for k in names]
+    else
+        _require_nargs("RossLiSurfaceScalar", positional, 3, "fvol, fgeo, fiso")
+        _require_config(!any(k -> haskey(kw, k), names),
+            "RossLiSurfaceScalar: give fvol, fgeo, fiso either positionally or as keywords.")
+        coeffs = positional
+    end
+    cap = get(kw, :zenith_cap_deg, 80)
+    _require_config(cap === nothing || (cap isa Real && !(cap isa Bool) && 0 < cap <= 90),
+        "RossLiSurfaceScalar: zenith_cap_deg must lie in (0, 90] degrees or be nothing/null.")
+    return CoreRT.RossLiSurfaceScalar(FT(coeffs[1]), FT(coeffs[2]), FT(coeffs[3]);
+                                      zenith_cap_deg = cap)
 end
 
 function _construct_surface(::Val{:CoxMunkSurface}, FT, args)
@@ -388,7 +418,9 @@ Parse a surface spec like "LambertianSurfaceScalar(0.1)" or
 
 Supports both positional arguments and keyword arguments (key=value syntax).
 When keyword arguments are detected, a `Dict{Symbol,Any}` is passed as the
-sole element of the args list to the dispatching surface constructor.
+last element of the args list to the dispatching surface constructor, after
+any positional arguments (all-keyword specs therefore pass it as the sole
+element). Values `nothing`, `null` and `none` parse to `nothing`.
 """
 function parse_surface_str(s::AbstractString, FT)
     # Match "Name(args)" or "Name{Type}(args)" -- strip optional type parameter
@@ -407,18 +439,21 @@ function parse_surface_str(s::AbstractString, FT)
     has_kwargs = any(p -> occursin('=', p) && !startswith(strip(p), "["), raw_parts)
 
     if has_kwargs
-        # Pack keyword arguments into a Dict passed as args[1]
+        # Positional arguments first, then the keyword arguments as one Dict
+        positional = Any[]
         kwargs = Dict{Symbol,Any}()
         for part in raw_parts
             p = strip(part)
             if occursin('=', p) && !startswith(p, "[")
                 kv = split(p, '='; limit=2)
-                kwargs[Symbol(strip(kv[1]))] = _parse_arg(strip(kv[2]), FT)
+                kwargs[Symbol(strip(kv[1]))] = _parse_arg(strip(kv[2]), FT; allow_nothing = true)
+            else
+                push!(positional, _parse_arg(p, FT; allow_nothing = true))
             end
         end
-        return _construct_surface(Val(Symbol(name)), FT, Any[kwargs])
+        return _construct_surface(Val(Symbol(name)), FT, Any[positional..., kwargs])
     else
-        args_list = [_parse_arg(x, FT) for x in raw_parts]
+        args_list = [_parse_arg(x, FT; allow_nothing = true) for x in raw_parts]
         return _construct_surface(Val(Symbol(name)), FT, args_list)
     end
 end

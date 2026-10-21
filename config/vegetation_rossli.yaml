@@ -21,7 +21,8 @@ radiative_transfer:
   spec_bands:
     - "[19417.0 19418.0]"
 
-  # Ross-Li BRDF: fvol, fgeo, fiso
+  # Ross-Li BRDF: fvol, fgeo, fiso. Kernel zenith angles are capped at 80° by
+  # default; append `, zenith_cap_deg=nothing` for the uncapped MODIS kernels.
   surface:
     - RossLiSurfaceScalar(0.05, 0.03, 0.10)
 

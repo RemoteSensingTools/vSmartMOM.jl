@@ -66,7 +66,13 @@
         },
         "surface": {
           "$ref": "#/definitions/stringArray",
-          "description": "One surface expression per band. Parser supports LambertianSurfaceScalar, LambertianSurfaceSpectrum, LambertianSurfaceLegendre, rpvSurfaceScalar, RossLiSurfaceScalar, and CoxMunkSurface."
+          "description": "One surface expression per band. Parser supports LambertianSurfaceScalar(albedo), LambertianSurfaceSpectrum([albedos]), LambertianSurfaceLegendre([coefficients]), rpvSurfaceScalar(ρ₀, ρ_c, k, Θ), RossLiSurfaceScalar(fvol, fgeo, fiso[, zenith_cap_deg=θ]) and CoxMunkSurface(wind_speed=U[, n_water=n, whitecap_albedo=a, include_whitecaps=true, shadowing=true]). RossLiSurfaceScalar caps both kernel zenith angles at zenith_cap_deg (default 80°, allowed (0, 90]); zenith_cap_deg=nothing (or null) uses the true angles, as MODIS and VLIDORT do. CoxMunkSurface without n_water uses the Segelstein (1981) water index at every spectral point.",
+          "examples": [
+            ["LambertianSurfaceScalar(0.05)"],
+            ["RossLiSurfaceScalar(0.05, 0.02, 0.12)"],
+            ["RossLiSurfaceScalar(0.05, 0.02, 0.12, zenith_cap_deg=nothing)"],
+            ["CoxMunkSurface(wind_speed=5.0)"]
+          ]
         },
         "quadrature_type": {
           "type": ["string", "null"],

@@ -30,26 +30,33 @@ Ross-Li BRDF model (Ross & Li, 2000): linear combination of isotropic, volumetri
 
 For scalar RT (n=1) only; returns zero for polarized. See Ross & Li (2000), RSE.
 
-Incident and reflected zenith angles are capped at 80° before the kernels are
-evaluated. This is a package regularization of the grazing quadrature nodes,
-not MODIS practice; reflectances beyond 80° therefore equal those at 80°.
+By default (`zenith_cap_deg = 80`) incident and reflected zenith angles are
+capped at 80° before the kernels are evaluated: a package regularization of
+the grazing quadrature nodes, not MODIS practice, so reflectances beyond 80°
+equal those at 80°. `zenith_cap_deg = nothing` uses the true angles (the
+MODIS/VLIDORT kernels).
 """
 function reflectance(RossLi::RossLiSurfaceScalar{FT},n, μᵢ::FT, μᵣ::FT, dϕ::FT) where FT
-    (; fiso, fvol, fgeo) = RossLi
+    (; fiso, fvol, fgeo, zenith_cap_deg) = RossLi
     # Function was defined for RAMI definition, have to reverse here:
     dϕ = π - dϕ
     # Convert cosines to angles for Ross-Li kernels
     # clamp: F32 rounding can push cosines an ulp past ±1 → acos = NaN.
-    # ALSO cap the kernel zenith angles at 80°: the LiSparse geometric kernel
-    # grows like sec θ·sec θ' and reaches reflectances of O(100) at the
-    # grazing discrete-ordinate nodes (θ ≈ 89.4°) — far outside the kernel's
-    # validity (MODIS MCD43 weights are retrieved for θ ≲ 65°) — which makes
-    # the surface-interaction geometric series (E − r⁻⁺R⁺⁻)⁻¹ near-singular
-    # and NaN-prone in Float32. The cap is a vSmartMOM regularization, not
-    # MODIS (MCD43) practice: beyond 80° the BRDF is the kernel value at 80°.
-    θ_cap = FT(80) * FT(π) / FT(180)
-    θᵢ   = min(acos(clamp(μᵢ, FT(-1), FT(1))), θ_cap) #assert 0<=θᵢ<=π/2
-    θᵣ   = min(acos(clamp(μᵣ, FT(-1), FT(1))), θ_cap) #assert 0<=θᵣ<=π/2
+    θᵢ   = acos(clamp(μᵢ, FT(-1), FT(1))) #assert 0<=θᵢ<=π/2
+    θᵣ   = acos(clamp(μᵣ, FT(-1), FT(1))) #assert 0<=θᵣ<=π/2
+    # Optional cap of the kernel zenith angles (default 80°): the LiSparse
+    # geometric kernel grows like sec θ·sec θ' and the BRDF turns strongly
+    # negative at the grazing discrete-ordinate nodes (θ ≈ 89.4°) — far
+    # outside the kernel's validity (MODIS MCD43 weights are retrieved for
+    # θ ≲ 65°) — which can make the surface-interaction geometric series
+    # (E − r⁻⁺R⁺⁻)⁻¹ near-singular and NaN-prone in Float32. The cap is a
+    # vSmartMOM regularization, not MODIS (MCD43) practice: beyond the cap the
+    # BRDF is the kernel value at the cap.
+    if zenith_cap_deg !== nothing
+        θ_cap = zenith_cap_deg * FT(π) / FT(180)
+        θᵢ = min(θᵢ, θ_cap)
+        θᵣ = min(θᵣ, θ_cap)
+    end
 
     if n==1
         return fiso * RossLi_K_iso() + 

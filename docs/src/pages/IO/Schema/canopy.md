@@ -47,6 +47,20 @@ Julia with `CanopySurface_from_prospect(leaf, λgrid; soil=..., LAI=...)`
 instead of the YAML `canopy:` block (see the comment block in
 `config/canopy_forest.yaml`).
 
+## Outputs
+
+The canopy layer folds the direct beam into its reflected source and sets
+its `j₀⁺ = 0`. The TOA radiance and the `hdr` / `bhr_uw` diagnostics include
+the canopy's reflection of the direct beam. `bhr_dw`, the hemispherical
+downwelling flux at the surface, is **diffuse only** for a canopy: the
+attenuated direct flux `μ₀ F₀ e^{−τ/μ₀}` that a bare surface adds to `bhr_dw`
+is absent. Add it yourself to form a canopy BHR (see
+[Concepts/05 § HDRF and BHR](../../concepts/05_surfaces.md)). For the same
+reason the forward BOA downwelling radiance carries no collimated solar beam
+at a view that falls on the solar ordinate (a bare surface carries it there;
+the linearized solver adds it for every surface). Interior observer heights
+are not available with a canopy.
+
 ## Example
 
 Forest canopy over a dark Lambertian soil, with within-canopy absorption

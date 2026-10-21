@@ -371,6 +371,13 @@ Internally:
    resolved on `soil_spec_wn` first.
 5. Copy the resulting R⁻⁺ and J₀ into the output `added_layer`.
 
+The direct beam enters only through the reflected source `j₀⁻`; the layer's
+`j₀⁺` is zero. The BHR-down diagnostic (`bhr_dw` of `rt_run`) is therefore
+the diffuse downwelling flux at the canopy top, without the direct solar
+flux, and the forward BOA radiance carries no collimated beam at a view on
+the solar ordinate. TOA radiances, `hdr` and `bhr_uw` include the reflected
+direct beam.
+
 # TODO: Canopy + Raman (RRS/VS) coupling is not currently implemented. The
 # canopy BRDF code is noRS-only; calling rt_run with CanopySurface + RRS/VS
 # has undefined behavior (the inelastic ieR/ieT branches in the kernels
