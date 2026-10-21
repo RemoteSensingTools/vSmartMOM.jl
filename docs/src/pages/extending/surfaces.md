@@ -50,7 +50,32 @@ function reflectance(surface::MySurface{FT}, n, mu_i::FT, mu_r::FT, dphi::FT) wh
 end
 ```
 
-The generic Fourier-moment method in `src/CoreRT/Surfaces/rpv_surface.jl` can then integrate over azimuth and return the quadrature-space reflectance matrix.
+The generic Fourier-moment method and inherited `create_surface_layer!` in
+`src/CoreRT/Surfaces/analytic_surface.jl` integrate over azimuth and assemble the
+surface operator. A scalar analytic BRDF needs only the reflectance hook above;
+specialize the layer builder only for a different operator construction.
+
+Check the normalization before using this hook: its scalar angular value is
+`π * BRDF`, so a Lambertian albedo `a` returns `a`, not `a/π`. The Fourier
+builder applies `(1/π)∫₀^π ... dφ` at `m=0` and twice that at higher moments.
+A Mueller BRDF implementation must follow the same normalization and Stokes
+sign convention. In a transparent atmosphere with unpolarized incident
+irradiance `F₀`, the direct surface radiance is `μ₀ * F₀ * BRDF`. This absolute
+check catches a missing factor of π that forward/linearized parity alone cannot.
+
+## Declare capabilities
+
+Implement `component_m_max(surface, ctx)` so anisotropic surfaces receive
+enough Fourier moments. For retrieval support, declare
+`surface_parameter_count(surface)` and use `result.layout` for column mapping.
+The default count of one does not implement a new surface's derivative.
+
+Check the full run, atmosphere/surface replay, and any advertised linearized
+path. External-solar, equivalent-source Jacobian adding, interior observers,
+SIF injection, and canopy coupling have separate support restrictions; a new
+BRDF method does not automatically enable them. Reject unsupported requested
+physics explicitly. GPU support requires checking the actual array/backend
+operations as well as the surface's floating-point type.
 
 For a model with a closed-form quadrature matrix, implement `create_surface_layer!` directly. Use existing methods in `src/CoreRT/Surfaces/lambertian_surface.jl` as the reference for:
 
@@ -95,7 +120,9 @@ Keep new tests small and local before adding an end-to-end RT case:
 
 - parser: `parse_surface_str("MySurface(...)", Float32)` returns `MySurface{Float32}`;
 - parser failure: bad arity throws `ArgumentError`;
-- reflectance: finite, non-negative values over representative angles;
+- reflectance: finite values, non-negative Stokes-I response to unpolarized
+  light, and the appropriate physical polarization bounds (Mueller
+  off-diagonal entries may be negative);
 - Fourier moment: `m = 0` and at least one higher moment behave as expected;
 - RT smoke: one tiny CPU scene runs with finite `R` and `T`.
 
@@ -103,4 +130,19 @@ Use `test/test_parameters_parser.jl`, `test/test_coxmunk.jl`, and `test/test_can
 
 ## Linearized RT
 
-If the new surface should contribute analytic Jacobians, add or extend the matching method under `src/CoreRT/Surfaces/*_lin.jl` and update `ParameterLayout` assumptions as needed. Otherwise document that the surface is forward-only and make sure linearized tests either skip it or compare through an explicit finite-difference path.
+If the new surface should contribute analytic Jacobians, add or extend the
+matching method under `src/CoreRT/Surfaces/*_lin.jl`. Check its parameter
+derivatives and atmospheric attenuation derivatives against centered finite
+differences of the complete forward output, including any exact direct-glint
+correction. Otherwise document the surface as forward-only and reject requests
+for its unimplemented tangent. See `test/test_coxmunk_rt_contract.jl` for
+absolute-radiance, source-scaling, replay, and tangent checks.
+
+## Further Reading
+
+Engineering notes & derivation crib sheets:
+[`docs/dev_notes/`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/docs/dev_notes/README.md)
+(see its README) — living technical references (verified theory crib sheet,
+design specs, linearization bug catalog) that go deeper than the public docs
+above. `dev_notes/` lives outside `docs/src/`, so it is a GitHub link rather
+than a relative one.

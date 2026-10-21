@@ -33,34 +33,441 @@ NAer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params
 NGas = size(lin_model.τ̇_abs[1], 1)
 NSurf = 1
 
-R, T, dR, dT = rt_run_lin(model, lin_model, NAer, NGas, NSurf)
+result = rt_run_lin(model, lin_model, NAer, NGas, NSurf)
+R, T, dR, dT = result
 ```
 
-The outputs are:
+`result` is an [`ObserverRTResultLin`](@ref). Its named endpoint fields are:
 
-- `R`: reflected Stokes field, shaped `nVZA × nStokes × nSpec`
-- `T`: transmitted Stokes field, shaped like `R`
-- `dR`: derivative of `R`, shaped `nVZA × nStokes × nSpec × nParams`
-- `dT`: derivative of `T`, shaped like `dR`
+- `result.toa`: reflected Stokes field, shaped `nVZA × nStokes × nSpec`
+- `result.boa`: transmitted Stokes field, shaped like `result.toa`
+- `result.toa_jacobian`: derivative of `result.toa`, shaped
+  `nVZA × nStokes × nSpec × nParams`
+- `result.boa_jacobian`: derivative of `result.boa`, shaped like the TOA
+  Jacobian
+
+An endpoint field and its Jacobian are `nothing` when that endpoint was not
+selected by `obs_alt`. Historical four-value destructuring remains available,
+as shown above.
+
+## Retrieval-Selected Jacobians
+
+Use a retrieval flavour when the inverse problem needs only a subset of the
+physical derivatives. The flavour is compiled into a generic `JacobianPlan`;
+the elemental, doubling, and interaction kernels see only its compact
+band-local tangent dimension.
+
+```julia
+model, lin_model = model_from_parameters(OCO_RRS_synth(), params)
+
+# Application code supplies SolarBeam + SurfaceSIF in band 1 and SolarBeam
+# alone in bands 2 and 3.
+result = rt_run_lin(model, lin_model;
+                    i_band=1,
+                    sources=sources_for_band(params, 1))
+
+local_names = parameter_names(result.layout)
+K_global = globalize_jacobian(result.toa_jacobian, result.layout)
+global_names = parameter_names(lin_model.plan)
+```
+
+`OCO_RRS_synth` defines one 30-column active retrieval state for the current
+16-layer experiment. Its band-local dimensions are:
+
+| Band | Active columns | Contents |
+|:--|--:|:--|
+| O2 A | 12 | pressure, 3×(native aerosol `tau_ref`/`z0`), 3 surface coefficients, 2 SIF coefficients |
+| weak CO2 | 22 | pressure, 12 active CO2 layers, 3×(native aerosol `tau_ref`/`z0`), 3 surface coefficients |
+| strong CO2 | 22 | same structure as weak CO2 |
+
+The exact global order is:
+
+| Columns | Meaning |
+|:--|:--|
+| 1 | surface pressure |
+| 2:13 | CO2 VMR in active layers 5:16 |
+| 14:16 | native `tau_ref` for sulfate, organic carbon, and UTLS sulfate |
+| 17:19 | physical `z0` for those three aerosol profiles |
+| 20:22 | O2 A-band surface `P0:P2` |
+| 23:25 | weak-CO2 surface `P0:P2` |
+| 26:28 | strong-CO2 surface `P0:P2` |
+| 29:30 | `SIF760,mSIF` |
+
+Band-local atmospheric columns stay in kernel/native order: pressure,
+`(tau_ref,z0)` for each aerosol, then the active CO2 layers. Surface and SIF
+blocks follow. Consequently the O2 A local layout is
+`pressure + 6 aerosol + 3 surface + 2 SIF`, whereas each CO2 layout is
+`pressure + 6 aerosol + 12 CO2 + 3 surface`. The key-based
+`local_to_global` map performs the cross-band reordering.
+
+The four CO2 layers above 10 km have zero prior variance in this experiment,
+so they remain part of the forward absorption but have no tangent columns.
+H2O, aerosol refractive index, size distribution, and profile width likewise
+remain fixed forward-model inputs. Because aerosol microphysics is inactive,
+the flavour also skips the linearized Mie calculation and constructs only the
+forward aerosol phase functions.
+
+This is not a mask applied to the returned array. Selection is split into
+component-local aerosol/gas indices while building the Fourier-invariant
+optical cache. Inactive columns therefore never enter the combined
+`CoreScatteringOpticalPropertiesLin` phase tensor or the large 4-D tangent
+operators. If no aerosol Mie parameter is selected, only the forward phase
+blocks are computed. `globalize_jacobian` then scatters a band-local result
+into the shared 30-column order, filling parameters inactive in that band with
+exact zeros.
+
+New retrievals extend
+`jacobian_plan(::MyRetrievalFlavor, params, model, lin_model)` and optionally
+the upstream-work traits `requires_aerosol_microphysics_jacobians`,
+`requires_h2o_jacobians` and `requires_pressure_jacobians`. The RT
+kernels require no retrieval-specific methods.
+
+For fixed-pressure retrievals, return `false` from the pressure trait (or pass
+`compute_pressure_jacobians=false`) and omit pressure from the plan. Forward
+absorbers then need no pressure derivative implementation. Disabled pressure
+fields are `nothing`; full-layout solves or plans requesting pressure reject
+them rather than returning an incomplete sensitivity.
+
+The returned aerosol columns remain derivatives with respect to vSmartMOM's
+native physical `tau_ref` and profile location. Transformations such as
+`dF/dln(q) = q*dF/dq`, and conversion between reference-AOD conventions,
+belong in the retrieval-state mapping rather than in the RT kernels.
+
+For fixed aerosol microphysics, if `AOD760 = s760*tau_ref`, then
+`dF/dAOD760 = (dF/dtau_ref)/s760` and
+`dF/dlog(AOD760) = tau_ref*dF/dtau_ref`. Likewise,
+`dF/dlog(z0) = z0*dF/dz0`. CO2 Jacobians are per unit VMR; multiply by
+`1e-6` for a ppm state coordinate.
+
+The complete implementation contract, mappings, units, limitations, and
+finite-difference record are in
+[`docs/dev_notes/selective_jacobian_plans.md`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/docs/dev_notes/selective_jacobian_plans.md).
+
+## Instrument convolution and retrieval accuracy
+
+The RT Jacobian differentiates high-resolution radiance on the configured
+spectral grid. The retrieval must also differentiate its measurement operator.
+For a fixed linear convolution/resampling operator `C`, apply the **same**
+operator to every radiance and Jacobian column: `y = C*R`, `K_y = C*K_R`.
+Use the same grid ordering, boundary treatment, quadrature weights, and
+spectral-density units in both operations. Convolving reflectance and then
+multiplying by a sampled solar spectrum generally differs from convolving
+the physical radiance, especially across Fraunhofer lines.
+
+When a fitted shift, dispersion, or line-shape width changes `C`, the chain
+rule also contains its derivative:
+
+```math
+\frac{\partial y}{\partial x_j}
+= C(x)\frac{\partial R}{\partial x_j}
++ \frac{\partial C(x)}{\partial x_j}R(x).
+```
+
+Grid-coordinate changes may also change `R(x)` itself. State which grid is
+fixed when evaluating a derivative; avoid counting a shift twice. Validate
+the complete mapping from retrieval state to detector samples with centered
+finite differences, including shift and width columns. These operations live
+at the retrieval/instrument boundary, outside the RT kernels.
+
+For a precision comparison, retain two measurements: native Float32 versus
+Float64 grids (the operational difference), and identical physical grid
+locations in both runs (to isolate arithmetic error). Check high-resolution
+radiance, convolved radiance, convolved Jacobians, and converged retrievals.
+Lower spectral residuals alone do not establish a lower retrieval bias.
+
+“Noise sigma” means the measurement standard deviation used by the retrieval.
+It is neither a floating-point tolerance nor a line-shape width. For independent
+errors, report `(y_fast-y_reference) ./ sigma`; for correlated errors, whiten
+with the measurement covariance `S_e = L*L'`, giving `L \ delta_y`.
+A coherent model discrepancy is systematic even when every sample is smaller
+than one sigma.
+
+For the same observations and prior, define
+`delta_y = F_fast(x_reference)-F_reference(x_reference)`. The local
+Gauss–Newton estimate of the resulting state displacement is
+
+```math
+\delta x \approx
+-\left(K^T S_e^{-1}K + S_a^{-1}\right)^{-1}
+ K^T S_e^{-1}\delta y.
+```
+
+This is a linear estimate with a fixed Jacobian and prior; rerun the inversion
+to assess nonlinear convergence, changed stopping decisions, or fitted shifts.
+Report both the displacement in physical units and its size relative to the
+posterior uncertainty. The archived OCO precision/convolution experiments are
+in [the Jacobian investigation](https://github.com/RemoteSensingTools/vSmartMOM.jl/tree/main/docs/dev_notes/jacobian_batched);
+their acceptance thresholds and outcomes are fixture-specific.
+
+Analytic derivatives also hold the selected discrete representation fixed.
+Changing a Fourier ceiling, truncation support, quadrature, layer count, or
+adaptive stopping decision can introduce a discontinuity. Use fixed numerical
+settings for finite-difference validation, then assess any adaptive policy
+separately on the final retrieval.
+
+## Interior-Height Jacobians
+
+Strict-interior observer heights are supported by the analytic elastic
+multiple-scatter solver. Configure them through `obs_alt` before building the
+forward and linearized models:
+
+```julia
+height_params = deepcopy(params)
+height_params.obs_alt = [0.0, 5.0]  # endpoints plus one interior interface
+
+height_model, height_lin_model = model_from_parameters_lin(height_params)
+height_result = rt_run_lin(
+    height_model, height_lin_model, NAer, NGas, NSurf)
+
+level = only(height_result.levels)
+level.height_km
+level.boundary_index
+
+level.upwelling
+level.downwelling
+level.unscattered_downwelling
+
+level.upwelling_jacobian
+level.downwelling_jacobian
+level.unscattered_downwelling_jacobian
+
+total_down = total_downwelling(level)
+total_down_jacobian = total_downwelling_jacobian(level)
+```
+
+The radiance fields have shape `nVZA × nStokes × nSpec`; each Jacobian
+adds `nParams` as its last axis. The parameter order is stored directly in
+`height_result.layout`.
+
+The unscattered solar contribution remains separate from the diffuse MOM
+field. For fixed solar irradiance and geometry its atmospheric tangent is
+
+```math
+\frac{\partial L_{\mathrm{direct}}}{\partial x_j}
+= -\frac{L_{\mathrm{direct}}}{\mu_0}
+  \frac{\partial \tau_{\mathrm{above}}}{\partial x_j}.
+```
+
+It is zero for non-solar output ordinates and for surface-parameter columns.
+The BOA endpoint `result.boa` and `result.boa_jacobian` retain the historical
+total-radiance convention and therefore already include the direct carrier;
+the separate fields apply to strict-interior records.
+Raman/inelastic linearization remains unsupported. The separate
+single-scatter driver `rt_run_ss` continues to reject strict-interior observer
+requests. Interior linearized runs currently accept `SolarBeam` or `NoSource`;
+thermal and surface-emission sources, plus `CanopySurface`, are rejected
+explicitly until their multisensor tangent/source-slot propagation is
+implemented.
 
 ## Slice The Parameter Dimension
 
-Use [`ParameterLayout`](@ref) rather than hard-coded offsets.
+Use [`ParameterLayout`](@ref) rather than hard-coded offsets. The last axis of
+every full-RT Jacobian has this stable block ordering:
+
+| Block | Accessor | Columns within block | Derivative units |
+|:--|:--|:--|:--|
+| Surface pressure | `psurf_index(layout)` | one scalar `p_surf` | per hPa |
+| Aerosols | `aerosol_range(layout, iaer)` | seven columns per aerosol | parameter-dependent |
+| Trace gases | `gas_profile_range(layout, igas, Nz)` | `Nz` columns per gas, TOA to BOA | per unit VMR |
+| Surface | `surface_range(layout)` | surface-model parameters | parameter-dependent |
+| SIF | `sif_range(layout)` | `[SIF760, mSIF]` when `SurfaceSIF` is present (`[SIF755, slope]` for the legacy `SIF755`/`slope` interface) | parameter-dependent |
+| Canopy | `canopy_range(layout)` | canopy-model parameters, when present | parameter-dependent |
+
+Thus the state vector is
+
+```text
+x = [p_surf,
+     aerosol₁[1:7], ..., aerosol_NAer[1:7],
+     VMR₁(z₁), ..., VMR₁(z_Nz),
+     ...,
+     VMR_NGas(z₁), ..., VMR_NGas(z_Nz),
+     surface parameters,
+     SIF parameters,
+     canopy parameters]
+```
+
+Here `z₁` is the top atmospheric layer and `z_Nz` is the bottom layer. Gas
+VMR means dimensionless mole fraction; a derivative “per ppm” is therefore
+`1e-6 .* dR_dVMR`. Pressure, temperature, dry-air column, and absorption
+cross section are held fixed for a gas-VMR derivative. Surface-pressure
+derivatives are a separate state column, defined on the **final model grid**.
+Under the default `FixedPressureGrid()` convention only the bottom pressure
+interface changes, while all other interfaces, layer temperatures, humidity
+and VMRs remain fixed. Thus `∂p_full[end]/∂p_surf = 1/2`. The opt-in
+`FixedAltitudeGrid()` convention
+(`model_from_parameters(LinMode(), params; vertical_grid=FixedAltitudeGrid())`)
+instead keeps every interface at its geometric altitude, so every interface
+pressure and layer column scales with `p_surf`, and the cross sections respond
+through the layer pressures, (∂σ/∂p_full)·p_full/p_surf. A retrieval
+that varies `p_surf` must rebuild `params.p` with the same convention, via
+`surface_pressure_interfaces(convention, p_half, p_surf)`. Ordinary line absorption includes both the
+molecular-column response and pressure-dependent cross-section response.
+Line-by-line models differentiate their prepared line shapes upstream;
+legacy interpolation tables differentiate their interpolant; native ABSCO
+uses the exact pressure-interval slope with each node's own temperature grid.
+
+ABSCO selects the right interval at an interior pressure knot and zero slope
+at or outside the clamped pressure endpoints. Hard line-wing cutoffs and LUT
+knots are not differentiable at their jumps/kinks; a centered difference
+there need not match the chosen local derivative. Regridding the atmosphere,
+interpolating composition, or moving other interfaces with pressure adds a
+separate coordinate transformation that this column does not include.
+CIA/MT_CKD include their pressure-scaling terms, but not their abundance
+response; see [Gas-abundance columns](#Gas-abundance-columns) and the
+[absorption contract](IO/Schema/absorption.md).
+
+With `depol: -1` (automatic depolarization), the Rayleigh depolarization is
+computed at the dry-column-weighted mean temperature of the profile. It sets
+the Rayleigh Greek coefficients and, through the King factor, τ_Rayleigh.
+Under `FixedPressureGrid()`, moving `p_surf` changes that weighting slightly,
+because only the bottom column changes. This dependence has no tangent, so the
+surface-pressure column omits it. By an order-of-magnitude estimate the
+omitted term is about 1e-5 of the Rayleigh contribution to the
+surface-pressure derivative; it is neglected by decision. Under
+`FixedAltitudeGrid()` every column scales with `p_surf`, the weighted mean
+does not change, and the term is zero. An explicit `depol ≥ 0` removes it.
+The Cabannes depolarization and ϖ_Cabannes use the same temperature but enter
+only Raman runs, which are not linearized.
 
 ```julia
-layout = CoreRT.ParameterLayout(aerosol_params = 7,
-                                n_aerosols = NAer,
-                                n_gases = NGas,
-                                n_surface = NSurf)
+layout = result.layout
+Nz = length(model.profile.p_full)
 
 surface_idx = CoreRT.surface_index(layout)
 gas_block = CoreRT.gas_range(layout)
+gas1_profile = CoreRT.gas_profile_range(layout, 1, Nz)
+gas1_bottom = CoreRT.gas_layer_index(layout, 1, Nz, Nz)
 aerosol1_block = NAer > 0 ? CoreRT.aerosol_range(layout, 1) : 1:0
 
 dR_surface = dR[:, 1, :, surface_idx]
+dR_dgas1_profile = dR[:, :, :, gas1_profile]
+dT_dgas1_bottom = dT[:, :, :, gas1_bottom]
 ```
 
-The current ordering is aerosol parameters first, then gas VMR parameters, then surface parameters. Each aerosol contributes seven derivative slots: `τ_ref`, `nᵣ`, `nᵢ`, mean radius, geometric width, vertical-location parameter, and vertical-width parameter.
+### Gas-abundance columns
+
+Each gas column is the native partial `∂τ/∂VMR = σ·N_dry` (with the ABSCO
+exception below). Temperature, pressure, the dry-air column, every line cross
+section, and the CIA and MT_CKD optical depths are held fixed. For q-driven H₂O the coordinate is the
+dry-air molar ratio `r = N_H2O/N_dry` at fixed dry column, not `q`.
+
+This partial is the complete derivative of the forward absorption only when
+no other term in the band responds to that abundance. Construction records
+the exceptions:
+
+| Abundance | Forward response omitted by the native column |
+|:--|:--|
+| q-driven H₂O | self broadening of line-by-line H₂O cross sections; MT_CKD continuum; every CIA pair (through the dry-air number density) |
+| variable gas | CIA pairs with that gas as a collider, including at zero VMR |
+
+A full-layout solve, or a Jacobian plan, that requests such a column throws
+an `ArgumentError` naming the omitted terms. Hold the abundance fixed
+(`compute_h2o_jacobians=false`, or list the gas in `fixed_molecules`), omit
+its columns from the plan, or accept the native partial explicitly:
+
+```julia
+model, lin_model = model_from_parameters(LinMode(), params;
+    abundance_jacobians=:frozen_cross_section)
+```
+
+ABSCO tables with a multi-node H₂O-broadener axis (O₂, CO₂ and H₂O itself)
+are the exception to the native partial: the q-driven H₂O columns add each
+table's response `N_dry·VMR·∂σ/∂b·db/dr`, where `b` is the broadener
+abundance passed to the table (`r` for other gases, the moist mole fraction
+`r/(1+r)` for H₂O). It is exact for the table's linear interpolation in the
+tabulated VMR (the slope of the bracketing node interval; zero outside the
+table). It is included under both `abundance_jacobians` settings, so
+`:frozen_cross_section` only accepts the omissions listed in the table above
+and never changes derivative values. Legacy interpolation
+tables carry a fixed broadener abundance, so a q-driven H₂O column computed
+from them is complete with respect to that forward model (unless MT_CKD or
+CIA are also configured in the band); the forward model itself then ignores
+humidity-dependent broadening. When `q ≡ 0`, H₂O absorption is not evaluated
+and the H₂O columns are structural zeros, not derivatives; Jacobian plans may
+not select them.
+
+For illustration, with HITRAN2016 H₂O lines at 6200–6260 cm⁻¹ in a
+500–1000 hPa layer at 290 K, the native H₂O column differed from a
+step-converged finite difference of the complete forward absorption (dry
+column fixed) by 4.4% (q = 0.0125) and 8.1% (q = 0.025) in norm; the
+line-centre ratios were 1.061 and 1.116. These are case-specific
+diagnostics of different derivative definitions, not retrieval biases.
+
+`NGas = size(lin_model.τ̇_abs[1], 1)` is the number of flattened gas-layer
+columns, not merely the number of molecular species. Consequently,
+`NGas % Nz == 0`, and the number of gas slots is `NGas ÷ Nz`. Do not pass the
+number of species to `rt_run_lin`; pass the flattened dimension exactly as
+shown in the setup example.
+
+Each aerosol contributes seven derivative slots in this order:
+
+1. reference optical depth `τ_ref`;
+2. real refractive index `nᵣ`;
+3. imaginary refractive index `nᵢ`;
+4. native lognormal location `μ_logr = log(rₘ)`;
+5. native lognormal width `σ_logr = log(σ_g)`;
+6. vertical-profile location (`p₀` or `z₀`);
+7. vertical-profile width (`σ_p` or `σ₀`).
+
+For derivatives with respect to the YAML median radius and geometric width,
+divide the native size columns by `rₘ` and `σ_g`, respectively. This upstream
+coordinate convention is independent of the retrieval-specific transformations
+performed by a selected Jacobian plan.
+
+The size columns are derivatives of the discretized optics: the radius nodes
+are fixed by `scattering.r_min`, `r_max` and `nquad_radius` and do not move with
+`μ_logr` or `σ_logr`, so central differences of a rebuilt model reproduce them
+at any `nquad_radius`. Their accuracy as derivatives of the continuous size
+integral follows the convergence of the forward optics in `nquad_radius`.
+
+The array dimensions should always satisfy:
+
+```julia
+@assert size(dR)[1:3] == size(R)
+@assert size(dT)[1:3] == size(T)
+@assert size(dR, 4) == CoreRT.n_total(layout)
+@assert size(dT, 4) == CoreRT.n_total(layout)
+@assert NGas % Nz == 0
+```
+
+### Parsing into named retrieval blocks
+
+The following pattern avoids embedding any column offsets in downstream
+retrieval or diagnostic code:
+
+```julia
+function parse_jacobian(J, model, layout, NAer, NGas)
+    Nz = length(model.profile.p_full)
+    @assert NGas % Nz == 0
+    n_gas_species = NGas ÷ Nz
+
+    aerosols = [@view J[:, :, :, CoreRT.aerosol_range(layout, ia)]
+                for ia in 1:NAer]
+    gases = [@view J[:, :, :, CoreRT.gas_profile_range(layout, ig, Nz)]
+             for ig in 1:n_gas_species]
+
+    return (
+        psurf = @view(J[:, :, :, CoreRT.psurf_index(layout)]),
+        aerosols = aerosols,
+        gases = gases, # each entry: nVZA × nStokes × nSpec × Nz
+        surface = @view(J[:, :, :, CoreRT.surface_range(layout)]),
+    )
+end
+
+dR_named = parse_jacobian(dR, model, layout, NAer, NGas)
+dT_named = parse_jacobian(dT, model, layout, NAer, NGas)
+```
+
+When applying a physical profile perturbation, contract over the final axis:
+
+```julia
+delta_vmr = fill(1e-6, Nz) # +1 ppm in every layer
+delta_R = dropdims(sum(dR_named.gases[1] .* reshape(delta_vmr, 1, 1, 1, Nz),
+                       dims=4), dims=4)
+```
+
+This contraction recovers a column-wide perturbation while retaining the
+ability to apply arbitrary nonuniform vertical profiles.
 
 For a longer walkthrough with plots and finite-difference checks, use [Tutorial: Jacobians](tutorials/Tutorial_Jacobians.md). The hybrid AD notes are in [Tutorial: HybridAD](tutorials/Tutorial_HybridAD.md).
 

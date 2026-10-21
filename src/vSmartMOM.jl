@@ -50,11 +50,24 @@ Marker selecting the linearized model construction path used for Jacobians.
 """
 struct LinMode <: RT_Mode end
 export FwdMode, LinMode
+export AbstractJacobianFlavor, OCO_RRS_synth, JacobianPlan,
+       ActiveParameterLayout, ParameterKey, jacobian_plan, band_layout,
+       parameter_names, local_to_global, n_global, globalize_jacobian,
+       requires_aerosol_microphysics_jacobians, requires_h2o_jacobians,
+       requires_pressure_jacobians
+export AbstractVerticalGridConvention, FixedPressureGrid, FixedAltitudeGrid,
+       surface_pressure_interfaces
 
 export HenyeyGreensteinPhaseFunction,
        SyntheticPolarizedHenyeyGreensteinPhaseFunction,
        greek_coefficients, analytic_aerosol_optics,
-       phase_matrix_first_column
+       phase_matrix_first_column,
+       AbstractMolecularRayleighMethod, UsingRefInd, UsingPolTen,
+       RefractiveIndexRayleigh,
+       AbstractPolarizabilityDispersion, ConstantAnisotropy,
+       DispersiveAnisotropy,
+       molecular_rayleigh_properties, molecular_rayleigh_cross_section_ratio,
+       molecular_rayleigh_provenance
 
 # GPU/CPU Architecture (from Oceanigans)
 include("Architectures.jl")
@@ -73,7 +86,15 @@ include("Scattering/Scattering.jl")
 using .Scattering: HenyeyGreensteinPhaseFunction,
                    SyntheticPolarizedHenyeyGreensteinPhaseFunction,
                    greek_coefficients, analytic_aerosol_optics,
-                   phase_matrix_first_column
+                   phase_matrix_first_column,
+                   AbstractMolecularRayleighMethod,
+                   UsingRefInd, UsingPolTen,
+                   RefractiveIndexRayleigh,
+                   AbstractPolarizabilityDispersion, ConstantAnisotropy,
+                   DispersiveAnisotropy,
+                   molecular_rayleigh_properties,
+                   molecular_rayleigh_cross_section_ratio,
+                   molecular_rayleigh_provenance
 
 # Inelastic Scattering module:
 include("Inelastic/InelasticScattering.jl")
@@ -105,17 +126,29 @@ using .Aerosols
 # SIF emission data + loaders
 import DataInterpolations: ExtrapolationType
 include("SIF_emission/sif_loader.jl")
-export load_sif_spectrum, load_ficus_reflectance, sif_data_path, build_sif_source
+export load_sif_spectrum, sif_reference_state, load_ficus_reflectance,
+       sif_data_path, build_sif_source
 
 # Export some vSmartMOM functions
 export default_parameters, parameters_from_file, parameters_from_source,
        parameters_from_yaml, parameters_from_dict,
-       model_from_parameters, rt_run, read_parameters,
-       read_atmos_profile, read_atmos_profile_dict
+       model_from_parameters, copy_parameters, rt_run, rt_run_toa, read_parameters,
+       read_atmos_profile, read_atmos_profile_dict,
+       ObserverRTResult, LevelRadiance,
+       ObserverRTResultLin, LevelRadianceLin,
+       total_downwelling, total_downwelling_jacobian
 # Export linearized RT functions
 export rt_run_lin, model_from_parameters_lin
+# Atmosphere/surface split (cache the atmosphere phase, sweep the surface phase)
+export rt_run_atmosphere, rt_run_surface, rt_run_multi_surface, AtmosphereRTCache
+# Analytic Lambertian-albedo closure over a cached atmosphere (O(1) per albedo)
+export LambertianClosure, lambertian_closure, albedo_jacobian, invert_albedo
+# Scenario sweeps: SZA × view-pair × BRDF over one scene, amortising the
+# atmosphere phase per SZA (rt_run_multi_surface) and the per-SZA model
+# rebuild (remake_geometry) — surface_split_albedo_sweep.md §6/§7 PR 3
+export remake_geometry, ScenarioSweep, SweepResult, run_sweep
 # Export batch-processing API
-export BatchContext, update_model!,
+export BatchContext, update_model!, clear_spectroscopy_cache!,
        update_aerosol_loading!, update_aerosol_microphysics!
 # Export standalone exact single-scattering API
 export StandaloneSS, run_exact_ss, ExactSSConfig, SSGeometry,

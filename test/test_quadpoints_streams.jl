@@ -18,7 +18,7 @@ function _make_obs_geom(; sza, vza)
         sza = Float64(sza),
         vza = Float64.(vza),
         vaz = zeros(Float64, length(vza)),
-        obs_alt = 1000.0,
+        obs_alt = [0.0],
     )
 end
 
@@ -106,5 +106,61 @@ end
             CoreRT.GaussLegQuad(), obs, pol_type, _ARR; nstreams = 0)
         @test_throws ArgumentError CoreRT.rt_set_streams(
             CoreRT.RadauQuad(), obs, pol_type, _ARR; nstreams = -1)
+    end
+
+    @testset "Default external solar direction" begin
+        # Keep both the VZA and SZA distinct from the five Gauss nodes. The
+        # diffuse operator then has 5 weighted + 1 VZA nodes, while the phase
+        # grid additionally carries the exact direct-solar direction.
+        obs = _make_obs_geom(sza = 41.0, vza = [23.0])
+        pol_type = CoreRT.Stokes_IQU()
+
+        qp = CoreRT.rt_set_streams(CoreRT.GaussLegQuad(), obs, pol_type, _ARR;
+                                   nstreams = 5, external_solar = true)
+        @test qp.external_solar
+        @test qp.Nstreams == 5
+        @test qp.Nquad == 6
+        @test length(qp.qp_μN) == 18
+        @test length(qp.wt_μN) == 18
+        @test length(qp.phase_qp_μ) == 7
+        @test qp.iμ₀ == 0
+        @test qp.iμ₀Nstart == 0
+        @test qp.phase_qp_μ[qp.iμ₀_phase] == qp.μ₀
+        @test qp.iμ₀Nstart_phase == 3 * (qp.iμ₀_phase - 1) + 1
+        @test !(qp.μ₀ in qp.qp_μ)
+
+        # The positional-Ltrunc constructor exposes the same default mode.
+        qp_positional = CoreRT.rt_set_streams(
+            CoreRT.GaussLegQuad(), 8, obs, pol_type, _ARR; external_solar = true)
+        @test qp_positional.qp_μ == qp.qp_μ
+        @test qp_positional.phase_qp_μ == qp.phase_qp_μ
+
+        # Explicit opt-out retains the legacy square-grid representation:
+        # 5 weighted + VZA + SZA nodes, expanded to 21 entries for IQU.
+        legacy = CoreRT.rt_set_streams(CoreRT.GaussLegQuad(), obs, pol_type, _ARR;
+                                       nstreams = 5, external_solar = false)
+        @test !legacy.external_solar
+        @test legacy.Nquad == 7
+        @test length(legacy.qp_μN) == 21
+        @test legacy.phase_qp_μ == legacy.qp_μ
+        @test legacy.iμ₀_phase == legacy.iμ₀
+        @test legacy.iμ₀Nstart_phase == legacy.iμ₀Nstart
+
+        # Preserve the historical public positional constructor for external
+        # callers that build an embedded-solar QuadPoints directly.
+        compat = CoreRT.QuadPoints(
+            legacy.μ₀, legacy.iμ₀, legacy.iμ₀Nstart,
+            legacy.qp_μ, legacy.wt_μ, legacy.qp_μN, legacy.wt_μN,
+            legacy.Nquad, legacy.Nstreams)
+        @test !compat.external_solar
+        @test compat.phase_qp_μ === compat.qp_μ
+        @test compat.iμ₀_phase == compat.iμ₀
+        @test compat.iμ₀Nstart_phase == compat.iμ₀Nstart
+
+        @test_throws ArgumentError CoreRT.rt_set_streams(
+            CoreRT.RadauQuad(), 8, obs, pol_type, _ARR; external_solar = true)
+        @test_throws ArgumentError CoreRT.rt_set_streams(
+            CoreRT.RadauQuad(), obs, pol_type, _ARR;
+            nstreams = 5, external_solar = true)
     end
 end

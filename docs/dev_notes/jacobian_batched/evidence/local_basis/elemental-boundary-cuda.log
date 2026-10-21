@@ -1,0 +1,4 @@
+Test Summary:                      | Pass  Total   Time
+Elemental boundary derivatives CPU |  160    160  15.9s
+Test Summary:                       | Pass  Total   Time
+Elemental boundary derivatives CUDA |  160    160  39.0s

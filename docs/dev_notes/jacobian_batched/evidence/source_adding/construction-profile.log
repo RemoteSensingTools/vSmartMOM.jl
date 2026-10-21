@@ -1,0 +1,344 @@
+
+Progress:  10%|████▏                                    |  ETA: 0:03:22
+Progress: 100%|█████████████████████████████████████████| Time: 0:00:22
+AtmosphericAbsorption source: /home/cfranken/.julia/packages/AtmosphericAbsorption/LiDhy/src/AtmosphericAbsorption.jl
+CONSTRUCTION mode=forward sample=1 seconds=2.707258701 host_bytes=928863488 gc_seconds=0.476074862
+─────────────────────────────────────────────────────────────────────────────────
+                                        Time                    Allocations
+                               ───────────────────────   ────────────────────────
+       Tot / % measured:            3.04s /  88.7%            915MiB /  96.4%
+
+Section                ncalls     time    %tot     avg     alloc    %tot      avg
+─────────────────────────────────────────────────────────────────────────────────
+Read HITRAN                 2    1.82s   67.6%   911ms    654MiB   74.1%   327MiB
+Read HITRAN H2O             1    647ms   24.0%   647ms    210MiB   23.8%   210MiB
+Absorption Coeff            2    202ms    7.5%   101ms   12.8MiB    1.5%  6.41MiB
+Absorption Coeff H2O        1   21.4ms    0.8%  21.4ms   3.92MiB    0.4%  3.92MiB
+Mie calc                    2   2.04ms    0.1%  1.02ms   1.30MiB    0.1%   668KiB
+─────────────────────────────────────────────────────────────────────────────────
+
+CONSTRUCTION mode=forward sample=2 seconds=2.687156849 host_bytes=928861136 gc_seconds=0.503792553
+─────────────────────────────────────────────────────────────────────────────────
+                                        Time                    Allocations
+                               ───────────────────────   ────────────────────────
+       Tot / % measured:            2.69s /  99.6%            886MiB /  99.6%
+
+Section                ncalls     time    %tot     avg     alloc    %tot      avg
+─────────────────────────────────────────────────────────────────────────────────
+Read HITRAN                 2    1.78s   66.5%   889ms    654MiB   74.1%   327MiB
+Read HITRAN H2O             1    685ms   25.6%   685ms    210MiB   23.8%   210MiB
+Absorption Coeff            2    191ms    7.1%  95.5ms   12.8MiB    1.5%  6.41MiB
+Absorption Coeff H2O        1   18.5ms    0.7%  18.5ms   3.92MiB    0.4%  3.92MiB
+Mie calc                    2   2.25ms    0.1%  1.12ms   1.30MiB    0.1%   667KiB
+─────────────────────────────────────────────────────────────────────────────────
+
+CONSTRUCTION mode=forward sample=3 seconds=2.637538484 host_bytes=928860944 gc_seconds=0.474269249
+─────────────────────────────────────────────────────────────────────────────────
+                                        Time                    Allocations
+                               ───────────────────────   ────────────────────────
+       Tot / % measured:            2.64s /  99.6%            886MiB /  99.6%
+
+Section                ncalls     time    %tot     avg     alloc    %tot      avg
+─────────────────────────────────────────────────────────────────────────────────
+Read HITRAN                 2    1.71s   65.2%   856ms    654MiB   74.1%   327MiB
+Read HITRAN H2O             1    701ms   26.7%   701ms    210MiB   23.8%   210MiB
+Absorption Coeff            2    191ms    7.3%  95.5ms   12.8MiB    1.5%  6.41MiB
+Absorption Coeff H2O        1   21.1ms    0.8%  21.1ms   3.92MiB    0.4%  3.92MiB
+Mie calc                    2   1.93ms    0.1%   965μs   1.30MiB    0.1%   667KiB
+─────────────────────────────────────────────────────────────────────────────────
+
+HOST_PROFILE mode=forward
+ Count  Overhead File                    Line Function
+ =====  ======== ====                    ==== ========
+    10         1 @Base/parse.jl          113 tryparse_internal(::Type{Int32}, …
+    10         0 @Base/lock.jl           272 unlock
+    11         0 @vSmartMOM/…el_from_parameters.jl  403 model_from_parameters(params::vSm…
+    11         0 @vSmartMOM/…RT/tools/atmo_prof.jl  823 compute_h2o_absorption_profile!(τ…
+    11         0 @vSmartMOM/…RT/tools/atmo_prof.jl  728 compute_absorption_profile!
+    11         0 @vSmartMOM/…RT/tools/atmo_prof.jl  697 _layer_absorption_cross_section
+    12         0 @CUDA/…rv/synchronization.jl   90 spinning_synchronization
+    12         0 @Base/iostream.jl        42 eof(s::IOStream)
+    13         0 @Base/multidimensional.jl  970 _unsafe_getindex
+    13         0 @Base/multidimensional.jl  979 _unsafe_getindex!
+    13         0 @Base/cartesian.jl       64 macro expansion
+    13         0 @Base/multidimensional.jl  981 macro expansion
+    14         0 @Base/lock.jl           195 lock
+    14        12 @Base/lock.jl           171 trylock
+    15         4 @Base/anyall.jl         188 all
+    16         0 @CUDA/…rv/synchronization.jl  196 #synchronize#575
+    16        16 @Base/int.jl             83 <
+    17         0 @AtmosphericAbsorption/…sssections/kernels.jl   85 _compute_cross_section(model::Atm…
+    17         0 @AtmosphericAbsorption/…sssections/prepare.jl   20 prepare
+    17         0 @Base/array.jl         1152 (::Base.var"#_growend!##0#_growen…
+    19         0 @Base/genericmemory.jl  125 unsafe_copyto!
+    19        19 @Base/cmem.jl            28 memmove
+    19         7 @Base/array.jl         1130 _growend!
+    22         0 @Base/io.jl            1237 iterate
+    23         0 @Base/array.jl          986 setindex!
+    23        23 @Base/array.jl          991 _setindex!
+    23         0 @Base/strings/substring.jl   62 view
+    23         0 @Base/strings/substring.jl   52 SubString
+    23         2 @Base/strings/substring.jl   49 SubString
+    26         6 @Base/parse.jl          254 parse(::Type{Int32}, s::SubString…
+    27        27 @Base/strings/string.jl  533 length_continued
+    27         0 @Base/array.jl         1148 (::Base.var"#_growend!##0#_growen…
+    27         0 @Base/array.jl         1067 array_new_memory
+    31         1 @Base/parse.jl          253 parse
+    32         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   45 parse_par(path::String; mol::Int6…
+    36        19 @AtmosphericAbsorption/…itran/isotope_data.jl   24 molar_mass(mol::Int32, iso::Int32)
+    40         0 @AtmosphericAbsorption/…/hitran/HitranPort.jl   64 load_lines(port::AtmosphericAbsor…
+    44         0 @Base/array.jl         1131 _growend!
+    54         1 @Base/strings/string.jl  532 length_continued
+    57        57 @Base/int.jl             87 +
+    60         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   14 _f64_or_zero
+    65         0 @CUDA/…rv/synchronization.jl   56 take!(f::CUDA.var"#synchronizatio…
+    65         0 @CUDA/…rv/synchronization.jl  125 (::CUDA.var"#synchronization_work…
+    65        65 @CUDA/…ib/cudadrv/libcuda.jl 5091 unchecked_cuStreamSynchronize
+    66         0 @Base/array.jl         1292 _push!
+    67         0 @Base/array.jl         1289 push!
+    71         0 @CUDA/…rv/synchronization.jl  200 #synchronize#575
+    71         0 @CUDA/…rv/synchronization.jl  168 nonblocking_synchronize
+    71         0 @CUDA/…rv/synchronization.jl   40 put!
+    77         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   62 parse_par(path::String; mol::Int6…
+    77         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   58 parse_par(path::String; mol::Int6…
+    81         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   59 parse_par(path::String; mol::Int6…
+    85         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   57 parse_par(path::String; mol::Int6…
+    87         0 @AtmosphericAbsorption/…sssections/kernels.jl   92 _compute_cross_section(model::Atm…
+    87         0 @AtmosphericAbsorption/…cAbsorptionCUDAExt.jl   15 synchronize_if_gpu
+    87         0 @CUDA/…rv/synchronization.jl  194 synchronize
+    87         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   49 parse_par(path::String; mol::Int6…
+    88         7 @Base/strings/string.jl  513 length(s::String)
+    90         1 @AtmosphericAbsorption/…/hitran/par_parser.jl   44 parse_par(path::String; mol::Int6…
+    90         0 @Base/array.jl          595 zeros
+    94         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   55 parse_par(path::String; mol::Int6…
+    95         0 @vSmartMOM/…el_from_parameters.jl  372 model_from_parameters(params::vSm…
+    95         0 @vSmartMOM/…RT/tools/atmo_prof.jl  728 compute_absorption_profile!(τ_abs…
+    95         0 @vSmartMOM/…RT/tools/atmo_prof.jl  694 _layer_absorption_cross_section
+    99         0 @AtmosphericAbsorption/…LineLists/columnar.jl   69 AtmosphericAbsorption.LineLists.L…
+    99         0 @AtmosphericAbsorption/…LineLists/columnar.jl   64 col
+    99         0 @Base/array.jl          591 zeros
+   101         0 @AtmosphericAbsorption/…LineLists/columnar.jl   56 LineDatabase
+   106         0 @vSmartMOM/…RT/tools/atmo_prof.jl  766 compute_absorption_profile!(τ_abs…
+   106         0 @ProgressMeter/src/ProgressMeter.jl 1026 macro expansion
+   106         0 @vSmartMOM/…RT/tools/atmo_prof.jl  780 macro expansion
+   106         0 @vSmartMOM/…on/autodiff_helper.jl   37 absorption_cross_section
+   106         0 @vSmartMOM/…on/autodiff_helper.jl   37 #absorption_cross_section#45
+   106         0 @AtmosphericAbsorption/…ssections/sampling.jl  328 compute_cross_section
+   106         0 @AtmosphericAbsorption/…ssections/sampling.jl  335 #compute_cross_section#6
+   106         0 @AtmosphericAbsorption/…sssections/kernels.jl   46 compute_cross_section
+   106         0 @AtmosphericAbsorption/…sssections/kernels.jl   68 compute_cross_section(model::Atmo…
+   106         0 @AtmosphericAbsorption/…sssections/kernels.jl   79 _compute_cross_section
+   114         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   51 parse_par(path::String; mol::Int6…
+   119         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   56 parse_par(path::String; mol::Int6…
+   124       124 @Base/iostream.jl        43 readline(s::IOStream; keep::Bool)
+   133         0 @Base/multidimensional.jl  968 _unsafe_getindex
+   133         0 @Base/abstractarray.jl  822 similar
+   133         0 @Base/array.jl          377 similar
+   133         0 @Base/io.jl            1238 iterate
+   133         0 @Base/iostream.jl       474 readline
+   146         0 @Base/multidimensional.jl  956 _getindex
+   148         0 @Base/abstractarray.jl 1342 getindex
+   155         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   63 parse_par(path::String; mol::Int6…
+   223         0 @Base/boot.jl           660 Array
+   223         0 @Base/boot.jl           647 Array
+   250       250 @Base/boot.jl           588 GenericMemory
+   256         0 @AtmosphericAbsorption/…/hitran/HitranPort.jl   65 load_lines(port::AtmosphericAbsor…
+   374         0 @vSmartMOM/…el_from_parameters.jl  395 model_from_parameters(params::vSm…
+   615         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   11 _f64
+   641       635 @Base/parse.jl          268 tryparse
+   644         0 @Base/parse.jl          394 parse
+   644         0 @Base/parse.jl          394 #parse#475
+   644         0 @Base/parse.jl          381 tryparse_internal
+   644         0 @Base/parse.jl          382 #tryparse_internal#474
+   966         0 @vSmartMOM/…el_from_parameters.jl  364 model_from_parameters(params::vSm…
+  1039         0 @AtmosphericAbsorption/…/hitran/HitranPort.jl   62 load_lines(port::AtmosphericAbsor…
+  1039         6 @AtmosphericAbsorption/…/hitran/par_parser.jl   39 parse_par
+  1340         0 @AtmosphericAbsorption/…/hitran/HitranPort.jl   50 kwcall(::@NamedTuple{FT::DataType…
+  1448         0 …nstruction_profile.jl   10 (::var"#39#40"{Symbol})()
+  1448         0 @vSmartMOM/…el_from_parameters.jl  255 kwcall(::@NamedTuple{external_sol…
+  1451         0 …nstruction_profile.jl   23 macro expansion
+  1451         0 …al_basis_benchmark.jl   20 quiet(f::var"#39#40"{Symbol})
+  1451         0 @Base/stream.jl        1464 (::Base.RedirectStdStream)(thunk:…
+  1451         0 …al_basis_benchmark.jl   21 #quiet##0
+  1451         0 @Base/logging/logging.jl  653 with_logger
+  1451         0 @Base/logging/logging.jl  542 with_logstate(f::var"#quiet##2#qu…
+  1451         0 …al_basis_benchmark.jl   22 #quiet##2
+  1455         0 @Base/client.jl         550 _start()
+  1455         0 @Base/client.jl         317 exec_options(opts::Base.JLOptions)
+  1455         0 @Base/Base.jl           306 include(mod::Module, _path::Strin…
+  1455         0 @Base/loading.jl       2934 _include(mapexpr::Function, mod::…
+  1455         0 @Base/loading.jl       2874 include_string(mapexpr::typeof(id…
+  1455         0 @Base/boot.jl           489 eval(m::Module, e::Any)
+  1455         0 …nstruction_profile.jl   23 top-level scope
+  1455         4 @Profile/src/Profile.jl   60 macro expansion
+  5935         0 @CUDA/…rv/synchronization.jl   53 take!(f::CUDA.var"#synchronizatio…
+  6000         0 @Base/task.jl           868 task_done_hook(t::Task)
+  6000         0 @CUDA/…rv/synchronization.jl  119 synchronization_worker(data::Ptr{…
+  6006         0 @Base/condition.jl      136 wait
+  6006         0 @Base/condition.jl      141 wait(c::Base.GenericCondition{Ree…
+ 12006         0 @Base/task.jl          1228 wait()
+ 12006     12005 @Base/task.jl          1216 poptask(W::Base.IntrusiveLinkedLi…
+Total snapshots: 18000. Utilization: 33% across all threads and tasks. Use the `groupby` kwarg to break down by thread and/or task.
+CONSTRUCTION mode=linearized sample=1 seconds=2.667857375 host_bytes=1000907448 gc_seconds=0.349085378
+─────────────────────────────────────────────────────────────────────────────────
+                                        Time                    Allocations
+                               ───────────────────────   ────────────────────────
+       Tot / % measured:            2.67s /  99.2%           0.93GiB /  98.1%
+
+Section                ncalls     time    %tot     avg     alloc    %tot      avg
+─────────────────────────────────────────────────────────────────────────────────
+Read HITRAN                 3    2.35s   88.6%   782ms    864MiB   92.3%   288MiB
+Absorption Coeff            2    206ms    7.8%   103ms   14.4MiB    1.5%  7.18MiB
+Mie calc                    2   61.8ms    2.3%  30.9ms   52.9MiB    5.7%  26.5MiB
+Absorption Coeff H2O        1   33.2ms    1.3%  33.2ms   4.69MiB    0.5%  4.69MiB
+─────────────────────────────────────────────────────────────────────────────────
+
+CONSTRUCTION mode=linearized sample=2 seconds=2.610028885 host_bytes=1000887816 gc_seconds=0.280073341
+─────────────────────────────────────────────────────────────────────────────────
+                                        Time                    Allocations
+                               ───────────────────────   ────────────────────────
+       Tot / % measured:            2.61s /  99.3%           0.93GiB /  98.1%
+
+Section                ncalls     time    %tot     avg     alloc    %tot      avg
+─────────────────────────────────────────────────────────────────────────────────
+Read HITRAN                 3    2.30s   88.6%   766ms    864MiB   92.3%   288MiB
+Absorption Coeff            2    208ms    8.0%   104ms   14.4MiB    1.5%  7.18MiB
+Mie calc                    2   61.4ms    2.4%  30.7ms   52.9MiB    5.7%  26.5MiB
+Absorption Coeff H2O        1   24.7ms    1.0%  24.7ms   4.69MiB    0.5%  4.69MiB
+─────────────────────────────────────────────────────────────────────────────────
+
+CONSTRUCTION mode=linearized sample=3 seconds=2.522473095 host_bytes=1000889112 gc_seconds=0.251130336
+─────────────────────────────────────────────────────────────────────────────────
+                                        Time                    Allocations
+                               ───────────────────────   ────────────────────────
+       Tot / % measured:            2.52s /  99.4%           0.93GiB /  98.1%
+
+Section                ncalls     time    %tot     avg     alloc    %tot      avg
+─────────────────────────────────────────────────────────────────────────────────
+Read HITRAN                 3    2.22s   88.4%   739ms    864MiB   92.3%   288MiB
+Absorption Coeff            2    204ms    8.1%   102ms   14.4MiB    1.5%  7.18MiB
+Mie calc                    2   63.2ms    2.5%  31.6ms   52.9MiB    5.7%  26.5MiB
+Absorption Coeff H2O        1   22.7ms    0.9%  22.7ms   4.69MiB    0.5%  4.69MiB
+─────────────────────────────────────────────────────────────────────────────────
+
+HOST_PROFILE mode=linearized
+ Count  Overhead File                    Line Function
+ =====  ======== ====                    ==== ========
+    10         0 @CUDA/…rv/synchronization.jl  196 #synchronize#575
+    10         0 @Base/abstractarray.jl 1342 getindex
+    10         0 @Base/number.jl           7 convert
+    10         0 @vSmartMOM/…RT/tools/atmo_prof.jl  697 _layer_absorption_cross_section
+    11         7 @vSmartMOM/…g/compute_NAI2_lin.jl  170 compute_aerosol_optical_propertie…
+    11         0 @vSmartMOM/…el_from_parameters.jl  232 model_from_parameters(lin::LinMod…
+    11         0 @vSmartMOM/…ools/atmo_prof_lin.jl  332 compute_h2o_absorption_profile!(τ…
+    11         0 @vSmartMOM/…ools/atmo_prof_lin.jl  270 compute_absorption_profile!
+    12         3 @Base/anyall.jl         188 all
+    13         8 @Base/parse.jl          113 tryparse_internal(::Type{Int32}, …
+    13         0 @Base/array.jl         1152 (::Base.var"#_growend!##0#_growen…
+    14         0 @Base/genericmemory.jl  125 unsafe_copyto!
+    14        14 @Base/cmem.jl            28 memmove
+    15         0 @Base/array.jl          986 setindex!
+    15        14 @Base/array.jl          991 _setindex!
+    15         0 @Base/io.jl            1237 iterate
+    18         0 @vSmartMOM/…el_from_parameters.jl  437 model_from_parameters(lin::LinMod…
+    18         0 @AtmosphericAbsorption/…sssections/kernels.jl   85 _compute_cross_section(model::Atm…
+    18         0 @AtmosphericAbsorption/…sssections/prepare.jl   20 prepare
+    19         0 @vSmartMOM/…el_from_parameters.jl  440 model_from_parameters(lin::LinMod…
+    20         0 @Base/strings/substring.jl   62 view
+    20         0 @Base/strings/substring.jl   52 SubString
+    20         1 @Base/strings/substring.jl   49 SubString
+    21         0 @Base/array.jl         1131 _growend!
+    28         9 @Base/parse.jl          254 parse(::Type{Int32}, s::SubString…
+    32         0 @Base/array.jl         1289 push!
+    32         0 @Base/array.jl         1292 _push!
+    34        19 @AtmosphericAbsorption/…itran/isotope_data.jl   24 molar_mass(mol::Int32, iso::Int32)
+    35         2 @Base/parse.jl          253 parse
+    37         0 @vSmartMOM/…el_from_parameters.jl  412 (::vSmartMOM.CoreRT.var"#aerosol_…
+    37         0 @AtmosphericAbsorption/…/hitran/HitranPort.jl   64 load_lines(port::AtmosphericAbsor…
+    38         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   45 parse_par(path::String; mol::Int6…
+    49        49 @Base/strings/string.jl  533 length_continued
+    53         0 @Base/strings/string.jl  532 length_continued
+    57        57 @Base/int.jl             87 +
+    63         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   14 _f64_or_zero
+    64         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   59 parse_par(path::String; mol::Int6…
+    65         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   62 parse_par(path::String; mol::Int6…
+    70         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   57 parse_par(path::String; mol::Int6…
+    77         0 @CUDA/…rv/synchronization.jl  200 #synchronize#575
+    77         0 @CUDA/…rv/synchronization.jl  168 nonblocking_synchronize
+    77         0 @CUDA/…rv/synchronization.jl   40 put!
+    79         0 @CUDA/…rv/synchronization.jl   56 take!(f::CUDA.var"#synchronizatio…
+    79         0 @CUDA/…rv/synchronization.jl  125 (::CUDA.var"#synchronization_work…
+    79        79 @CUDA/…ib/cudadrv/libcuda.jl 5091 unchecked_cuStreamSynchronize
+    80         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   58 parse_par(path::String; mol::Int6…
+    87         0 @AtmosphericAbsorption/…sssections/kernels.jl   92 _compute_cross_section(model::Atm…
+    87         0 @AtmosphericAbsorption/…cAbsorptionCUDAExt.jl   15 synchronize_if_gpu
+    88         0 @CUDA/…rv/synchronization.jl  194 synchronize
+    89         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   56 parse_par(path::String; mol::Int6…
+    91         0 @Base/broadcast.jl      227 similar
+    91         0 @Base/broadcast.jl      228 similar
+    91         0 @Base/abstractarray.jl  866 similar
+    91         0 @Base/abstractarray.jl  867 similar
+    93         0 @Base/boot.jl           660 Array
+    93         0 @Base/boot.jl           647 Array
+    94         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   55 parse_par(path::String; mol::Int6…
+    96         0 @vSmartMOM/…RT/tools/atmo_prof.jl  694 _layer_absorption_cross_section
+    96         0 @Base/broadcast.jl      894 materialize
+    97         0 @Base/broadcast.jl      919 copy
+    98         0 @vSmartMOM/…el_from_parameters.jl  289 model_from_parameters(lin::LinMod…
+    98         0 @vSmartMOM/…ools/atmo_prof_lin.jl  270 compute_absorption_profile!(τ_abs…
+   101       101 @Base/boot.jl           588 GenericMemory
+   105         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   51 parse_par(path::String; mol::Int6…
+   106         0 @vSmartMOM/…on/autodiff_helper.jl   37 absorption_cross_section
+   106         0 @vSmartMOM/…on/autodiff_helper.jl   37 #absorption_cross_section#45
+   106         0 @AtmosphericAbsorption/…ssections/sampling.jl  328 compute_cross_section
+   106         0 @AtmosphericAbsorption/…ssections/sampling.jl  335 #compute_cross_section#6
+   106         0 @AtmosphericAbsorption/…sssections/kernels.jl   46 compute_cross_section
+   106         0 @AtmosphericAbsorption/…sssections/kernels.jl   68 compute_cross_section(model::Atmo…
+   106         0 @AtmosphericAbsorption/…sssections/kernels.jl   79 _compute_cross_section
+   109         0 @vSmartMOM/…ools/atmo_prof_lin.jl  284 compute_absorption_profile!(τ_abs…
+   109         0 @ProgressMeter/src/ProgressMeter.jl 1026 macro expansion
+   109         0 @vSmartMOM/…ools/atmo_prof_lin.jl  307 macro expansion
+   112         8 @Base/strings/string.jl  513 length(s::String)
+   113         1 @AtmosphericAbsorption/…/hitran/par_parser.jl   44 parse_par(path::String; mol::Int6…
+   115         0 @AtmosphericAbsorption/…/hitran/HitranPort.jl   65 load_lines(port::AtmosphericAbsor…
+   120         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   49 parse_par(path::String; mol::Int6…
+   214       214 @Base/iostream.jl        43 readline(s::IOStream; keep::Bool)
+   219         0 @Base/io.jl            1238 iterate
+   219         0 @Base/iostream.jl       474 readline
+   234         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   63 parse_par(path::String; mol::Int6…
+   353         0 @vSmartMOM/…el_from_parameters.jl  220 model_from_parameters(lin::LinMod…
+   600         0 @AtmosphericAbsorption/…/hitran/par_parser.jl   11 _f64
+   636         0 @Base/parse.jl          394 parse
+   636         0 @Base/parse.jl          394 #parse#475
+   636         0 @Base/parse.jl          381 tryparse_internal
+   636         0 @Base/parse.jl          382 #tryparse_internal#474
+   636       627 @Base/parse.jl          268 tryparse
+   905         0 @vSmartMOM/…el_from_parameters.jl  280 model_from_parameters(lin::LinMod…
+  1102         0 @AtmosphericAbsorption/…/hitran/HitranPort.jl   62 load_lines(port::AtmosphericAbsor…
+  1102         7 @AtmosphericAbsorption/…/hitran/par_parser.jl   39 parse_par
+  1257         0 @AtmosphericAbsorption/…/hitran/HitranPort.jl   50 kwcall(::@NamedTuple{FT::DataType…
+  1409         0 …nstruction_profile.jl   10 (::var"#39#40"{Symbol})()
+  1409         0 @vSmartMOM/…el_from_parameters.jl   97 kwcall(::@NamedTuple{external_sol…
+  1412         0 @Base/client.jl         550 _start()
+  1412         0 @Base/client.jl         317 exec_options(opts::Base.JLOptions)
+  1412         0 @Base/Base.jl           306 include(mod::Module, _path::Strin…
+  1412         0 @Base/loading.jl       2934 _include(mapexpr::Function, mod::…
+  1412         0 @Base/loading.jl       2874 include_string(mapexpr::typeof(id…
+  1412         0 @Base/boot.jl           489 eval(m::Module, e::Any)
+  1412         0 …nstruction_profile.jl   23 top-level scope
+  1412         0 @Profile/src/Profile.jl   60 macro expansion
+  1412         0 …nstruction_profile.jl   23 macro expansion
+  1412         0 …al_basis_benchmark.jl   20 quiet(f::var"#39#40"{Symbol})
+  1412         0 @Base/stream.jl        1464 (::Base.RedirectStdStream)(thunk:…
+  1412         0 …al_basis_benchmark.jl   21 #quiet##0
+  1412         0 @Base/logging/logging.jl  653 with_logger
+  1412         0 @Base/logging/logging.jl  542 with_logstate(f::var"#quiet##2#qu…
+  1412         0 …al_basis_benchmark.jl   22 #quiet##2
+  5715         0 @CUDA/…rv/synchronization.jl   53 take!(f::CUDA.var"#synchronizatio…
+  5792         0 @Base/condition.jl      136 wait
+  5792         0 @Base/condition.jl      141 wait(c::Base.GenericCondition{Ree…
+  5794         0 @Base/task.jl           868 task_done_hook(t::Task)
+  5794         0 @CUDA/…rv/synchronization.jl  119 synchronization_worker(data::Ptr{…
+ 11586         0 @Base/task.jl          1228 wait()
+ 11586     11585 @Base/task.jl          1216 poptask(W::Base.IntrusiveLinkedLi…
+Total snapshots: 17382. Utilization: 33% across all threads and tasks. Use the `groupby` kwarg to break down by thread and/or task.

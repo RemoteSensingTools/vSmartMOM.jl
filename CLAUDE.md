@@ -24,16 +24,18 @@ vSmartMOM.jl is a Julia package for vectorized atmospheric radiative transfer us
 
 ```bash
 # Run full test suite
-julia --project=test test/runtests.jl
+cd test && julia --project=. runtests.jl
 
 # Run a single test file
-julia --project=test -e 'using vSmartMOM; include("test/test_Scattering.jl")'
+cd test && julia --project=. -e 'using vSmartMOM; include("test_Scattering.jl")'
 
 # Run via Pkg
-julia --project=test -e 'using Pkg; Pkg.test()'
+cd test && julia --project=. -e 'using Pkg; Pkg.test()'
 ```
 
-No linter or formatter configured. Julia compatibility: 1.9-1.12.
+TOML lint/format checks use Taplo 0.10.0 via `tools/install_taplo.sh`.
+Run `taplo lint` and `taplo format --check` from the repository root.
+Julia compatibility: 1.10-1.13; no automatic Julia source formatter is required.
 
 ## Architecture
 
@@ -48,7 +50,9 @@ No linter or formatter configured. Julia compatibility: 1.9-1.12.
 7. **SolarModel** (`src/SolarModel/SolarModel.jl`) — Solar irradiance spectrum
 8. **IO** (`src/IO/IO.jl`) — YAML config parsing, NetCDF readers, GEOSChem integration
 
-GPU is a weak dependency via `ext/vSmartMOMCUDAExt.jl` (loads when CUDA.jl is present).
+CUDA support is implemented in `ext/vSmartMOMCUDAExt.jl`. CUDA is currently a
+direct package dependency; CPU execution does not require a working CUDA
+device. Metal is an optional weak dependency.
 
 ### Main Pipeline
 
@@ -56,12 +60,35 @@ GPU is a weak dependency via `ext/vSmartMOMCUDAExt.jl` (loads when CUDA.jl is pr
 YAML/TOML/Dict
     → read_parameters()        → vSmartMOM_Parameters   (unified entry point)
     → model_from_parameters()  → RTModel
-    → rt_run(model)            → (R, T) reflectance/transmittance
+    → rt_run(model)            → ObserverRTResult (named endpoint/level radiances)
+    → rt_run_toa(model)        → TOA upwelling only (opt-in external-solar SFI)
 ```
 
 `parameters_from_yaml(path)` is the YAML-specific alias and still works; use `read_parameters` for TOML or `Dict` inputs.
 
-Linearized variant: `model_from_parameters(LinMode(), params)` then `rt_run(model, lin_model, NAer, NGas, NSurf)` returns `(R, T, dR, dT)`.
+With the default `obs_alt: [0]`, `ObserverRTResult` iterates as the historical
+forward tuple, so `R, T = rt_run(model)` still binds TOA upwelling and BOA
+downwelling. Interior-height radiances are available through
+`result.levels`.
+
+`rt_run_toa` requires `model_from_parameters(...; external_solar=true)`;
+this constructor keyword is not a YAML setting. In this optional Gauss/SFI
+representation, scalar `μ₀` is excluded from the diffuse
+operator and evaluated through rectangular direct-beam phase/operator columns.
+The path supports elastic `noRS`, analytic elastic linearization, and forward
+rotational Raman `RRS` with Lambertian surfaces. It does not allocate or
+postprocess BOA, HDR, or BHR, and it does not support Raman linearization,
+VRS, `rt_run_ss`, non-Lambertian, or interior-sensor runs.
+The embedded-`μ₀` representation remains the default
+(`external_solar=false`); unsupported paths reject external-solar models rather
+than falling back silently.
+
+Linearized variant: `model_from_parameters(LinMode(), params)` then
+`rt_run(model, lin_model, NAer, NGas, NSurf)` returns an
+`ObserverRTResultLin`. It remains iterable as `(R, T, dR, dT)` and exposes
+strict-interior radiances/Jacobians through `result.levels`.
+For external-solar elastic Jacobians, use this same linearized `rt_run`
+entry point; it returns TOA fields and `nothing` for unavailable BOA fields.
 
 ### RTModel Hierarchy (Oceananigans-style)
 
@@ -71,8 +98,8 @@ Linearized variant: `model_from_parameters(LinMode(), params)` then `rt_run(mode
 RTModel{ARCH, FT} <: AbstractRTModel{ARCH, FT}
 ├── architecture :: ARCH                    # CPU() or GPU()
 ├── solver       :: SolverConfig{FT}        # polarization, quadrature, truncation, m_max_bands
-├── geometry     :: ObsGeometry{FT}         # sza, vza, vaz, obs_alt
-├── quad_points  :: QuadPoints{FT}          # μ₀, qp_μ, wt_μ, Nquad, Nstreams (v0.7)
+├── geometry     :: ObsGeometry{FT}         # angles + resolved observer interfaces
+├── quad_points  :: QuadPoints{FT}          # diffuse qp_μ/wt_μ + phase_qp_μ; optional external μ₀
 ├── atmosphere   :: Atmosphere{FT}          # profile + spec_bands
 ├── optics       :: Optics{FT}             # ALL optical properties
 │   ├── rayleigh :: RayleighScattering{FT}  # greek_rayleigh, greek_cabannes, ϖ_Cabannes
@@ -93,7 +120,12 @@ RTModel{ARCH, FT} <: AbstractRTModel{ARCH, FT}
 
 ### CoreRT Solver Flow (Adding-Doubling)
 
-For each Fourier moment m = 0..m_max_bands[iBand] (v0.7 — order-semantics; trait-derived per-component bound):
+For each Fourier moment m = 0..m_max_bands[iBand] (v0.7 — order-semantics;
+trait-derived per-component bound). Aerosol traits may use a two-stage bound:
+the maximum size parameter sets the allocated Mie-series ceiling, then
+`greek_beta_cutoff` selects the last `l` with `abs(β_l)` above threshold at any
+band wavelength. Only β is tested, and the maximum across aerosol species is
+combined with other component traits before stream/user caps are applied.
 1. **Elemental** — single-scattering layer → AddedLayer (r, t, j)
 2. **Doubling** — double thin layers ndoubl times to full optical depth
 3. **Interaction** — combine layers top-to-bottom: CompositeLayer (R, T, J) + AddedLayer
@@ -110,8 +142,12 @@ For each Fourier moment m = 0..m_max_bands[iBand] (v0.7 — order-semantics; tra
 | `Atmosphere` | `src/CoreRT/types.jl` | AtmosphericProfile + spec_bands |
 | `Optics` | `src/CoreRT/types.jl` | All optical properties (rayleigh, aerosol, abs, rayl) |
 | `AtmosphericProfile` | `src/CoreRT/types.jl` | T, p, q, VMR profiles |
-| `ObsGeometry` | `src/CoreRT/types.jl` | SZA, VZA, VAZ, observer altitude |
-| `QuadPoints` | `src/CoreRT/types.jl` | Quadrature points, weights, mu0 |
+| `ObsGeometry` | `src/CoreRT/types.jl` | SZA, VZA, VAZ, requested/resolved observer heights |
+| `ObserverRTResult` | `src/CoreRT/types.jl` | Named TOA, BOA, and interior-height forward outputs |
+| `LevelRadiance` | `src/CoreRT/types.jl` | Co-located up/down radiances at one interior interface |
+| `ObserverRTResultLin` | `src/CoreRT/types_lin.jl` | Named endpoint and interior-height linearized outputs |
+| `LevelRadianceLin` | `src/CoreRT/types_lin.jl` | Co-located radiances and analytic Jacobians at one interior interface |
+| `QuadPoints` | `src/CoreRT/types.jl` | Diffuse quadrature, phase-evaluation grid, scalar μ₀, and external-solar flag |
 | `CompositeLayer` | `src/CoreRT/types.jl` | Accumulated R, T, J matrices (uppercase) |
 | `AddedLayer` | `src/CoreRT/types.jl` | Single-layer r, t, j matrices (lowercase) |
 | `Aerosol` | `src/Scattering/types.jl` | Size distribution + refractive index (nr, ni) |
@@ -138,6 +174,9 @@ All surfaces implement `create_surface_layer!()`. Linearized variants have `_lin
 ### Polarization Types (`src/Scattering/types.jl`)
 
 - `Stokes_I` — scalar intensity only (n=1)
+- `Stokes_IQ` — intensity and Q (n=2); rejected by CoreRT model builds
+  (use `Stokes_IQU`), still used by StandaloneSS `ExactSSConfig` and
+  Scattering functions
 - `Stokes_IQU` — linear polarization (n=3)
 - `Stokes_IQUV` — full Stokes polarization (n=4)
 
@@ -148,9 +187,16 @@ All surfaces implement `create_surface_layer!()`. Linearized variants have `_lin
 - **Unicode variables**: `τ` (optical depth), `ϖ` (SSA), `μ` (cosine zenith) used directly
 - **Sign convention**: `+` = incoming/downward, `-` = outgoing/upward
 - **Layer naming**: CompositeLayer uses uppercase (R, T, J), AddedLayer uses lowercase (r, t, j)
-- **3D matrices**: RT matrices are `(NquadN, NquadN, nSpec)` where `NquadN = Nquad * n_stokes`
+- **3D matrices**: diffuse RT matrices are `(NquadN, NquadN, nSpec)` where
+  `NquadN = Nquad * n_stokes`. External-solar phase matrices may carry one
+  additional exact μ₀ row/column, while the diffuse operators remain square
+  on `qp_μ`.
+- **External solar is not a stream**: with `external_solar=true`, scalar μ₀ and
+  rectangular `Z₀ → R₀/T₀` operators provide direct-beam coupling; legacy indices
+  `iμ₀`/`iμ₀Nstart` are zero sentinels. Five weighted streams plus one
+  distinct VZA in IQU gives an 18×18 diffuse operator.
 - **Spectral units**: wavenumber in cm⁻¹ internally; wavelength in micrometers for Mie
-- **Pressure**: hPa in YAML configs; Pa for obs_alt
+- **Vertical units**: profile pressure is hPa; `obs_alt` is geometric km above BOA
 - **Profile direction**: TOA to BOA (top of atmosphere to bottom)
 
 ## File Structure
@@ -163,7 +209,7 @@ src/
     hitran_preferences.jl     # Edition selection (set/get_hitran_edition!, available_hitran_editions)
     hitran_api.jl             # Download client (fetch_hitran, fetch_hitran_by_ids)
     artifact_helper.jl        # Unified artifact() dispatch (legacy Artifacts vs scratch cache)
-    download_hitran.jl        # Offline artifact generation script (developer-only)
+    download_hitran_artifacts.jl  # Offline artifact generation script (developer-only)
   Absorption/
     Absorption.jl             # Module entry
     types.jl                  # HitranTable, broadening types, CEF types
@@ -202,11 +248,12 @@ src/
     Sources.jl                # GeosChemSource, NetCDFGridSource
     NetCDF/                   # GEOSChem NetCDF reader
 ext/
-  vSmartMOMCUDAExt.jl         # CUDA weak dependency extension
+  vSmartMOMCUDAExt.jl         # CUDA extension (CUDA is a direct dependency)
 config/                       # Example YAML configurations
 test/
-  runtests.jl                 # Test orchestrator (11 test sets)
-  test_helpers.jl             # run_lin_rt, rel_errors, fd_jacobian_R
+  runtests.jl                 # Test orchestrator
+  test_helpers.jl             # VSmartMOMTestSupport: run_linearized_rt, forward_R, rel_errors
+  README.md                   # test-file inventory (active/optional/benchmark/support/historical)
   test_parameters/            # Test YAML configs
 ```
 
@@ -215,7 +262,10 @@ test/
 ### Adding a New Surface Model
 
 1. Define struct subtyping `AbstractSurfaceType` in `src/CoreRT/types.jl`
-2. Create `src/CoreRT/Surfaces/mysurf_surface.jl` implementing `create_surface_layer!()`
+2. Create `src/CoreRT/Surfaces/mysurf_surface.jl`. Scalar analytic BRDFs implement
+   `reflectance(surface, stokes_index, μᵢ, μᵣ, Δϕ)` and inherit Fourier integration
+   and `create_surface_layer!` from `analytic_surface.jl`. Specialize the layer
+   builder only when the model needs a different operator construction.
 3. Include the file in `src/CoreRT/CoreRT.jl`
 4. Add type name to `BRDF_MAP` in `src/IO/Parameters.jl`
 5. Export the type from `CoreRT.jl`
@@ -227,7 +277,8 @@ test/
 1. Create `test/test_myfeature.jl` with `@testset` blocks
 2. Add `@testset` entry in `test/runtests.jl`
 3. Test YAML files go in `test/test_parameters/`
-4. Use helpers from `test/test_helpers.jl` (e.g., `run_lin_rt`, `rel_errors`, `fd_jacobian_R`)
+4. Use the `VSmartMOMTestSupport` helpers from `test/test_helpers.jl` (`run_linearized_rt`, `linearized_R`, `run_forward_rt`, `forward_R`, `rel_errors`); see its header for the include guard
+5. Add the file to the inventory in `test/README.md`
 
 ### Running Forward RT
 
@@ -244,7 +295,7 @@ R, T   = rt_run(model)
 using vSmartMOM
 params = read_parameters("config/ocean_coxmunk.yaml")
 model, lin_model = model_from_parameters(LinMode(), params)
-NAer = length(params.scattering_params.rt_aerosols)
+NAer = params.scattering_params === nothing ? 0 : length(params.scattering_params.rt_aerosols)
 NGas = size(lin_model.τ̇_abs[1], 1)
 NSurf = 1
 R, T, dR, dT = rt_run(model, lin_model, NAer, NGas, NSurf)
@@ -261,8 +312,8 @@ reference and examples.
 `max_m` / `l_trunc`. Public contract: `stream_l_cap = 2·nstreams - 1`
 regardless of `quadrature_type`. `nstreams ≥ 3` (Rayleigh m=2
 minimum). `truncation: auto` is the recommended default — resolves
-to `NoTruncation()` if the phase function fits, `δBGE(N, Δ_angle)`
-otherwise. Legacy YAMLs with `max_m`/`l_trunc` keep working unchanged.
+to `NoTruncation()` if the phase function fits, `δBGE(stream_l_cap)`
+otherwise (`Δ_angle` is retired: nonzero values warn and are stored as 0). Legacy YAMLs with `max_m`/`l_trunc` keep working unchanged.
 
 **Editor support**: TOML configs get autocomplete + validation via
 the repo's `.taplo.toml` (wires `schemas/vsmartmom-parameters.schema.json`).

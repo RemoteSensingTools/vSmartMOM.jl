@@ -21,7 +21,7 @@ const CORE_RT_BENCHMARK_DIR = joinpath(@__DIR__, "benchmarks")
                 parameters.vaz = repeat([azs[az_i]], 16)
                 parameters.sza = szas[sza_i]
                 parameters.brdf = [vSmartMOM.CoreRT.LambertianSurfaceScalar(ρ)]
-                model = model_from_parameters(parameters);
+                model = model_from_parameters(parameters; external_solar=false);
                 model.τ_rayl[1] .= τ
                 # rt_run returns radiance factor L = I/F₀; 6SV1 reference is reflectance R = πL/μ₀.
                 R_modeled[sza_i, az_i, :] = π * vSmartMOM.CoreRT.rt_run(model, i_band=1)[1][:,1,1] / model.quad_points.μ₀
@@ -58,13 +58,15 @@ end
     parameters.sza = acosd(0.2)
 
     # Direct rt_run (the reference output)
-    model_a = model_from_parameters(parameters)
+    # Stream export and full-column rt_run intentionally use the embedded
+    # solar representation; the external-solar path is TOA-only.
+    model_a = model_from_parameters(parameters; external_solar=false)
     model_a.τ_rayl[1] .= 0.5
     R_direct, _T_direct = vSmartMOM.CoreRT.rt_run(model_a)
 
     # Streams output (separate model — both build from the same
     # `parameters` so optical depth + Fourier-loop bounds match)
-    model_b = model_from_parameters(parameters)
+    model_b = model_from_parameters(parameters; external_solar=false)
     model_b.τ_rayl[1] .= 0.5
     streams = vSmartMOM.CoreRT.rt_run_streams(model_b)
 
@@ -129,7 +131,7 @@ end
 
     for ϕ_i in 1:length(ϕs)
         parameters.vaz = repeat([ϕs[ϕ_i]], 16)
-        model = model_from_parameters(parameters);
+        model = model_from_parameters(parameters; external_solar=false);
         model.τ_rayl[1] .= τ
 
         # rt_run returns radiance factor L = I/F₀; Natraj table is reflectance R = πL.
@@ -150,8 +152,15 @@ end
     # |modeled| ≥ 0.01), and 0.01% (U, |modeled| ≥ 0.01) — see
     # docs/src/pages/benchmarks.md. Limits sit ~2× over measured for the
     # noisy-Q rows and ~5× over the very stable I/U rows.
+    # Modeled values must be finite before any masked/filtered maximum is
+    # trusted; the U filter below may only drop NaNs from 0/0 in the table.
+    @test all(isfinite, I_modeled_all)
+    @test all(isfinite, Q_modeled_all)
+    @test all(isfinite, U_modeled_all)
+    U_compared = filter(!isnan, U_deltas_all[findall(i -> i >= 0.01, U_modeled_all)])
+    @test !isempty(U_compared)
     @test maximum(I_deltas_all) < 5e-4
     @test maximum(Q_deltas_all[findall(i -> i >= 0.01, Q_modeled_all)]) < 2.5e-3
-    @test maximum(filter(!isnan, U_deltas_all[findall(i -> i >= 0.01, U_modeled_all)])) < 5e-4
+    @test maximum(U_compared) < 5e-4
 
 end

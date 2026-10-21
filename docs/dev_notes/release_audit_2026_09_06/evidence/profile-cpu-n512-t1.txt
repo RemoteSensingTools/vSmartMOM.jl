@@ -1,0 +1,950 @@
+ Count  Overhead File                    Line Function
+ =====  ======== ====                    ==== ========
+     5         0 @LinearAlgebra/src/dense.jl 1083 inv(A::SubArray{Float64, 2, Array…
+     5         0 @vSmartMOM/…el/interaction_lin.jl  320 interaction_helper!(::vSmartMOM.C…
+     5         0 @juliasrc/task.c        474 ctx_switch
+     5         0 @LinearAlgebra/src/lapack.jl 1079 getri!(A::Matrix{Float64}, ipiv::…
+     5         5 @juliasrc/gc-stock.h    280 gc_alloc_map_is_set
+     5         5 @juliasrc/gc-common.c   582 jl_genericmemory_nbytes
+     5         5 @juliasrc/gc-stock.c   1807 gc_mark_objarray
+     5         5 @juliasrc/gc-stock.c   2266 gc_mark_outrefs
+     5         0 @Base/int.jl           1015 -
+     5         0 @vSmartMOM/…ayerProperties_lin.jl  788 expandOpticalProperties(in::vSmar…
+     5         0 @vSmartMOM/…ernel/doubling_lin.jl  289 doubling_allparams_helper!(pol_ty…
+     5         5 @juliasrc/jl_uv.c       389 ijl_process_events
+     5         5 @Base/range.jl            ? macro expansion
+     5         0 @juliasrc/safepoint.c   214 jl_safepoint_start_gc
+     5         0 @Base/special/exp.jl    216 exp_impl
+     5         0 @juliasrc/julia.h      1708 jl_is_kind
+     5         5 @juliasrc/iddict.c      156 ijl_eqtable_get
+     5         5 …t-12/cli/loader_exe.c   15 jl_get_pgcstack_static
+     5         0 @Base/abstractarray.jl 1440 setindex!(::Array{Float64, 4}, ::…
+     5         0 @juliasrc/jltypes.c    2138 inst_datatype_inner
+     5         0 @vSmartMOM/…ernel/doubling_lin.jl  270 doubling_allparams_helper!(pol_ty…
+     5         5 @juliasrc/support/hashing.c   36 int64hash
+     5         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl  485 rt_run(RS_type::vSmartMOM.Inelast…
+     5         0 @Base/tuple.jl           33 getindex
+     5         0 @Base/reinterpretarray.jl  196 stride
+     5         5 @juliasrc/staticdata.c 2341 gc_sweep_sysimg
+     5         0 @vSmartMOM/…el/interaction_lin.jl  279 interaction_helper!(::vSmartMOM.C…
+     5         0 @Base/array.jl          795 collect(itr::Base.Generator{Base.…
+     5         0 @juliasrc/datatype.c   1895 set_nth_field
+     5         0 @vSmartMOM/…el/interaction_lin.jl  270 interaction_helper!(::vSmartMOM.C…
+     5         0 @vSmartMOM/…rnel/elemental_lin.jl  691 macro expansion
+     5         2 @juliasrc/typemap.c     257 sig_match_simple
+     5         0 @LinearAlgebra/src/matmul.jl 1260 *(α::Float64, B::Matrix{Float64},…
+     5         0 @LinearAlgebra/src/matmul.jl 1288 mat_vec_scalar
+     5         0 @LinearAlgebra/src/matmul.jl 1294 _mat_vec_scalar
+     5         0 @LinearAlgebra/src/matmul.jl   71 mul!
+     5         0 @LinearAlgebra/src/matmul.jl   74 _mul!
+     5         0 @LinearAlgebra/src/matmul.jl   79 generic_matvecmul!
+     5         0 @LinearAlgebra/src/matmul.jl  636 gemv!
+     5         0 @LinearAlgebra/src/blas.jl  668 gemv!(trans::Char, alpha::Float64…
+     5         0 @Base/indices.jl        217 setindex_shape_check(::Array{Floa…
+     5         3 @juliasrc/jltypes.c    1828 typekeyvalue_hash
+     5         0 @juliasrc/gc-stock.c   3487 ijl_gc_collect
+     5         0 @juliasrc/datatype.c   1907 set_nth_field
+     5         5 @juliasrc/julia_internal.h  379 memassign_safe
+     5         0 @ProgressMeter/src/ProgressMeter.jl  470 lock_if_threading
+     5         0 @ProgressMeter/src/ProgressMeter.jl  211 updateProgress!
+     5         0 @ProgressMeter/src/ProgressMeter.jl  213 #updateProgress!#9
+     5         0 @ProgressMeter/src/ProgressMeter.jl  217 _updateProgress!
+     5         5 @juliasrc/gc-stock.c    736 jl_gc_small_alloc_inner
+     5         5 @juliasrc/gc-stock.c   1263 gc_sweep_pool_parallel
+     5         0 @juliasrc/gc-stock.c   1311 gc_free_pages
+     5         0 @juliasrc/subtype.c    1482 subtype
+     5         0 @juliasrc/subtype.c     850 subtype_var
+     5         0 @juliasrc/iddict.c      118 jl_table_peek_bp
+     5         0 @Base/threadingconstructs.jl  176 threading_run(fun::vSmartMOM.Core…
+     5         1 @juliasrc/builtins.c    736 jl_f__apply_iterate
+     5         2 @juliasrc/jltypes.c    1016 typekeyvalue_eq
+     6         0 @Base/boot.jl           578 _Task
+     6         6 @juliasrc/jltypes.c    1134 lookup_typevalue
+     6         0 @Base/task.jl           852 task_done_hook(t::Task)
+     6         0 @Base/condition.jl      159 notify
+     6         0 @Base/condition.jl      159 #notify#399
+     6         0 @Base/condition.jl      165 notify(c::Base.GenericCondition{B…
+     6         0 @Base/task.jl          1056 schedule
+     6         0 @Base/task.jl          1069 schedule(t::Task, arg::Any; error…
+     6         6 @juliasrc/typemap.c    1130 jl_typemap_entry_assoc_exact
+     6         6 @julialib/…lia/libopenblas64_.so    ? dgemv_kernel_4x4
+     6         6 @juliasrc/gc-stock.c   2363 gc_mark_outrefs
+     6         6 @juliasrc/gc-stock.c   2364 gc_mark_outrefs
+     6         6 @juliasrc/gc-stock.c   1816 gc_mark_objarray
+     6         0 @Base/threadingconstructs.jl  195 threading_run(fun::vSmartMOM.Core…
+     6         6 @Base/bool.jl            40 &
+     6         0 @juliasrc/task.c        449 ctx_switch
+     6         6 @juliasrc/datatype.c   1898 set_nth_field
+     6         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl  375 macro expansion
+     6         0 @LinearAlgebra/src/lapack.jl  107 chkfinite
+     6         0 @LinearAlgebra/src/dense.jl 1086 inv(A::SubArray{Float64, 2, Array…
+     6         0 @LinearAlgebra/src/generic.jl 1452 istril
+     6         0 @juliasrc/gc-stock.c    882 gc_sweep_page
+     6         6 @juliasrc/gc-page-profiler.h   41 gc_page_profile_write_empty_page
+     6         1 @Base/abstractarray.jl 1070 copyto!(dest::SubArray{Float64, 4…
+     6         0 @juliasrc/safepoint.c    50 jl_safepoint_enable
+     6         0 @juliasrc/safepoint.c    67 jl_safepoint_enable
+     6         6 @juliasrc/gc-stock.c    779 ijl_gc_small_alloc
+     6         6 @juliasrc/gc-page-profiler.c  145 gc_page_profile_write_to_file
+     6         6 @juliasrc/julia.h      1711 jl_is_kind
+     6         0 @juliasrc/gc-stock.c   1371 gc_sweep_pool
+     6         6 @juliasrc/gc-stock.c   1144 gc_pool_sync_nfree
+     6         0 @vSmartMOM/…rnel/elemental_lin.jl  670 macro expansion
+     6         0 @Base/subarray.jl       476 compute_offset1
+     6         0 @Base/subarray.jl       482 compute_offset1
+     6         0 @Base/subarray.jl       486 compute_linindex
+     6         0 @Base/subarray.jl       491 compute_linindex
+     6         6 @juliasrc/builtins.c     90 compare_svec
+     6         0 @juliasrc/jltypes.c    1409 inst_datatype_env
+     6         0 @juliasrc/jltypes.c    1405 inst_datatype_env
+     6         2 @juliasrc/typemap.c     212 sig_match_simple
+     6         5 /lib64/libc.so.6          ? _longjmp
+     6         4 @Base/array.jl         1002 _setindex!
+     6         6 @juliasrc/gc-stock.c    526 sweep_list_of_oldest_bigvals
+     6         0 @vSmartMOM/…rnel/elemental_lin.jl  132 elemental!(pol_type::vSmartMOM.Sc…
+     6         6 @juliasrc/julia.h      1710 jl_is_kind
+     6         6 @juliasrc/julia.h      1309 jl_svecref
+     6         0 @juliasrc/typemap.c     250 sig_match_simple
+     6         0 @juliasrc/subtype.c    4568 jl_type_intersection_env_s
+     6         0 @juliasrc/subtype.c     545 obviously_disjoint
+     6         6 @juliasrc/gc-page-profiler.c  111 gc_page_profile_write_to_file
+     6         0 @juliasrc/subtype.c    1307 subtype_tuple_tail
+     6         0 @juliasrc/subtype.c    1059 check_vararg_length
+     6         0 @Base/multidimensional.jl  450 __inc
+     6         6 @juliasrc/julia.h      1916 jl_is_concrete_type
+     6         0 @vSmartMOM/…el/interaction_lin.jl  244 interaction_helper!(::vSmartMOM.C…
+     6         0 @vSmartMOM/…el/interaction_lin.jl  277 interaction_helper!(::vSmartMOM.C…
+     7         7 @juliasrc/threading.c   893 ijl_enter_threaded_region
+     7         0 @vSmartMOM/…el/interaction_lin.jl  237 interaction_helper!(::vSmartMOM.C…
+     7         7 @juliasrc/gc-stock.c   2516 gc_mark_loop_serial_
+     7         0 @juliasrc/gc-stock.c   1809 gc_mark_objarray
+     7         0 @juliasrc/builtins.c   2092 jl_f__compute_sparams
+     7         0 @vSmartMOM/…el/interaction_lin.jl  239 interaction_helper!(::vSmartMOM.C…
+     7         0 @Base/math.jl            56 two_mul
+     7         0 @LinearAlgebra/src/lapack.jl  582 getrf!(A::Matrix{Float64}, ipiv::…
+     7         0 @juliasrc/subtype.c    2425 jl_tuple1_isa
+     7         0 @Base/abstractarray.jl 1530 unalias
+     7         0 @Base/abstractarray.jl 1567 mightalias
+     7         7 @vSmartMOM/…rnel/elemental_lin.jl  602 macro expansion
+     7         7 @juliasrc/threading.c   262 ijl_get_pgcstack
+     7         7 @juliasrc/gf.c         4127 jl_lookup_generic_
+     7         0 @LinearAlgebra/src/generic.jl 1546 _isbanded_impl(A::SubArray{Float6…
+     7         0 @LinearAlgebra/src/generic.jl 1385 _iszero
+     7         0 @Base/reducedim.jl      326 mapreduce
+     7         0 @Base/reducedim.jl      326 #mapreduce#728
+     7         0 @Base/reducedim.jl      331 _mapreduce_dim
+     7         0 @Base/reduce.jl          36 mapfoldl_impl
+     7         0 @Base/reduce.jl          40 foldl_impl
+     7         0 @juliasrc/julia.h      1877 jl_egal__unboxed_
+     7         0 @juliasrc/jltypes.c    1425 ijl_apply_type
+     7         0 @juliasrc/jltypes.c    1409 inst_datatype_env
+     7         7 @julialib/…lia/libopenblas64_.so    ? dgetrf_single
+     7         0 @Base/special/exp.jl    215 exp_impl
+     7         0 @Base/array.jl          826 collect_to_with_first!
+     7         0 @Base/array.jl          848 collect_to!
+     7         0 none                      ? (::vSmartMOM.CoreRT.var"#_interpo…
+     7         0 @vSmartMOM/…el_from_parameters.jl 1062 #_interpolate_phase_nodes##0
+     7         7 @juliasrc/gc-stock.c   1798 gc_mark_objarray
+     7         0 @juliasrc/gc-stock.c   2460 gc_mark_outrefs
+     7         7 @juliasrc/julia.h      1565 jl_dt_layout_ptrs
+     7         7 @juliasrc/gc-stock.c    315 gc_setmark
+     7         7 @juliasrc/jltypes.c    1819 typekeyvalue_hash
+     7         0 @Base/abstractarray.jl  681 checkbounds
+     7         0 @Base/abstractarray.jl  754 checkindex
+     7         0 @vSmartMOM/…rnel/elemental_lin.jl  210 elemental!(pol_type::vSmartMOM.Sc…
+     7         0 @vSmartMOM/…reKernel/elemental.jl  514 apply_D_matrix_elemental!(ndoubl:…
+     7         0 none                      ? cpu_apply_D_elemental!(__ctx__::K…
+     7         7 @juliasrc/support/hashing.c   33 int64hash
+     7         7 /lib64/libc.so.6          ? __memset_avx2_unaligned
+     7         0 @Base/subarray.jl       214 view(::Array{Float64, 4}, ::Funct…
+     7         7 @juliasrc/julia_internal.h 1155 jl_vararg_kind
+     7         7 @Base/task.jl          1161 try_yieldto(undo::typeof(Base.ens…
+     7         7 @juliasrc/gc-stock.c   1805 gc_mark_objarray
+     7         7 @Base/essentials.jl     733 reinterpret
+     7         7 @juliasrc/gc-stock.c    916 gc_sweep_page
+     8         7 @juliasrc/julia.h      1594 jl_field_isptr
+     8         8 @juliasrc/gc-stock.c    929 gc_sweep_page
+     8         0 @vSmartMOM/…rnel/elemental_lin.jl  682 macro expansion
+     8         0 @vSmartMOM/…rnel/elemental_lin.jl  536 macro expansion
+     8         1 @Base/abstractarray.jl 3047 _sub2ind(::Array{Float64, 5}, ::I…
+     8         0 @juliasrc/gc-stock.c   3433 ijl_gc_collect
+     8         8 @juliasrc/gc-stock.c   1176 gc_sweep_prescan
+     8         0 @juliasrc/gc-stock.c   1453 gc_sweep_pool
+     8         0 @vSmartMOM/…ernel/doubling_lin.jl  295 doubling_allparams_helper!(pol_ty…
+     8         8 @Base/abstractarray.jl    ? getindex
+     8         0 @vSmartMOM/…rnel/rt_kernel_lin.jl  156 rt_kernel!(RS_type::vSmartMOM.Ine…
+     8         0 @vSmartMOM/…el_from_parameters.jl 1060 _interpolate_phase_nodes(ν_spec::…
+     8         8 @LinearAlgebra/src/matmul.jl  489 matmul2x2or3x3_nonzeroalpha!(C::S…
+     8         8 @juliasrc/subtype.c    2252 ijl_subtype_env
+     8         8 @juliasrc/gc-stock.c   1794 gc_mark_objarray
+     8         0 @Base/promotion.jl      648 max
+     8         0 @juliasrc/typemap.c     277 is_cache_leaf
+     8         0 @vSmartMOM/…el/interaction_lin.jl  276 interaction_helper!(::vSmartMOM.C…
+     8         4 @juliasrc/jltypes.c    1822 typekeyvalue_hash
+     8         0 @vSmartMOM/…el/interaction_lin.jl  234 interaction_helper!(::vSmartMOM.C…
+     8         0 @Base/multidimensional.jl 1017 macro expansion
+     8         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl  279 rt_run(RS_type::vSmartMOM.Inelast…
+     8         0 @juliasrc/subtype.c    1295 subtype_tuple_tail
+     8         0 @Base/math.jl           218 exthorner
+     8         0 @juliasrc/gc-stock.h    345 page_metadata
+     8         8 @juliasrc/gc-stock.h    337 page_metadata_unsafe
+     9         2 @Base/threadingconstructs.jl  172 threading_run(fun::vSmartMOM.Core…
+     9         1 @juliasrc/datatype.c   1842 ijl_get_nth_field
+     9         0 @Base/task.jl           998 enq_work(t::Task)
+     9         9 @juliasrc/gc-stock.c    980 gc_sweep_pool_page
+     9         9 /lib64/libc.so.6          ? __sigsetjmp
+     9         0 @Base/special/exp.jl    422 expm1_small
+     9         0 @vSmartMOM/…rnel/elemental_lin.jl  140 elemental!(pol_type::vSmartMOM.Sc…
+     9         9 @julialib/…lia/libopenblas64_.so    ? dgemv_kernel_4x1
+     9         5 @Base/boot.jl           648 Array
+     9         1 @juliasrc/gc-stock.c   2379 gc_mark_outrefs
+     9         9 @juliasrc/gc-stock.c   2461 gc_mark_outrefs
+     9         9 @juliasrc/gc-stock.c   1786 gc_mark_objarray
+     9         9 @juliasrc/gc-stock.c   1850 gc_mark_objarray
+     9         9 @juliasrc/work-stealing-queue.h   67 ws_queue_push
+     9         9 @juliasrc/staticdata.c 2337 gc_sweep_sysimg
+     9         0 @Base/div.jl            371 div
+     9         0 @vSmartMOM/…rnel/elemental_lin.jl  137 elemental!(pol_type::vSmartMOM.Sc…
+     9         0 @vSmartMOM/…rnel/elemental_lin.jl  514 macro expansion
+     9         9 @juliasrc/support/hashing.c   38 int64hash
+     9         0 @juliasrc/datatype.c   1844 ijl_get_nth_field
+     9         9 @juliasrc/julia_internal.h  644 undefref_check
+     9         0 @Base/task.jl          1214 poptask(W::Base.IntrusiveLinkedLi…
+     9         9 /lib64/libc.so.6          ? __memcmp_avx2_movbe
+     9         0 @juliasrc/julia.h      1887 jl_egal_
+     9         0 @juliasrc/datatype.c   1811 ijl_get_nth_field
+     9         0 @juliasrc/gc-stock.c   2491 gc_mark_outrefs
+     9         0 @juliasrc/gc-stock.c   1781 gc_mark_obj32
+     9         0 @juliasrc/gc-stock.c   1838 gc_mark_objarray
+     9         9 @juliasrc/gc-stock.c   1813 gc_mark_objarray
+     9         9 @juliasrc/gc-stock.c   1711 gc_mark_obj8
+     9         9 @juliasrc/gc-stock.c    912 gc_sweep_page
+     9         0 @juliasrc/gc-stock.c    547 sweep_big
+     9         9 @juliasrc/gc-stock.c   1422 gc_sweep_pool
+     9         0 @vSmartMOM/…ayerProperties_lin.jl  527 constructCoreOpticalProperties(RS…
+     9         0 @vSmartMOM/…ayerProperties_lin.jl  525 (::vSmartMOM.CoreRT.var"#zdot#con…
+     9         0 @vSmartMOM/…el/interaction_lin.jl  313 interaction_helper!(::vSmartMOM.C…
+     9         0 @vSmartMOM/…rnel/elemental_lin.jl  745 macro expansion
+     9         0 @Base/multidimensional.jl 1707 macro expansion
+    10         0 @Base/threadingconstructs.jl  178 threading_run(fun::vSmartMOM.Core…
+    10         0 @Base/task.jl             5 Task
+    10        10 @juliasrc/typemap.c    1129 jl_typemap_entry_assoc_exact
+    10        10 @juliasrc/work-stealing-queue.h   58 ws_queue_push
+    10        10 @juliasrc/gc-stock.c   1699 gc_mark_obj8
+    10         0 @Base/div.jl            336 fld
+    10        10 @Base/int.jl             86 -
+    10         5 @juliasrc/datatype.c   1814 ijl_get_nth_field
+    10        10 /lib64/libc.so.6          ? mprotect
+    10         0 @Base/special/exp.jl    230 exp_impl
+    10         0 @LinearAlgebra/src/dense.jl 1084 inv(A::SubArray{Float64, 2, Array…
+    10         0 @LinearAlgebra/src/generic.jl 1418 istriu
+    10        10 @Base/simdloop.jl         ? copyto!
+    10        10 @Base/essentials.jl     799 ifelse
+    10         0 @Base/essentials.jl     504 argtail(::Int64, ::Int64, ::Varar…
+    10         2 @juliasrc/typemap.c    1191 jl_typemap_level_assoc_exact
+    10         1 @juliasrc/julia.h      1773 jl_is_genericmemory
+    10        10 @juliasrc/gc-stock.c    853 gc_sweep_page
+    11         0 @juliasrc/subtype.c    2132 obvious_subtype
+    11         0 @juliasrc/subtype.c    1936 obvious_subtype
+    11         0 @NNlib/src/gemm.jl      157 batched_gemm!
+    11         0 @Base/abstractarray.jl 1473 _setindex!
+    11         0 @Base/subarray.jl       386 setindex!
+    11         0 @vSmartMOM/…el/interaction_lin.jl  278 interaction_helper!(::vSmartMOM.C…
+    11         0 @Base/math.jl           225 _exthorner
+    11         0 @vSmartMOM/…rnel/elemental_lin.jl  596 macro expansion
+    11         0 @Base/subarray.jl       214 view
+    11         0 @vSmartMOM/…ernel/doubling_lin.jl  325 doubling_allparams_helper!(pol_ty…
+    11        11 @juliasrc/gc-stock.c   1419 gc_sweep_pool
+    11         0 @vSmartMOM/…rnel/elemental_lin.jl  540 macro expansion
+    11         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl  283 rt_run(RS_type::vSmartMOM.Inelast…
+    11         0 @vSmartMOM/…lper_functions_lin.jl  100 make_composite_layer(lin::LinMode…
+    12        12 @Base/boot.jl             ? RefValue
+    12         0 @vSmartMOM/…rnel/elemental_lin.jl  139 elemental!(pol_type::vSmartMOM.Sc…
+    12        12 @Base/floatfuncs.jl     358 fma
+    12        12 @juliasrc/support/hashing.c   35 int64hash
+    12        12 @juliasrc/gc-stock.c    923 gc_sweep_page
+    12         0 @Base/math.jl           227 _exthorner
+    12        12 @juliasrc/task.c        311 jl_finish_task
+    12         0 @juliasrc/gc-stock.c   2866 gc_mark_roots
+    12         0 @vSmartMOM/…el/interaction_lin.jl  330 interaction_helper!(::vSmartMOM.C…
+    12        12 @Base/int.jl             88 *
+    12         0 @vSmartMOM/…ayerProperties_lin.jl   47 _compute_aerosol_phase_blocks_lin…
+    12         0 @Base/ntuple.jl          19 ntuple(f::vSmartMOM.CoreRT.var"#i…
+    12         0 @vSmartMOM/…ayerProperties_lin.jl   45 (::vSmartMOM.CoreRT.var"#interp#_…
+    12        12 @juliasrc/gc-stock.c   1585 gc_mark_push_remset
+    12        12 @juliasrc/work-stealing-queue.h   76 ws_queue_pop
+    12         0 @juliasrc/typemap.c    1194 jl_typemap_level_assoc_exact
+    12        12 @juliasrc/jltypes.c     997 typekeyvalue_eq
+    12         0 @Base/boot.jl           674 Array(A::Array{Float64, 4})
+    12        12 @juliasrc/gc-stock.c    851 gc_sweep_page
+    12         0 @Base/special/exp.jl    418 expm1_small
+    13        13 @juliasrc/julia.h      1884 jl_egal_
+    13        13 @LinearAlgebra/src/blas.jl 1636 gemm!(transA::Char, transB::Char,…
+    13         0 @juliasrc/gc-stock.c    992 gc_sweep_other
+    13        13 @juliasrc/gc-stock.c   2368 gc_mark_outrefs
+    13        13 @juliasrc/staticdata.c 2336 gc_sweep_sysimg
+    13         0 @vSmartMOM/…rnel/elemental_lin.jl  138 elemental!(pol_type::vSmartMOM.Sc…
+    13         0 @Base/task.jl          1228 wait()
+    13         0 @juliasrc/gc-stock.c   3069 _jl_gc_collect
+    13         0 @LinearAlgebra/src/blas.jl 1635 gemm!(transA::Char, transB::Char,…
+    13        13 /lib64/libc.so.6          ? __memcpy_avx_unaligned
+    13        12 @juliasrc/gf.c         4125 jl_lookup_generic_
+    13        13 @LinearAlgebra/src/generic.jl    ? _isbanded_impl(A::SubArray{Float6…
+    13         3 @Base/abstractarray.jl  697 checkbounds(::Array{Float64, 5}, …
+    13         0 @LinearAlgebra/src/dense.jl 1082 inv(A::SubArray{Float64, 2, Array…
+    13         0 @LinearAlgebra/src/generic.jl 1609 isdiag
+    13         0 @LinearAlgebra/src/generic.jl 1486 isbanded
+    13         2 @LinearAlgebra/src/generic.jl 1492 _isbanded
+    14         0 @vSmartMOM/…el/interaction_lin.jl  331 interaction_helper!(::vSmartMOM.C…
+    14         2 @Base/abstractarray.jl 1339 getindex(::Array{Float64, 4}, ::F…
+    14         0 @vSmartMOM/…el/interaction_lin.jl  236 interaction_helper!(::vSmartMOM.C…
+    14        14 @juliasrc/gf.c         4211 ijl_apply_generic
+    14         0 @vSmartMOM/…ernel/doubling_lin.jl  285 doubling_allparams_helper!(pol_ty…
+    14         0 @Base/subarray.jl       443 stride
+    14         0 @Base/subarray.jl       434 strides
+    14         0 @juliasrc/typemap.c    1195 jl_typemap_level_assoc_exact
+    14        10 @juliasrc/datatype.c   1871 set_nth_field
+    14        14 @juliasrc/gc-stock.c   2251 gc_mark_outrefs
+    14        14 @juliasrc/gc-stock.c    248 gc_try_setmark_tag
+    14        14 @julialib/…lia/libopenblas64_.so    ? idamax_k_ZEN
+    14        14 @Base/int.jl            519 <
+    14         0 @Base/subarray.jl        32 SubArray
+    14         0 @Base/abstractarray.jl  824 similar
+    14         3 @juliasrc/gc-stock.c    961 gc_sweep_page
+    14         0 @juliasrc/gc-stock.c    794 jl_gc_alloc_
+    14        14 @juliasrc/julia_internal.h  536 jl_gc_szclass
+    15         0 @vSmartMOM/…ernel/doubling_lin.jl  432 apply_D_matrix!(n_stokes::Int64, …
+    15         0 @Base/tuple.jl          544 ==
+    15        15 @Base/tuple.jl          549 _eq
+    15         0 @Base/abstractarray.jl 1371 _getindex
+    15        14 @julialib/…lia/libopenblas64_.so    ? dscal_k_ZEN
+    15         0 @vSmartMOM/…el/interaction_lin.jl  328 interaction_helper!(::vSmartMOM.C…
+    15        15 @juliasrc/gc-stock.c    250 gc_try_setmark_tag
+    15         2 @juliasrc/jltypes.c    1011 typekeyvalue_eq
+    15        15 @juliasrc/gc-stock.c    922 gc_sweep_page
+    15         0 @Base/int.jl            287 mod
+    15         0 @vSmartMOM/…rnel/elemental_lin.jl  575 macro expansion
+    15         0 @vSmartMOM/…eKernel/rt_helpers.jl   38 expdiff_neg
+    15        15 /lib64/libc.so.6          ? __libc_enable_asynccancel
+    15        15 @LinearAlgebra/src/matmul.jl  444 matmul_size_check
+    15         0 @Base/math.jl            94 evalpoly
+    15         0 @Base/math.jl            95 macro expansion
+    15        15 @julialib/…lia/libopenblas64_.so    ? dot_compute
+    15        15 @juliasrc/support/hashing.c   32 int64hash
+    15         0 @vSmartMOM/…rnel/elemental_lin.jl  584 macro expansion
+    15        15 @juliasrc/iddict.c      126 jl_table_peek_bp
+    15         0 @vSmartMOM/…el/interaction_lin.jl  235 interaction_helper!(::vSmartMOM.C…
+    16         0 @vSmartMOM/…el/interaction_lin.jl  329 interaction_helper!(::vSmartMOM.C…
+    16        16 @Base/anyall.jl         128 _any
+    16        16 @julialib/…lia/libopenblas64_.so    ? daxpy_k_ZEN
+    16        16 @juliasrc/gc-heap-snapshot.h   77 gc_heap_snapshot_record_array_edge
+    16        16 @juliasrc/gc-stock.c   1833 gc_mark_objarray
+    16         0 @Base/math.jl           217 exthorner
+    16        16 @julialib/…lia/libopenblas64_.so    ? dgemv_kernel_4x2
+    16         0 @vSmartMOM/…rnel/elemental_lin.jl  118 elemental!(pol_type::vSmartMOM.Sc…
+    17        17 @juliasrc/gf.c         3991 _jl_invoke
+    17         0 @juliasrc/gc-stock.c   1714 gc_mark_obj8
+    17        17 @juliasrc/gc-heap-snapshot.h   83 gc_heap_snapshot_record_object_ed…
+    17        17 @juliasrc/gc-stock.c   2238 gc_mark_outrefs
+    17         0 @Base/multidimensional.jl 1675 permutedims(B::Array{Float64, 4},…
+    17         0 @Base/multidimensional.jl 1689 permutedims!(P::Array{Float64, 4}…
+    17         0 @Base/multidimensional.jl 1703 macro expansion
+    17        17 @Base/float.jl          500 muladd
+    17         0 @LinearAlgebra/src/matmul.jl  792 gemm_wrapper!
+    17        17 @juliasrc/julia.h       983 jl_to_typeof
+    18         0 @Base/threadingconstructs.jl  189 threading_run(fun::vSmartMOM.Core…
+    18         0 @Base/task.jl          1012 schedule
+    18         0 @Base/subarray.jl       316 getindex
+    18        18 @juliasrc/gc-stock.c    294 gc_setmark_pool_
+    18        18 @juliasrc/julia.h      1852 jl_is_type_type
+    18         0 @vSmartMOM/…el/interaction_lin.jl  233 interaction_helper!(::vSmartMOM.C…
+    18         0 @vSmartMOM/…ernel/doubling_lin.jl  431 apply_D_matrix!(n_stokes::Int64, …
+    18         0 @Base/multidimensional.jl  923 uncolon
+    18         0 @Base/indices.jl        383 Slice
+    19         0 @LinearAlgebra/src/lu.jl  349 _lucopy
+    19         0 @LinearAlgebra/src/LinearAlgebra.jl  499 copy_similar
+    19        19 @LinearAlgebra/src/matmul.jl  508 generic_matmatmul_wrapper!(C::Sub…
+    19         0 @Base/reinterpretarray.jl  195 strides
+    19        19 @juliasrc/gc-stock.c    302 gc_setmark_pool_
+    19         0 @juliasrc/typemap.c    1148 jl_typemap_entry_assoc_exact
+    19         0 @juliasrc/subtype.c    1548 subtype
+    19         0 @juliasrc/subtype.c    1374 subtype_tuple
+    20         0 @juliasrc/datatype.c   1858 ijl_get_nth_field_checked
+    20         0 @Base/abstractarray.jl 1388 _getindex
+    20         0 @juliasrc/gc-stock.c   2531 gc_drain_own_chunkqueue
+    20        20 @juliasrc/gc-stock.c   2244 gc_mark_outrefs
+    20        20 @juliasrc/work-stealing-queue.h   69 ws_queue_push
+    20         0 @vSmartMOM/…el/interaction_lin.jl  321 interaction_helper!(::vSmartMOM.C…
+    20        20 @juliasrc/gc-stock.c    661 sweep_malloced_memory
+    20         3 @Base/abstractarray.jl 3078 _sub2ind_recurse(::NTuple{5, Base…
+    20         3 @vSmartMOM/…eKernel/rt_helpers.jl   36 expdiff_neg
+    21         0 @Base/reshapedarray.jl  363 unsafe_convert
+    21         0 @LinearAlgebra/src/matmul.jl  801 gemm_wrapper!
+    21         0 @Base/promotion.jl      410 promote
+    21         0 @Base/promotion.jl      388 _promote
+    21         0 @Base/number.jl           7 convert
+    21        21 @Base/float.jl          251 Float64
+    21         0 @juliasrc/gc-stock.c    776 ijl_gc_small_alloc
+    21        21 @juliasrc/work-stealing-queue.h   82 ws_queue_pop
+    21         0 @vSmartMOM/…lper_functions_lin.jl  385 compute_Z_moments(mod::vSmartMOM.…
+    21         1 @vSmartMOM/…ernel/doubling_lin.jl  324 doubling_allparams_helper!(pol_ty…
+    21         0 @juliasrc/jltypes.c    1832 typekeyvalue_hash
+    22        22 @Base/pointer.jl         63 cconvert
+    22         0 @vSmartMOM/…ernel/doubling_lin.jl  311 doubling_allparams_helper!(pol_ty…
+    22         0 @vSmartMOM/…ayerProperties_lin.jl  213 (::vSmartMOM.CoreRT.var"#lift_pha…
+    22         0 @vSmartMOM/…ertian_surface_lin.jl  125 create_surface_layer!(RS_type::vS…
+    23        23 @juliasrc/support/hashing.c   34 int64hash
+    23         0 @juliasrc/gf.c         4214 ijl_apply_generic
+    23         0 @Base/task.jl           868 task_done_hook(t::Task)
+    23        23 @juliasrc/gc-stock.c    917 gc_sweep_page
+    23        14 @julialib/…lia/libopenblas64_.so    ? ilaenv_64_
+    24         0 @Base/anyall.jl         130 _any(f::typeof(isnan), itr::Array…
+    24         9 @julialib/…lia/libopenblas64_.so    ? dtrmv_NUN
+    24        24 @juliasrc/gc-stock.c   2245 gc_mark_outrefs
+    24         0 @Base/special/exp.jl    421 expm1_small
+    24         0 @juliasrc/subtype.c     965 subtype_unionall
+    25         1 @juliasrc/iddict.c      128 jl_table_peek_bp
+    25         1 @juliasrc/subtype.c    1511 subtype
+    25         0 @Base/array.jl          591 zeros
+    26         0 @Base/views.jl          149 maybeview(::Array{Float64, 4}, ::…
+    26         0 @juliasrc/builtins.c    940 arg_tuple
+    26         0 @juliasrc/gf.c         1492 lookup_leafcache
+    27        27 @juliasrc/gc-stock.h    332 gc_page_data
+    27         0 /lib64/libc.so.6          ? systrim.isra.1.constprop.11
+    27         0 @Base/reducedim.jl      989 any(f::Function, a::Array{Float64…
+    27         0 @Base/reducedim.jl      989 any(f::Function, a::Array{Float64…
+    27         0 @vSmartMOM/…ernel/doubling_lin.jl  284 doubling_allparams_helper!(pol_ty…
+    27         0 @juliasrc/task.c        690 ijl_switch
+    27        27 @juliasrc/gc-stock.c    242 gc_try_setmark_tag
+    27         0 @vSmartMOM/…lper_functions_lin.jl  379 compute_Z_moments(mod::vSmartMOM.…
+    27         0 @juliasrc/gf.c         4143 jl_lookup_generic_
+    28         0 @vSmartMOM/…rnel/rt_kernel_lin.jl  120 rt_kernel!(RS_type::vSmartMOM.Ine…
+    28        28 @juliasrc/gc-stock.c    919 gc_sweep_page
+    28         0 @Base/array.jl          590 zeros
+    28         0 @Base/array.jl          592 zeros
+    29         0 @Base/subarray.jl       213 view
+    29        15 /lib64/libc.so.6          ? sysmalloc
+    29         0 @Base/boot.jl           647 Array
+    29         0 @juliasrc/gc-stock.c   2530 gc_drain_own_chunkqueue
+    29         0 @juliasrc/gc-stock.c   2016 gc_mark_chunk
+    29         6 @Base/array.jl          928 getindex
+    29         3 @Base/special/exp.jl    329 exp(x::Float64)
+    30        30 @Base/simdloop.jl         ? macro expansion
+    30         0 @Base/abstractarray.jl   98 axes
+    30         0 @vSmartMOM/…rnel/elemental_lin.jl  119 elemental!(pol_type::vSmartMOM.Sc…
+    30        30 @juliasrc/gc-stock.c   1418 gc_sweep_pool
+    31         4 @juliasrc/gc-stock.c    739 jl_gc_small_alloc_inner
+    31        23 @Base/array.jl          901 iterate
+    31        31 @LinearAlgebra/src/matmul.jl  498 generic_matmatmul_wrapper!(C::Sub…
+    31         0 @juliasrc/subtype.c    4580 jl_type_intersection_env_s
+    31         0 @Base/boot.jl           660 Array
+    31        31 @juliasrc/gc-stock.c   2242 gc_mark_outrefs
+    31         0 @juliasrc/subtype.c    2528 ijl_isa
+    31        31 @juliasrc/jltypes.c    1065 lookup_type_setvalue
+    32         0 @Base/anyall.jl         124 _any
+    32         3 @Base/subarray.jl       211 view(::Array{Float64, 4}, ::Funct…
+    32        10 @vSmartMOM/…rnel/elemental_lin.jl  531 macro expansion
+    32         0 @Base/abstractarray.jl 1090 copyto_unaliased!(deststyle::Inde…
+    32         0 @juliasrc/subtype.c    1820 forall_exists_subtype
+    32         0 @juliasrc/subtype.c    1791 exists_subtype
+    32         0 @juliasrc/builtins.c    780 jl_f__apply_iterate
+    33         0 @Base/number.jl          42 iszero
+    33         0 @Base/reshapedarray.jl  365 unsafe_convert
+    33         0 @Base/subarray.jl       461 first_index
+    33         0 @Base/array.jl         1046 setindex!
+    33         0 @Base/multidimensional.jl  982 macro expansion
+    33         0 @vSmartMOM/…ayerProperties_lin.jl  224 _attach_aerosol_phase(inv::vSmart…
+    33         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl  273 rt_run(RS_type::vSmartMOM.Inelast…
+    34         0 @vSmartMOM/…ernel/doubling_lin.jl  331 doubling_allparams_helper!(pol_ty…
+    34         0 @juliasrc/subtype.c    2279 ijl_subtype_env
+    34         0 @LinearAlgebra/src/blas.jl 1632 gemm!(transA::Char, transB::Char,…
+    35         1 @Base/task.jl          1143 try_yieldto(undo::typeof(Base.ens…
+    35         0 @juliasrc/gc-stock.c    636 jl_gc_free_memory
+    35        35 /lib64/libc.so.6          ? malloc_usable_size
+    35         0 @Base/abstractarray.jl 1870 __cat_offset!(A::Array{Float64, 4…
+    36         0 @Base/multidimensional.jl  934 _prechecked_iterate
+    36        29 @Base/abstractarray.jl  699 checkbounds
+    37        37 @vSmartMOM/…rnel/elemental_lin.jl    ? macro expansion
+    37         0 @julialib/julia/sys.so    ? jfptr_task_done_hook_59905.1
+    37        37 @juliasrc/gc-stock.c    240 gc_try_setmark_tag
+    37        37 @juliasrc/gc-stock.c   1698 gc_mark_obj8
+    38        23 @LinearAlgebra/src/matmul.jl  484 matmul2x2or3x3_nonzeroalpha!(C::S…
+    38         0 @juliasrc/builtins.c   2095 jl_f__compute_sparams
+    38         0 @vSmartMOM/…ayerProperties_lin.jl  223 _attach_aerosol_phase(inv::vSmart…
+    39        13 @Base/multidimensional.jl  449 __inc
+    39         0 @Base/subarray.jl       216 view
+    39         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl  439 rt_run(RS_type::vSmartMOM.Inelast…
+    39         0 @juliasrc/gc-stock.c   1686 gc_try_claim_and_push
+    39         0 @juliasrc/gc-stock.c   1606 gc_ptr_queue_push
+    39        39 @juliasrc/gc-stock.c    915 gc_sweep_page
+    40         0 @Base/subarray.jl        38 SubArray
+    40        35 @Base/subarray.jl        22 SubArray
+    40         2 @juliasrc/subtype.c    2417 jl_tuple1_isa
+    40        26 @juliasrc/gc-stock.c   1712 gc_mark_obj8
+    41         0 /lib64/libc.so.6          ? __default_morecore
+    41         0 /lib64/libc.so.6          ? __sbrk
+    41        41 /lib64/libc.so.6          ? brk
+    41         1 @julialib/…lia/libopenblas64_.so    ? dtrtri_UN_single
+    41         0 @Base/experimental.jl    32 getindex
+    41         0 @vSmartMOM/…lper_functions_lin.jl   49 kwcall(::@NamedTuple{external_sol…
+    41         0 @vSmartMOM/…lper_functions_lin.jl   55 make_added_layer(lin::LinMode, RS…
+    42         0 @Base/abstractarray.jl 1342 getindex
+    42        42 @LinearAlgebra/src/matmul.jl  483 matmul2x2or3x3_nonzeroalpha!(C::S…
+    42        15 @julialib/…lia/libopenblas64_.so    ? dtrti2_UN
+    42         2 @juliasrc/builtins.c    942 arg_tuple
+    42         0 @juliasrc/gc-stock.c   2446 gc_mark_outrefs
+    42        42 @juliasrc/gc-stock.c   1801 gc_mark_objarray
+    44         0 @Base/boot.jl           661 Array
+    44         1 @Base/boot.jl           651 Array
+    44        35 @juliasrc/gc-stock.h    342 page_metadata
+    45         0 @Base/special/exp.jl    434 expm1(x::Float64)
+    45        45 /lib64/libpthread.so.0    ? __pthread_mutex_unlock
+    46        45 /lib64/libc.so.6          ? malloc_consolidate
+    46         0 @Base/abstractarray.jl 1797 cat_similar(A::Array{Float64, 4},…
+    47         0 @juliasrc/typemap.c    1193 jl_typemap_level_assoc_exact
+    47         0 @Base/task.jl          1229 wait()
+    47         0 @Base/array.jl          596 zeros(::Type{Float64}, dims::NTup…
+    47        46 /lib64/libc.so.6          ? __memset_avx2_unaligned_erms
+    48         0 @Base/multidimensional.jl  425 iterate
+    48        48 @Base/simdloop.jl        72 macro expansion
+    48         0 @juliasrc/gc-stock.c   1270 gc_sweep_pool_parallel
+    48        48 @juliasrc/gc-stock.h    177 try_pop_lf_back
+    48         0 @juliasrc/task.c        341 jl_finish_task
+    48         0 @Base/boot.jl           668 Array
+    48         0 @vSmartMOM/…lper_functions_lin.jl    7 default_matrix(FT::Type, lin::Lin…
+    49        31 @julialib/…lia/libopenblas64_.so    ? [unknown function]
+    49         0 @LinearAlgebra/src/matmul.jl  502 generic_matmatmul_wrapper!(C::Sub…
+    49         0 @Base/anyall.jl         140 any
+    49        49 @Base/array.jl          194 size
+    49         0 @vSmartMOM/…rnel/elemental_lin.jl  736 macro expansion
+    49         0 @Base/abstractarray.jl 1855 _cat_t
+    49         0 @vSmartMOM/…ayerProperties_lin.jl  211 (::vSmartMOM.CoreRT.var"#lift_pha…
+    50         0 @Base/indices.jl        572 iterate
+    50         0 @Base/operators.jl      425 >
+    50         0 @Base/multidimensional.jl  891 ensure_indexable
+    50        50 @juliasrc/julia.h      1515 jl_is_layout_opaque
+    50         0 @Base/array.jl         1002 _setindex!(::Array{Float64, 5}, :…
+    51         0 @LinearAlgebra/src/matmul.jl  500 generic_matmatmul_wrapper!(C::Sub…
+    51        51 @Base/cartesian.jl        ? macro expansion
+    51         2 @juliasrc/typemap.c    1152 jl_typemap_entry_assoc_exact
+    51         0 @Base/array.jl          595 zeros(::Type{Float64}, dims::Tupl…
+    52        10 @julialib/…lia/libopenblas64_.so    ? dgemv_64_
+    53         0 @juliasrc/subtype.c    2267 ijl_subtype_env
+    54        21 @LinearAlgebra/src/matmul.jl  795 gemm_wrapper!
+    54         6 @julialib/…lia/libopenblas64_.so    ? dtrtri_64_
+    55        55 @Base/float.jl          498 /
+    56         0 @vSmartMOM/…rnel/elemental_lin.jl  599 macro expansion
+    58        58 @LinearAlgebra/src/blas.jl 1623 gemm!(transA::Char, transB::Char,…
+    60        13 @Base/simdloop.jl        84 macro expansion
+    60         0 @juliasrc/iddict.c      157 ijl_eqtable_get
+    60         4 @Base/abstractarray.jl 3081 _sub2ind_recurse(::NTuple{5, Base…
+    61         0 @juliasrc/typemap.c     308 mtcache_hash_lookup
+    61        21 @juliasrc/typemap.c     312 mtcache_hash_lookup
+    61         0 @juliasrc/task.c       1263 start_task
+    61         0 @Base/abstractarray.jl  681 checkbounds(::Type{Bool}, ::Array…
+    63         6 @juliasrc/jltypes.c    1830 typekeyvalue_hash
+    64         0 @Base/array.jl         1046 setindex!(A::Array{Float64, 4}, X…
+    64         0 @Base/broadcast.jl      905 materialize!(::Base.Broadcast.Def…
+    64         0 @Base/broadcast.jl      955 copyto!
+    65         0 @Base/subarray.jl       216 view(::Array{Float64, 3}, ::Funct…
+    65         0 @Base/array.jl          928 getindex(::Array{Float64, 5}, ::I…
+    68         0 @vSmartMOM/…c/CoreRT/types_lin.jl  360 +(a::vSmartMOM.CoreRT.UmbrellaCor…
+    68         1 @Base/abstractarray.jl  725 checkbounds_indices
+    69        19 @juliasrc/julia.h      1523 jl_datatype_layout
+    70        40 @julialib/…lia/libopenblas64_.so    ? dgemv_n_ZEN
+    70         0 @Base/abstractarray.jl 1176 copyto_axcheck!
+    71         0 @Base/broadcast.jl      902 materialize!
+    72         2 @Base/multidimensional.jl  919 to_indices
+    72         0 @Base/boot.jl           674 Array
+    72         0 @vSmartMOM/…ayerProperties_lin.jl  472 constructCoreOpticalProperties(RS…
+    73         0 @vSmartMOM/…c/CoreRT/types_lin.jl  368 +(a::vSmartMOM.CoreRT.UmbrellaCor…
+    75         0 @Base/broadcast.jl      696 _getindex
+    75         0 @Base/abstractarray.jl 2114 cat
+    76        76 @LinearAlgebra/src/matmul.jl    ? generic_matmatmul_wrapper!(C::Sub…
+    76         0 @vSmartMOM/…ernel/doubling_lin.jl  293 doubling_allparams_helper!(pol_ty…
+    78        78 @julialib/…lia/libopenblas64_.so    ? dgemm_small_matrix_permit_ZEN
+    78        78 @Base/float.jl          495 +
+    78         1 @Base/abstractarray.jl  699 checkbounds(::Array{Float64, 5}, …
+    78         0 @Base/array.jl         1003 _setindex!(::Array{Float64, 5}, :…
+    79         0 @Base/subarray.jl       213 view(::Array{Float64, 3}, ::Funct…
+    79         0 @Base/array.jl          322 copyto!
+    80        42 @juliasrc/jltypes.c    1067 lookup_type_setvalue
+    80        30 @Base/abstractarray.jl 1091 copyto_unaliased!(deststyle::Inde…
+    80         0 @Base/array.jl          299 copyto!
+    80         0 @Base/array.jl          308 _copyto_impl!
+    81        10 @juliasrc/support/hashing.h   31 bitmix
+    81        36 @julialib/…lia/libopenblas64_.so    ? dgetf2_k
+    82         0 @Base/char.jl           222 ==
+    83         3 @Base/essentials.jl     522 tail
+    84         0 @Base/array.jl          621 Array{Float64, 4}(x::Array{Float6…
+    84         1 @Base/array.jl          929 getindex(::Array{Float64, 5}, ::I…
+    86         1 @Base/abstractarray.jl 3065 _sub2ind(::NTuple{5, Base.OneTo{I…
+    87        87 @Base/cartesian.jl       62 macro expansion
+    88        88 @Base/refvalue.jl         8 RefValue
+    91         0 @Base/abstractarray.jl 1871 __cat_offset!(A::Array{Float64, 4…
+    91         0 @Base/abstractarray.jl 1870 __cat_offset!
+    92         1 @julialib/…lia/libopenblas64_.so    ? dgetrf_64_
+    92         0 @Base/abstractarray.jl  820 similar(a::Array{Float64, 4})
+    92         0 @Base/abstractarray.jl  821 similar
+    92        92 @juliasrc/work-stealing-queue.h   79 ws_queue_pop
+    93         0 @vSmartMOM/…el/interaction_lin.jl  247 interaction_helper!(::vSmartMOM.C…
+    96        26 …ines/ilp64_doubling.h   11 [unknown function]
+    96         3 @LinearAlgebra/src/lapack.jl  587 getrf!(A::Matrix{Float64}, ipiv::…
+    97         0 @Base/array.jl          284 unsafe_copyto!
+    98         0 @juliasrc/builtins.c    935 arg_tuple
+    99         0 @Base/abstractarray.jl 2114 kwcall(::@NamedTuple{dims::Int64}…
+   100         0 @Base/essentials.jl     687 cconvert
+   100         0 @Base/refpointer.jl     113 convert
+   101         0 @vSmartMOM/…el/interaction_lin.jl  288 interaction_helper!(::vSmartMOM.C…
+   101       101 @Base/essentials.jl     920 getindex
+   101         0 @juliasrc/gc-stock.c   2373 gc_mark_outrefs
+   102       100 @juliasrc/gf.c         4124 jl_lookup_generic_
+   102         0 @vSmartMOM/…ayerProperties_lin.jl  531 constructCoreOpticalProperties(RS…
+   103         2 @vSmartMOM/…ernel/doubling_lin.jl  292 doubling_allparams_helper!(pol_ty…
+   104         0 @Base/subarray.jl       249 unsafe_view
+   104         0 @Base/subarray.jl        28 SubArray
+   104         0 @juliasrc/gc-stock.c    954 gc_sweep_page
+   105         0 @juliasrc/jltypes.c    1136 lookup_typevalue
+   105         0 @LinearAlgebra/src/lapack.jl  580 getrf!
+   105       105 @juliasrc/gc-stock.h    161 push_lf_back
+   105         2 @juliasrc/julia_internal.h 1816 jl_typemap_assoc_exact
+   106         1 @juliasrc/jltypes.c    2479 jl_inst_arg_tuple_type
+   107         0 @Base/multidimensional.jl 1022 macro expansion
+   107         0 @Base/abstractarray.jl 3049 _sub2ind(::Array{Float64, 5}, ::I…
+   110         2 @Base/abstractarray.jl 1070 copyto!
+   111         0 @Base/array.jl          329 fill!
+   111         0 @Base/array.jl          333 _fill!
+   111         0 …ibuv/src/unix/linux.c 1404 uv__io_poll
+   112        97 /lib64/libc.so.6          ? epoll_pwait
+   115         0 @juliasrc/jltypes.c    1139 lookup_typevalue
+   115         0 none                      ? cpu_get_elem_rt_SFI_fused!(__ctx_…
+   115         0 @Base/broadcast.jl      978 preprocess_args
+   117         0 @vSmartMOM/…Sources/solar_beam.jl  395 source_tangent!(::SourceSet{Tuple…
+   117         0 @vSmartMOM/…Sources/solar_beam.jl  397 #source_tangent!#68
+   117         0 @vSmartMOM/…Sources/solar_beam.jl  354 source_tangent!
+   117         0 …libuv/src/unix/core.c  430 uv_run
+   117         0 @Base/broadcast.jl      988 copyto!
+   118         0 @Base/multidimensional.jl  743 getindex
+   118         0 @LinearAlgebra/src/lu.jl  347 #_lu#189
+   118         0 @LinearAlgebra/src/lu.jl   89 lu!
+   118         0 @LinearAlgebra/src/lu.jl   89 #lu!#179
+   118         0 @LinearAlgebra/src/lu.jl   90 lu!
+   118         0 @LinearAlgebra/src/lu.jl   91 #lu!#180
+   118         0 @LinearAlgebra/src/lapack.jl  787 getrf!
+   118         0 @LinearAlgebra/src/lapack.jl  787 #getrf!#5
+   118         0 @vSmartMOM/…rnel/elemental_lin.jl  193 elemental!(pol_type::vSmartMOM.Sc…
+   119         0 @vSmartMOM/…el/interaction_lin.jl  255 interaction_helper!(::vSmartMOM.C…
+   120         2 @LinearAlgebra/src/lu.jl  347 _lu
+   120       120 @Base/float.jl          497 *
+   121         0 @juliasrc/gf.c         4141 jl_lookup_generic_
+   121         0 @juliasrc/gf.c         3072 lookup_arg_type_tuple
+   122         1 @vSmartMOM/…el/interaction_lin.jl  264 interaction_helper!(::vSmartMOM.C…
+   124         0 @KernelAbstractions/src/cpu.jl   39 Kernel
+   125         2 @juliasrc/gc-stock.c   2352 gc_mark_outrefs
+   126         0 @Base/abstractarray.jl 1859 _cat_t
+   126         0 @Base/abstractarray.jl 1866 __cat(::Array{Float64, 4}, ::NTup…
+   126         0 @Base/abstractarray.jl 1879 __cat_offset1!
+   126         0 @Base/abstractarray.jl 1887 _copy_or_fill!
+   127         1 @juliasrc/jl_uv.c       394 ijl_process_events
+   127         0 @Base/abstractarray.jl 1443 setindex!(::Array{Float64, 4}, ::…
+   128         3 @Base/indices.jl        359 to_indices
+   131       131 @LinearAlgebra/src/matmul.jl  797 gemm_wrapper!
+   133         0 @Base/reshapedarray.jl  369 unsafe_convert
+   133       133 @Base/pointer.jl        314 +
+   134         1 @vSmartMOM/…lper_functions_lin.jl  348 compute_Z_moments(mod::vSmartMOM.…
+   135         0 @Base/broadcast.jl      672 _broadcast_getindex
+   135         0 @Base/broadcast.jl      699 _broadcast_getindex_evalf
+   135         0 @Base/task.jl          1230 wait()
+   135         0 @Base/libuv.jl          133 process_events
+   136       136 @Base/int.jl             83 <
+   137         0 @Base/abstractarray.jl 1377 _to_linear_index
+   137         0 @Base/abstractarray.jl 3049 _sub2ind
+   137         0 @Base/abstractarray.jl 3065 _sub2ind
+   137         0 @Base/abstractarray.jl 3081 _sub2ind_recurse
+   137       137 @juliasrc/gc-stock.c    973 gc_sweep_page
+   137       137 @juliasrc/gc-stock.c   2240 gc_mark_outrefs
+   138         0 @juliasrc/gc-stock.c   2514 gc_mark_loop_serial_
+   138         0 @juliasrc/gc-stock.c   1616 gc_ptr_queue_pop
+   139         0 @vSmartMOM/…lper_functions_lin.jl  349 compute_Z_moments(mod::vSmartMOM.…
+   140         1 @LinearAlgebra/src/lu.jl  341 lu(::SubArray{Float64, 2, Array{F…
+   141         1 @LinearAlgebra/src/lu.jl  341 lu
+   143         1 @Base/abstractarray.jl 1377 _to_linear_index(::Array{Float64,…
+   145         1 @Base/array.jl          997 setindex!(::Array{Float64, 5}, ::…
+   146         0 @LinearAlgebra/src/matmul.jl  501 generic_matmatmul_wrapper!(C::Sub…
+   148         0 @vSmartMOM/…ayerProperties_lin.jl  480 constructCoreOpticalProperties(RS…
+   148         0 none                      ? (::vSmartMOM.CoreRT.var"#construc…
+   151        11 @julialib/…lia/libopenblas64_.so    ? dgetri_64_
+   152         0 @LinearAlgebra/src/lapack.jl 1082 getri!(A::Matrix{Float64}, ipiv::…
+   153         0 @Base/broadcast.jl      665 _broadcast_getindex
+   157         0 @vSmartMOM/…ernel/doubling_lin.jl  269 doubling_allparams_helper!(pol_ty…
+   158         0 @Base/broadcast.jl     1250 dotview
+   158       158 @juliasrc/gc-stock.c   1700 gc_mark_obj8
+   160         0 @juliasrc/typemap.c    1196 jl_typemap_level_assoc_exact
+   166         1 @juliasrc/gc-stock.c    641 jl_gc_free_memory
+   169         0 @vSmartMOM/…c/CoreRT/types_lin.jl  515 +(a::vSmartMOM.CoreRT.UmbrellaCor…
+   173         0 @Base/broadcast.jl      695 _getindex
+   173         0 @Base/array.jl          929 getindex
+   174         0 @Base/broadcast.jl      610 _newindexer
+   174         0 @Base/abstractarray.jl 2114 #cat#108
+   174         0 @Base/abstractarray.jl 2116 _cat(::Int64, ::Array{Float64, 4}…
+   175         0 @Base/broadcast.jl      671 _broadcast_getindex
+   178        49 /lib64/libc.so.6          ? _int_free
+   179         0 @Base/genericmemory.jl  125 unsafe_copyto!
+   179         1 @Base/cmem.jl            28 memmove
+   179         0 @Base/condition.jl      141 wait(c::Base.GenericCondition{Bas…
+   180        95 @Base/simdloop.jl        75 macro expansion
+   182       182 /lib64/libc.so.6          ? __memmove_avx_unaligned_erms
+   182         0 @Base/abstractarray.jl   42 size
+   182         0 @juliasrc/gc-stock.c   1705 gc_mark_obj8
+   184         0 @Base/task.jl           312 _wait(t::Task)
+   184         0 @Base/condition.jl      136 wait
+   187         0 @Base/threadingconstructs.jl  192 threading_run(fun::vSmartMOM.Core…
+   190       109 @juliasrc/gc-stock.c   1685 gc_try_claim_and_push
+   192         0 @Base/broadcast.jl      666 extrude
+   192         0 @Base/broadcast.jl      605 newindexer
+   192         0 @Base/broadcast.jl      606 shapeindexer
+   192         0 @Base/broadcast.jl      611 _newindexer
+   195         0 @Base/broadcast.jl      991 copyto!
+   195         0 @Base/broadcast.jl      974 preprocess
+   195         0 @Base/broadcast.jl      977 preprocess_args
+   195         0 @Base/broadcast.jl      975 preprocess
+   199         0 @juliasrc/julia_internal.h 1820 jl_typemap_assoc_exact
+   200         0 @Base/subarray.jl        65 size
+   200       200 @Base/tuple.jl          359 map
+   200         0 @juliasrc/gf.c         4147 jl_lookup_generic_
+   201         0 @juliasrc/gc-stock.c    666 sweep_malloced_memory
+   202         0 @juliasrc/gc-stock.c   1168 gc_sweep_prescan
+   202       202 @juliasrc/gc-stock.h    152 pop_lf_back_nosync
+   205       205 @juliasrc/staticdata.c 2347 gc_sweep_sysimg
+   211       211 @juliasrc/gc-stock.c    292 gc_setmark_pool_
+   213       213 /lib64/libc.so.6          ? unlink_chunk.isra.2
+   214         0 @LinearAlgebra/src/matmul.jl  851 lapack_size
+   221         0 @Base/operators.jl      321 !=
+   221       221 @Base/int.jl             87 +
+   221         0 @juliasrc/gc-stock.c    991 gc_sweep_other
+   233         0 @KernelAbstractions/src/cpu.jl   39 kwcall(::@NamedTuple{ndrange::Tup…
+   233         0 none                      ? cpu_get_elem_rt_fused!(__ctx__::K…
+   234         0 @juliasrc/gc-stock.c   3184 _jl_gc_collect
+   235         0 @vSmartMOM/…rnel/elemental_lin.jl  146 elemental!(pol_type::vSmartMOM.Sc…
+   236         0 @juliasrc/gc-stock.c   3189 _jl_gc_collect
+   236         0 @juliasrc/gc-stock.c   1467 gc_sweep_perm_alloc
+   246         0 @vSmartMOM/…/tools/cpu_batched.jl   78 batched_mul(A::Array{Float64, 3},…
+   246         0 @Base/threadingconstructs.jl  216 macro expansion
+   251       251 @juliasrc/gc-stock.c    830 gc_update_page_fragmentation_data
+   252         0 @juliasrc/gc-stock.c    953 gc_sweep_page
+   256         0 @vSmartMOM/…el/interaction_lin.jl  300 interaction_helper!(::vSmartMOM.C…
+   256         0 @Base/multidimensional.jl 1020 macro expansion
+   261         0 @vSmartMOM/…el/interaction_lin.jl  287 interaction_helper!(::vSmartMOM.C…
+   263       263 @juliasrc/gc-stock.c   1420 gc_sweep_pool
+   264         4 @juliasrc/gc-stock.c   2267 gc_mark_outrefs
+   266         0 @vSmartMOM/…el/interaction_lin.jl  291 interaction_helper!(::vSmartMOM.C…
+   267         0 @Base/multidimensional.jl 1008 _setindex!
+   267         1 @Base/multidimensional.jl 1029 _unsafe_setindex!(::IndexLinear, …
+   273         0 @Base/array.jl          790 collect(itr::Base.Generator{UnitR…
+   278         0 @vSmartMOM/…el/interaction_lin.jl  249 interaction_helper!(::vSmartMOM.C…
+   285         0 @Base/abstractarray.jl 1466 _setindex!
+   288         0 @Base/broadcast.jl      616 getindex
+   288         0 @Base/broadcast.jl      620 _getindex
+   312       312 @LinearAlgebra/src/generic.jl    ? matmul2x2or3x3_nonzeroalpha!(C::S…
+   314         0 @Base/subarray.jl       392 setindex!
+   327       132 @julialib/…lia/libopenblas64_.so    ? blas_memory_free
+   331         0 @vSmartMOM/…ayerProperties_lin.jl   43 _compute_aerosol_phase_blocks_lin…
+   331         0 none                      ? #_compute_aerosol_phase_blocks_li…
+   331         0 @vSmartMOM/…ayerProperties_lin.jl   30 _compute_phase_blocks_lin(model::…
+   331         0 @vSmartMOM/…lper_functions_lin.jl  259 kwcall(::@NamedTuple{arr_type::Un…
+   337         0 @Base/subarray.jl        67 similar
+   343         0 @vSmartMOM/…ayerProperties_lin.jl  457 constructCoreOpticalProperties(RS…
+   350         0 @KernelAbstractions/src/macros.jl  314 macro expansion
+   356         0 @KernelAbstractions/src/cpu.jl   46 (::KernelAbstractions.Kernel{Kern…
+   356         0 @KernelAbstractions/src/cpu.jl  112 __run(obj::KernelAbstractions.Ker…
+   356         0 @KernelAbstractions/src/cpu.jl  147 __thread_run(tid::Int64, len::Int…
+   358       358 @juliasrc/gc-stock.c   1684 gc_try_claim_and_push
+   367         0 @Base/views.jl          149 maybeview
+   383         0 @juliasrc/gc-stock.c    316 gc_setmark
+   387         1 @vSmartMOM/…el/interaction_lin.jl  294 interaction_helper!(::vSmartMOM.C…
+   393         0 @juliasrc/gc-stock.c   1837 gc_mark_objarray
+   436         0 @Base/abstractarray.jl 1443 setindex!
+   438       438 /lib64/libpthread.so.0    ? __pthread_mutex_lock
+   456         0 @juliasrc/gc-stock.c    316 gc_setmark
+   460         3 @juliasrc/gc-stock.c   2412 gc_mark_outrefs
+   463         0 @juliasrc/gc-stock.c   2448 gc_mark_outrefs
+   464         0 @vSmartMOM/…rnel/elemental_lin.jl   78 elemental!(pol_type::vSmartMOM.Sc…
+   465         0 @vSmartMOM/…rnel/rt_kernel_lin.jl   90 rt_kernel!(RS_type::vSmartMOM.Ine…
+   477         0 @NNlib/…batched/batchedmul.jl   71 _batched_mul(::Type{Array{Float64…
+   482         0 @juliasrc/gf.c         4210 ijl_apply_generic
+   501         0 @juliasrc/gc-stock.c   1190 gc_sweep_prescan
+   501         0 @Base/multidimensional.jl  745 setindex!
+   513       513 @juliasrc/gc-stock.c   1423 gc_sweep_pool
+   549         0 @Base/indices.jl        401 iterate
+   561         0 @Base/array.jl         1148 (::Base.var"#_growend!##0#_growen…
+   561         0 @Base/array.jl         1067 array_new_memory
+   569         0 @LinearAlgebra/src/lapack.jl 1089 getri!(A::Matrix{Float64}, ipiv::…
+   569         0 @Base/array.jl         1482 resize!(a::Vector{Float64}, nl_::…
+   569         3 @Base/array.jl         1131 _growend!
+   585       585 @juliasrc/gc-stock.c   1806 gc_mark_objarray
+   607         0 @Base/multidimensional.jl  981 macro expansion
+   611       606 @Base/array.jl         1003 _setindex!
+   612         5 @Base/range.jl          921 iterate
+   617         0 @vSmartMOM/…ernel/doubling_lin.jl  306 doubling_allparams_helper!(pol_ty…
+   620         0 @Base/array.jl          997 setindex!
+   634        40 @Base/cartesian.jl       66 macro expansion
+   638       453 /lib64/libc.so.6          ? _int_malloc
+   639       639 @juliasrc/gc-stock.c    291 gc_setmark_pool_
+   639         7 @juliasrc/gc-stock.c   2273 gc_mark_outrefs
+   665         0 @juliasrc/builtins.c    868 jl_f__apply_iterate
+   672        23 /lib64/libc.so.6          ? _int_memalign
+   693       693 @juliasrc/gc-stock.c    913 gc_sweep_page
+   695        23 /lib64/libc.so.6          ? _mid_memalign
+   698         0 @juliasrc/gc-stock.c   3834 ijl_gc_managed_malloc
+   698         0 @juliasrc/gc-common.h   112 jl_malloc_aligned
+   699         4 /lib64/libc.so.6          ? posix_memalign
+   703         2 @Base/broadcast.jl      902 materialize!(dest::SubArray{Float…
+   707         0 @juliasrc/genericmemory.c   38 jl_alloc_genericmemory_unchecked
+   708         0 @Base/broadcast.jl      905 materialize!
+   727         0 @juliasrc/gc-stock.c   1393 gc_sweep_pool
+   727         0 @juliasrc/gc-stock.c   1211 gc_sweep_wake_all_pages
+   730         0 @LinearAlgebra/src/lu.jl  562 inv!
+   757         0 @vSmartMOM/…c/CoreRT/types_lin.jl  520 +(a::vSmartMOM.CoreRT.UmbrellaCor…
+   760         0 @Base/cartesian.jl       64 macro expansion
+   780         1 @vSmartMOM/…el/interaction_lin.jl  246 interaction_helper!(::vSmartMOM.C…
+   833         0 @Base/boot.jl           663 Array
+   833         0 @Base/boot.jl           657 Array
+   843       443 @LinearAlgebra/src/matmul.jl  506 generic_matmatmul_wrapper!(C::Sub…
+   851         0 @Base/broadcast.jl      894 materialize
+   871         0 @LinearAlgebra/src/dense.jl 1089 inv(A::SubArray{Float64, 2, Array…
+   908         2 @LinearAlgebra/src/uniformscaling.jl  283 \
+   914         0 @juliasrc/gc-stock.c   1275 gc_sweep_pool_parallel
+   923         0 @Base/threadingconstructs.jl  279 (::vSmartMOM.CoreRT.var"#batch_in…
+   923         0 @vSmartMOM/…/tools/cpu_batched.jl   34 macro expansion
+   924         0 @Base/threadingconstructs.jl  246 #batch_inv!##0
+   931         0 @vSmartMOM/…ayerProperties_lin.jl  484 constructCoreOpticalProperties(RS…
+   931         0 none                      ? (::vSmartMOM.CoreRT.var"#construc…
+   940         0 @juliasrc/gc-stock.c    309 gc_setmark_pool
+   946       946 @Base/promotion.jl      637 ==
+   969         0 @juliasrc/gc-stock.c   1394 gc_sweep_pool
+   971       971 @julialib/…lia/libopenblas64_.so    ? dgemm_oncopy_ZEN
+   995         0 @vSmartMOM/…ernel/doubling_lin.jl  275 doubling_allparams_helper!(pol_ty…
+  1012         0 @Base/array.jl          986 setindex!
+  1012       965 @Base/array.jl          991 _setindex!
+  1026      1026 /lib64/libpthread.so.0    ? __pthread_mutex_unlock_usercnt
+  1068         1 @vSmartMOM/…ernel/doubling_lin.jl  300 doubling_allparams_helper!(pol_ty…
+  1080         0 @vSmartMOM/…el/interaction_lin.jl  354 interaction!(scattering_interface…
+  1081         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl  475 rt_run(RS_type::vSmartMOM.Inelast…
+  1086         0 @Base/simdloop.jl        77 macro expansion
+  1086         0 @Base/broadcast.jl      995 macro expansion
+  1124       305 @julialib/…lia/libopenblas64_.so    ? blas_memory_alloc
+  1146         0 @Base/array.jl          826 collect_to_with_first!(dest::Vect…
+  1146         0 @Base/array.jl          848 collect_to!(dest::Vector{vSmartMO…
+  1153         2 @vSmartMOM/…ernel/doubling_lin.jl  297 doubling_allparams_helper!(pol_ty…
+  1153         0 @Base/array.jl          800 collect(itr::Base.Generator{UnitR…
+  1263         0 @Base/multidimensional.jl  989 _unsafe_getindex!
+  1263         0 @Base/multidimensional.jl  979 macro expansion
+  1264         0 @Base/multidimensional.jl  970 _unsafe_getindex(::IndexLinear, :…
+  1405        16 @juliasrc/gc-stock.c    983 gc_sweep_pool_page
+  1407         0 @Base/broadcast.jl      994 copyto!
+  1424         0 @Base/generator.jl       48 iterate
+  1452      1452 @julialib/…lia/libopenblas64_.so    ? dgemm_itcopy_ZEN
+  1559         0 @vSmartMOM/…ernel/doubling_lin.jl  319 doubling_allparams_helper!(pol_ty…
+  1627         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl  339 rt_run(RS_type::vSmartMOM.Inelast…
+  1729         0 @Base/broadcast.jl      947 copyto!
+  1776      1776 @juliasrc/gc-stock.c   1704 gc_mark_obj8
+  1804         0 @vSmartMOM/…rnel/rt_kernel_lin.jl  169 rt_kernel!(RS_type::vSmartMOM.Ine…
+  1804         0 @vSmartMOM/…el/interaction_lin.jl  354 interaction!
+  1808      1808 @julialib/…lia/libopenblas64_.so    ? dgemm_beta_ZEN
+  2236         0 @juliasrc/gc-stock.c   2463 gc_mark_outrefs
+  2259         0 @vSmartMOM/…/tools/cpu_batched.jl   77 batched_mul(A::Array{Float64, 3},…
+  2370         0 @Base/broadcast.jl      227 similar
+  2370         0 @Base/broadcast.jl      228 similar
+  2371         0 @Base/abstractarray.jl  866 similar
+  2371         0 @Base/abstractarray.jl  867 similar
+  2496         1 @vSmartMOM/…ernel/doubling_lin.jl  274 doubling_allparams_helper!(pol_ty…
+  2543         0 @Base/broadcast.jl      894 materialize(bc::Base.Broadcast.Br…
+  2546         0 @juliasrc/gc-stock.c   3187 _jl_gc_collect
+  2763         0 @Base/multidimensional.jl  968 _unsafe_getindex(::IndexLinear, :…
+  2766         0 @Base/abstractarray.jl  822 similar
+  2771         0 @vSmartMOM/…ernel/doubling_lin.jl  315 doubling_allparams_helper!(pol_ty…
+  3104       247 @NNlib/src/gemm.jl      148 batched_gemm!
+  3119         0 @NNlib/…batched/batchedmul.jl  262 _batched_gemm!(::Type{Array{Float…
+  3121         2 @NNlib/…batched/batchedmul.jl  258 _batched_try_gemm!
+  3123         0 @NNlib/…batched/batchedmul.jl   72 _batched_mul(::Type{Array{Float64…
+  3123         0 @NNlib/…batched/batchedmul.jl  216 batched_mul!
+  3123         0 @NNlib/…batched/batchedmul.jl  222 _batched_mul!
+  3359         0 @Base/array.jl          377 similar
+  3392         1 @Base/broadcast.jl      919 copy
+  3601         1 @NNlib/…batched/batchedmul.jl   59 batched_mul(A::Array{Float64, 3},…
+  4032         1 @Base/multidimensional.jl  956 _getindex
+  4053         0 @Base/abstractarray.jl 1342 getindex(::Array{Float64, 4}, ::F…
+  4230      4230 @julialib/…lia/libopenblas64_.so    ? dgemm_kernel_ZEN
+  4680         0 @juliasrc/gc-stock.c   2519 gc_mark_loop_serial_
+  4811         0 @juliasrc/gc-stock.c   2542 gc_mark_loop_serial
+  4860         0 @juliasrc/gc-stock.c   3074 _jl_gc_collect
+  4860         0 @juliasrc/gc-stock.c   2730 gc_mark_loop
+  4935         0 @Base/boot.jl           662 Array
+  5246      3001 @julialib/…lia/libopenblas64_.so    ? dgemm_nn
+  5994       692 @LinearAlgebra/src/blas.jl 1642 gemm!(transA::Char, transB::Char,…
+  6395       238 @LinearAlgebra/src/matmul.jl  806 gemm_wrapper!
+  6618         0 @LinearAlgebra/src/matmul.jl  507 generic_matmatmul_wrapper!(C::Sub…
+  6618         0 @LinearAlgebra/src/matmul.jl  533 _syrk_herk_gemm_wrapper!
+  7193         3 @Base/boot.jl           654 Array
+  7889       916 @julialib/…lia/libopenblas64_.so    ? dgemm_64_
+  7894         0 @juliasrc/gc-stock.c   3475 ijl_gc_collect
+  7907         0 @juliasrc/gc-stock.c    351 maybe_collect
+  7911         0 @juliasrc/gc-stock.c    727 jl_gc_small_alloc_inner
+  7929         0 @juliasrc/genericmemory.c   41 jl_alloc_genericmemory_unchecked
+  7938         0 @juliasrc/gc-stock.c    799 jl_gc_alloc_
+  7938         0 @juliasrc/gc-stock.c    785 jl_gc_small_alloc_noinline
+  8061         0 @LinearAlgebra/src/matmul.jl  265 mul!
+  8061         0 @LinearAlgebra/src/matmul.jl  297 mul!
+  8061       226 @LinearAlgebra/src/matmul.jl  328 _mul!
+  8061         0 @Base/boot.jl           604 new_as_memoryref
+  8138         0 @Base/threadingconstructs.jl  279 (::vSmartMOM.CoreRT.var"#batched_…
+  8138         0 @vSmartMOM/…/tools/cpu_batched.jl   79 macro expansion
+  8142         3 @Base/threadingconstructs.jl  246 #batched_mul##0
+  8651        10 @Base/boot.jl           588 GenericMemory
+  9066         0 @Base/threadingconstructs.jl  178 (::Base.Threads.var"#threading_ru…
+  9079         0 @juliasrc/task.c       1252 start_task
+ 11161         0 @vSmartMOM/…rnel/rt_kernel_lin.jl  112 rt_kernel!(RS_type::vSmartMOM.Ine…
+ 11161         0 @vSmartMOM/…ernel/doubling_lin.jl  354 kwcall(::@NamedTuple{N_active::In…
+ 11161         0 @vSmartMOM/…ernel/doubling_lin.jl  361 #doubling_allparams!#83
+ 11161         0 @vSmartMOM/…ernel/doubling_lin.jl  216 doubling_allparams_helper!
+ 13489         0 @vSmartMOM/…rnel/rt_kernel_lin.jl   50 kwcall(::@NamedTuple{dτ_max_thres…
+ 13501         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl  380 macro expansion
+ 13514         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl  370 rt_run(RS_type::vSmartMOM.Inelast…
+ 13514         0 @ProgressMeter/src/ProgressMeter.jl 1026 macro expansion
+ 16322         0 @Base/stream.jl        1464 (::Base.RedirectStdStream)(thunk:…
+ 16322         0 …e/jacobian_profile.jl   15 #quiet##0
+ 16322         0 @Base/logging/logging.jl  653 with_logger
+ 16322         0 @Base/logging/logging.jl  542 with_logstate(f::var"#quiet##2#qu…
+ 16322         0 …e/jacobian_profile.jl   16 #quiet##2
+ 16322         0 …e/jacobian_profile.jl   60 #main##10
+ 16322         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl   81 rt_run
+ 16322         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl   86 #rt_run#151
+ 16322         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl  138 rt_run
+ 16323         0 …ysdeps/x86_64/start.S  123 [unknown function]
+ 16323         0 /lib64/libc.so.6          ? __libc_start_main
+ 16323         0 …t-12/cli/loader_exe.c   58 main
+ 16323         0 @juliasrc/jlapi.c      1139 jl_repl_entrypoint
+ 16323         0 @juliasrc/jlapi.c       971 true_main
+ 16323         0 @julialib/julia/sys.so    ? jfptr__start_63319.1
+ 16323         0 @Base/client.jl         550 _start()
+ 16323         0 @Base/client.jl         317 exec_options(opts::Base.JLOptions)
+ 16323         0 @Base/Base.jl           306 include(mod::Module, _path::Strin…
+ 16323         0 @Base/loading.jl       2934 _include(mapexpr::Function, mod::…
+ 16323         0 @Base/loading.jl       2874 include_string(mapexpr::typeof(id…
+ 16323         0 @Base/boot.jl           489 eval(m::Module, e::Any)
+ 16323         0 @juliasrc/toplevel.c   1092 ijl_toplevel_eval_in
+ 16323         0 @juliasrc/toplevel.c   1047 ijl_toplevel_eval
+ 16323         0 @juliasrc/toplevel.c    975 jl_toplevel_eval_flex
+ 16323         0 @juliasrc/toplevel.c   1035 jl_toplevel_eval_flex
+ 16323         0 @juliasrc/interpreter.c  898 jl_interpret_toplevel_thunk
+ 16323         0 @juliasrc/interpreter.c  707 eval_body
+ 16323         0 @juliasrc/interpreter.c  194 eval_stmt_value
+ 16323         0 @juliasrc/interpreter.c  243 eval_value
+ 16323         0 @juliasrc/interpreter.c  123 do_call
+ 16323         0 …e/jacobian_profile.jl   86 main()
+ 16323         0 @Profile/src/Profile.jl   60 macro expansion
+ 16323         0 …e/jacobian_profile.jl   87 macro expansion
+ 16323         0 …e/jacobian_profile.jl   14 quiet(f::var"#main##10#main##11"{…
+ 25450         0 @juliasrc/julia.h      2391 jl_apply
+ 25633        22 [any unknown stackframes]
+Total snapshots: 32065. Utilization: 100% across all threads and tasks. Use the `groupby` kwarg to break down by thread and/or task.

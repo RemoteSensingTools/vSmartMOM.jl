@@ -6,7 +6,7 @@
 
 # We are making use of the [HITRAN database](https://www.cfa.harvard.edu/hitran/), see a list of tutorials [here](https://www.youtube.com/playlist?list=PLqOG3cBizTUFQw5lwpkCpQFCVuxHTZgrT).
 
-# There are other spectroscopic linelists, but we are focusing on HITRAN only here. In addition, there are more complex line-shapes that we are not treating here, including [collisional narrowing](https://journals.aps.org/pr/abstract/10.1103/PhysRev.89.472) and [line-mixing](https://aip.scitation.org/doi/abs/10.1063/1.478724), [collision-induced absorption (CIA)](https://www.sciencedirect.com/science/article/abs/pii/S0022407311003773). In the future, these might be added to vSmartMOM.
+# There are other spectroscopic linelists, but we are focusing on HITRAN only here. In addition, there are more complex line-shapes that we are not treating here, including [collisional narrowing](https://journals.aps.org/pr/abstract/10.1103/PhysRev.89.472) and [line-mixing](https://aip.scitation.org/doi/abs/10.1063/1.478724), [collision-induced absorption (CIA)](https://www.sciencedirect.com/science/article/abs/pii/S0022407311003773). (The RT pipeline can add CIA and the MT_CKD water-vapour continuum through the `absorption` block's `cia_files` and `mtckd_file` keys; they are not part of the line-shape calculation shown here.)
 
 # ### Line-shape:
 # If we have a line-strength S (in cm$^{-1}$ cm$^2$/molecule) for a specific transition at $\nu_0$, we can compute the cross section as:
@@ -64,7 +64,10 @@ println("Doppler shift = $(1e7/(v₀-Δ_ν)-1e7/v₀) nm")
 
 # $$\phi_D(\nu) = \frac{1}{\Delta \nu_D \sqrt{\pi}}\exp{\left(-\frac{(\nu-\nu_0)^2}{\Delta \nu^2_D}\right)}\,,$$
 
-# which is a Gaussian distribution with $\Delta \nu_D$ representing the standard deviation.
+# where $\Delta \nu_D$ is the **1/e half-width**, not the standard deviation.
+# The standard deviation is $\sigma_D = \Delta\nu_D/\sqrt{2}$, and
+# HWHM is $\sqrt{\ln 2}\,\Delta\nu_D$. See the
+# [HITRAN width definitions](https://hitran.org/docs/definitions-and-units/).
 
 # Let us put in some numbers with R=8.3144598 J/K/mol at 6000cm$^{-1}$:
 
@@ -77,23 +80,20 @@ println("Doppler shift = $(1e7/(v₀-Δ_ν)-1e7/v₀) nm")
 # $\Delta \nu_D(290K,CO_2)=0.0066cm^{-1}$
 # $\Delta \nu_D(220K,CO_2)=0.0058cm^{-1}$
 # $\Delta \nu_D(290K,CH_4)=0.0110cm^{-1}$
-# $\Delta \nu_D(290K,CH_4)=0.0096cm^{-1}$
+# $\Delta \nu_D(220K,CH_4)=0.0096cm^{-1}$
 
-# Multitply with about 1.6585 (2$\sqrt{ln(2)}$) to get the full-width half-maximum (FWHM) of the spectral line.
+# Multiply by about 1.6651 (2$\sqrt{ln(2)}$) to get the full-width half-maximum (FWHM) of the spectral line.
 
 # ----
 
 # ### Natural broadening
 
-# The Heisenberg uncertainty principle tells us that there is an uncertainty in the Energy:
-
-# $$\Delta E \Delta t \sim h/2\pi\,,$$
-
-# As $\Delta E$ is $h\Delta\nu$, we can write:
-
-# $$\Delta\nu = \frac{h/2\pi}{\tau}$$
-
-# The natural line-width is defined by using the resulting radiative lifetime, but this is mostly negligible as the natural lifetime of the upper state is usually much much smaller than the "perturbed" lifetime in the presence of quencher (e.g. through collisions or doppler broadening). Again, there are exceptions.
+# For an isolated transition with upper-state population lifetime $τ$ and
+# a negligibly narrow lower state, the natural Lorentz FWHM in ordinary
+# frequency is $1/(2π τ)$; divide by the speed of light in cm/s for cm⁻¹.
+# Natural broadening is usually small for atmospheric infrared lines because
+# radiative lifetimes are long compared with collisional dephasing times.
+# Doppler broadening comes from the velocity distribution, not a shorter lifetime.
 
 # ### Collisional broadening
 
@@ -107,7 +107,9 @@ println("Doppler shift = $(1e7/(v₀-Δ_ν)-1e7/v₀) nm")
 # ----
 
 # ### Voigt lineshape
-# The Voigt line-shape is the combination of Doppler and Lorentz broadening (convolution of the two) but cannot be evaluated analytically. However, there are numerical routines to compute it efficiently, multiple of which are implemented in vSmartMOM.
+# The Voigt line shape is the convolution of Gaussian Doppler and Lorentz
+# profiles. It can be expressed using the complex error (Faddeeva) function;
+# numerical approximations evaluate that function efficiently.
 
 # ----
 
@@ -131,16 +133,19 @@ using vSmartMOM.Absorption
 
 #-------------------------
 
-# > **Note:** The functions below (`read_hitran`, `make_hitran_model`, `absorption_cross_section`)
-# > are the **standalone cross-section API** that ships with vSmartMOM's internal `Absorption`
-# > module (TIPS-2017 partition sums).  The RT pipeline (`model_from_parameters` → `rt_run`)
-# > computes gas absorption internally via
-# > [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl)
-# > (TIPS-2021), so there is no need to call these functions to run a full scene.  Use them
-# > for direct σ(ν, T, p) queries, custom grids, or cross-section comparisons.
+# > **Deprecation notice:** The functions below (`read_hitran`, `make_hitran_model`,
+# > `absorption_cross_section`) belong to the internal `vSmartMOM.Absorption` module.
+# > Its standalone line-by-line model (`make_hitran_model`, `HitranModel`) is deprecated
+# > in 2.2 and will be removed in 3.0; its first use logs a one-time notice with the
+# > corresponding AtmosphericAbsorption.jl calls and their convention differences.
+# > AtmosphericAbsorption.jl is the supported absorption dependency going forward; use it
+# > for new direct σ(ν, T, p), custom-grid, ABSCO HDF, and GPU workflows. The RT pipeline
+# > (`model_from_parameters` → `rt_run`) already uses AtmosphericAbsorption.jl. Tables for
+# > YAML `LUTfiles` are still built with `make_interpolation_model` in 2.x (or saved as
+# > AtmosphericAbsorption `.absco` tables).
 
 # Read the HITRAN database for CO$_2$, using artifacts in Julia:
-co2_par      = Absorption.read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6214.4, ν_max=6214.8);
+co2_par      = vSmartMOM.Absorption.read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6214.4, ν_max=6214.8);
 # Create a Voigt model (all in CPU mode)
 line_voigt   = make_hitran_model(co2_par, Voigt(), architecture=CPU())
 # Create a Doppler model
@@ -206,7 +211,7 @@ fig
 #-------------------------
 
 # Load a wider spectral range
-co2_par_band = Absorption.read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6000.0, ν_max=6400.0);
+co2_par_band = vSmartMOM.Absorption.read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6000.0, ν_max=6400.0);
 # Create a Voigt model for that
 band_voigt   = make_hitran_model(co2_par_band , Voigt(), architecture=CPU());
 
@@ -243,8 +248,9 @@ xlims!(ax, 6300, 6380)
 axislegend(ax, position=:rt)
 fig
 
-# The docs build includes an interactive Plotly summary of this temperature
-# redistribution effect across the band:
+# The interactive Plotly panel below is a qualitative illustration using
+# five synthetic lines and manually chosen strengths/widths. It is not the
+# HITRAN CO₂ calculation above and must not be used as a numerical reference:
 #
 # ```@raw html
 # <iframe title="CO2 temperature redistribution plot" src="../../assets/plots/absorption_temperature_band.html" loading="lazy" style="width: 100%; height: 560px; border: 1px solid var(--vp-c-divider); border-radius: 8px;"></iframe>
@@ -256,8 +262,10 @@ fig
 
 # ---
 # ### Animated views
-# We can use CairoMakie's `record` function to create animations showing the impact of pressure and temperature:
+# Set `ENV["VSMARTMOM_RUN_HEAVY_DOCS"]="true"` to generate the optional
+# pressure and temperature animations with CairoMakie.
 
+if get(ENV, "VSMARTMOM_RUN_HEAVY_DOCS", "false") == "true"
 T = 290.0
 fig = Figure(size=(700, 450))
 ax = Axis(fig[1,1],
@@ -293,6 +301,8 @@ end
 # When run locally, this writes `absorption_temperature.gif` next to the tutorial.
 
 #-------------------------
+
+end
 
 ## More extreme case, let's take 10 atmospheres (10,000 hPa)
 σ = absorption_cross_section(band_voigt, ν_band, 10000.0, 300.0);

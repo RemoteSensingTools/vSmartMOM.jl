@@ -1,0 +1,22 @@
+PREPARE original scene polarization=Stokes_I()
+MEASURE_BEGIN polarization=Stokes_I() mode=source
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:29
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:19
+RESULT Dict{String, Any}("polarization" => "Stokes_I()", "mode" => "source", "median_seconds" => 0.434226315, "max_forward_parity_error" => 0.0, "seconds" => [0.530659835, 0.432347313, 0.434226315], "device_bytes" => [2888314820, 2888314820, 2888314820], "host_bytes" => [151828264, 151815816, 151817032])
+MEASURE_BEGIN polarization=Stokes_I() mode=forward
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:07
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:04
+RESULT Dict{String, Any}("polarization" => "Stokes_I()", "mode" => "forward", "median_seconds" => 0.10747072, "max_forward_parity_error" => 5.377642775528102e-17, "seconds" => [0.110052544, 0.107402041, 0.10747072], "device_bytes" => [321185280, 321185280, 321185280], "host_bytes" => [19424664, 19276376, 19274552])
+PREPARE original scene polarization=Stokes_IQU()
+MEASURE_BEGIN polarization=Stokes_IQU() mode=source
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:05
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:03
+RESULT Dict{String, Any}("polarization" => "Stokes_IQU()", "mode" => "source", "median_seconds" => 2.343452158, "max_forward_parity_error" => 0.0, "seconds" => [2.30325198, 2.343452158, 2.348896884], "device_bytes" => [23254035252, 23254035252, 23254035252], "host_bytes" => [366722880, 366733984, 366750464])
+MEASURE_BEGIN polarization=Stokes_IQU() mode=forward
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:03
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:02
+RESULT Dict{String, Any}("polarization" => "Stokes_IQU()", "mode" => "forward", "median_seconds" => 0.28012076, "max_forward_parity_error" => 5.898059818321144e-17, "seconds" => [0.282837808, 0.28012076, 0.279241416], "device_bytes" => [2447530304, 2447530304, 2447530304], "host_bytes" => [47634448, 47655264, 47652672])

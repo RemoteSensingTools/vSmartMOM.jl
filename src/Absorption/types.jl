@@ -159,6 +159,10 @@ abstract type AbstractCrossSectionModel end
 """
     struct HitranModel{FT}
 
+!!! warning "Deprecated"
+    Part of the standalone line-by-line engine, deprecated in vSmartMOM 2.2 and planned for
+    removal in 3.0; use `AtmosphericAbsorption.LineByLineModel`. See `make_hitran_model`.
+
 A struct which provides all model parameters needed for cross-section 
 calculations using HITRAN data
 

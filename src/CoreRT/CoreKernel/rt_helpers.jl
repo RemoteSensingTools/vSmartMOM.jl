@@ -40,6 +40,85 @@ arguments without losing the small difference to cancellation.
 end
 
 """
+    expdiff_ratio(a, b)
+
+Divided difference of `exp(-x)` between `a` and `b`,
+`(exp(-a) - exp(-b)) / (b - a)`, accurate for every separation; its limit
+at `b = a` is `exp(-a)`.
+
+The finite-δ elemental transmission and source terms have the form
+`(exp(-a) - exp(-b)) / (b - a)` with `b - a ∝ μᵢ - μⱼ` (elastic) or
+`∝ μᵢ/μⱼ - dτ₁/dτ₀` (Raman). Writing them as `expdiff_neg(a, b)` divided by
+an independently computed `μᵢ - μⱼ` (or `μᵢ/μⱼ - dτ₁/dτ₀`) mixes the
+rounding of `a` and `b` with a denominator that does not share it, an error
+of about `eps·max(a, b)/|b - a|`. This function forms the divided difference
+from `a` and `b` alone. For `|b - a| ≤ 2` it uses the midpoint form
+`exp(-s) · sinh(x)/x` with `s = (a + b)/2` and `x = (b - a)/2`, where
+`sinh(x)/x` is its Taylor series (`_sinhc_series`): exact limit at `a = b`
+(no 0/0), symmetric, and smooth for ForwardDiff (no quotient near `a = b`).
+Farther apart, `expdiff_neg(a, b)/(b - a)` is used. In both branches the
+relative error is a few ulps plus the `eps·max(a, b)` that `exp(-a)` and
+`exp(-b)` themselves carry. The function is GPU-safe (elementary operations
+only, no allocation, no Float64 constants left in Float32 code). The
+relative accuracy holds while the result is a normal number; a result in the
+subnormal range (e.g. `exp(-100)` in Float32) may flush to zero.
+"""
+@inline function expdiff_ratio(a, b)
+    x = (b - a) / 2
+    abs(x) <= one(x) && return exp(-(a + b) / 2) * _sinhc_series(x)
+    return expdiff_neg(a, b) / (b - a)
+end
+
+"""
+    _sinhc_series(x)
+
+`sinh(x)/x` for `|x| ≤ 1` as its Taylor series `Σₖ x²ᵏ/(2k+1)!` through `x¹⁸`
+(truncation below 3e-20 at `|x| = 1`). All terms are positive, so Horner
+evaluation is accurate to an ulp or two, and the series is even in `x` and
+equals one exactly at `x = 0`.
+"""
+@inline function _sinhc_series(x)
+    y = x * x
+    c(v) = oftype(y, v)
+    return evalpoly(y, (one(y), c(1 / 6), c(1 / 120), c(1 / 5040), c(1 / 362880),
+                        c(1 / 39916800), c(1 / 6227020800), c(1 / 1307674368000),
+                        c(1 / 355687428096000), c(1 / 121645100408832000)))
+end
+
+"""
+    elem_trans_factor(τ, μᵢ, μⱼ)
+
+Angular factor of the finite-δ single-scattering transmission and direct-solar
+source (Fell 1997, Eq. 1.53; SF2023-II Eqs. 10–11):
+
+    μⱼ/(μᵢ - μⱼ) · (exp(-τ/μᵢ) - exp(-τ/μⱼ)) = (τ/μᵢ) · expdiff_ratio(τ/μᵢ, τ/μⱼ),
+
+with the limit `(τ/μᵢ) exp(-τ/μᵢ)` (Fell Eq. 1.54) at `μᵢ = μⱼ`. The
+right-hand side is accurate for all `μᵢ - μⱼ`; the left-hand side loses
+about `eps·μ/|μᵢ - μⱼ|` (relative) to cancellation, which matters for an
+SZA, VZA or Radau node close to another ordinate.
+"""
+@inline elem_trans_factor(τ, μᵢ, μⱼ) = (τ / μᵢ) * expdiff_ratio(τ / μᵢ, τ / μⱼ)
+
+"""
+    elem_trans_factor_dτ(τ, μᵢ, μⱼ)
+
+Derivative of `elem_trans_factor` with respect to `τ`,
+
+    μⱼ/(μᵢ - μⱼ) · (exp(-τ/μⱼ)/μⱼ - exp(-τ/μᵢ)/μᵢ)
+        = (exp(-B) - A · expdiff_ratio(a, b)) / μᵢ,
+
+where `a = τ/μᵢ`, `b = τ/μⱼ`, `A = min(a, b)`, `B = max(a, b)`. The
+right-hand side has no `1/(μᵢ - μⱼ)` and reduces to
+`exp(-τ/μᵢ)(1 - τ/μᵢ)/μᵢ` at `μᵢ = μⱼ`.
+"""
+@inline function elem_trans_factor_dτ(τ, μᵢ, μⱼ)
+    a = τ / μᵢ
+    b = τ / μⱼ
+    return (exp(-max(a, b)) - min(a, b) * expdiff_ratio(a, b)) / μᵢ
+end
+
+"""
     rt_tol(FT, x)
 
 Cast a scalar tolerance to the kernel element type. Use this in GPU-facing
@@ -60,8 +139,9 @@ inside elemental kernels.
 """
     rt_close_tol(FT)
 
-Return the same-type near-singularity tolerance used by elemental Raman branch
-checks that historically used `1e-8`.
+Return the same-type `1e-8` near-singularity tolerance that the elemental Raman
+kernels used for their coincidence branches before those were replaced by the
+exact divided difference `expdiff_ratio` (kept for API compatibility).
 """
 @inline rt_close_tol(::Type{FT}) where {FT} = rt_tol(FT, 1e-8)
 @inline rt_close_tol(::Type{Float32}) = 1f-8
@@ -70,12 +150,39 @@ checks that historically used `1e-8`.
 """
     rt_loose_tol(FT)
 
-Return the same-type near-singularity tolerance used by elemental Raman branch
-checks that historically used `1e-6`.
+Return the same-type `1e-6` near-singularity tolerance that the elemental Raman
+kernels used for their coincidence branches before those were replaced by the
+exact divided difference `expdiff_ratio` (kept for API compatibility).
 """
 @inline rt_loose_tol(::Type{FT}) where {FT} = rt_tol(FT, 1e-6)
 @inline rt_loose_tol(::Type{Float32}) = 1f-6
 @inline rt_loose_tol(::Type{Float64}) = 1e-6
+
+"""
+    _bmm!(C, A, B)
+
+In-place batched matrix multiply `C = A ⊠ B` (NNlib dispatch: CUBLAS on
+CUDA, threaded BLAS on CPU, generic fallback elsewhere). `C` must not
+alias `A` or `B`. Phase-0 preallocation seam: the Phase-1 fused KA
+kernels replace calls to this helper wholesale, so keep hot-path batched
+products routed through it.
+"""
+@inline _bmm!(C, A, B) = NNlib.batched_mul!(C, A, B)
+
+"""
+    _interaction_scratch(added_layer) -> (mA, v1, v2)
+
+Phase-0 scratch for the in-place interaction step: one matrix buffer and
+two J-shaped buffers. Reuses the doubling workspace (`dbl_gp_refl`,
+`dbl_v1`, `dbl_v2`) — dead by the time interaction runs — and falls back
+to `similar` for AddedLayers built without it (e.g. the lin path).
+"""
+@inline function _interaction_scratch(added_layer)
+    mA = added_layer.dbl_gp_refl === nothing ? similar(added_layer.t⁺⁺) : added_layer.dbl_gp_refl
+    v1 = added_layer.dbl_v1 === nothing ? similar(added_layer.j₀⁺) : added_layer.dbl_v1
+    v2 = added_layer.dbl_v2 === nothing ? similar(added_layer.j₀⁺) : added_layer.dbl_v2
+    return mA, v1, v2
+end
 
 """
     compute_geometric_progression!(gp_refl, tt_gp, r⁻⁺, t⁺⁺, I_static, temp2, temp1_ptr, temp2_ptr)
@@ -99,6 +206,7 @@ call covers all spectral points; see [Concepts/07](../../docs/src/pages/concepts
 
 Mutates `gp_refl` and `tt_gp` in place.
 """
+
 @inline function compute_geometric_progression!(gp_refl, tt_gp, r⁻⁺, t⁺⁺, I_static, temp2, temp1_ptr, temp2_ptr)
     if _use_fused_gp(tt_gp)
         # Fused single-kernel path: build (E − R·R), LU-factorise it, and
@@ -109,9 +217,12 @@ Mutates `gp_refl` and `tt_gp` in place.
         # the 3N² local-memory tile exceeds the device budget (large N) or on CPU.
         ka_fused_gp_solve!(tt_gp, r⁻⁺, t⁺⁺, KernelAbstractions.get_backend(tt_gp))
     else
-        temp2 .= I_static .- r⁻⁺ ⊠ r⁻⁺                  # (E − R·R)
+        # In-place (Phase 0): tt_gp doubles as scratch for R·R before its
+        # final assignment — no allocation, no extra buffer.
+        _bmm!(tt_gp, r⁻⁺, r⁻⁺)                           # R·R (scratch use)
+        temp2 .= I_static .- tt_gp                       # (E − R·R)
         batch_inv!(gp_refl, temp2, temp1_ptr, temp2_ptr) # (E − R·R)⁻¹
-        tt_gp .= t⁺⁺ ⊠ gp_refl                          # T · (E − R·R)⁻¹
+        _bmm!(tt_gp, t⁺⁺, gp_refl)                       # T · (E − R·R)⁻¹
     end
     return nothing
 end
@@ -137,13 +248,35 @@ end of each iteration so the layer thickness doubles. `tt_gp` is the helper
 
 Common to the forward, linearized, and inelastic paths.
 """
-@inline function doubling_source_update!(j₀⁺, j₀⁻, j₁⁺, j₁⁻, r⁻⁺, tt_gp, expk)
+@inline function doubling_source_update!(j₀⁺, j₀⁻, j₁⁺, j₁⁻, r⁻⁺, tt_gp, expk, v1, v2)
+    # Phase-1 fused single-launch path (GPU; tolerance-equivalent to the
+    # _bmm! path — see ka_batched_kernels.jl contract + test_fused_doubling.jl).
+    if _use_fused_doubling_source(tt_gp)
+        ka_fused_doubling_source!(j₀⁺, j₀⁻, j₁⁺, j₁⁻, r⁻⁺, tt_gp, expk,
+                                  KernelAbstractions.get_backend(tt_gp))
+        return nothing
+    end
     @inbounds @views j₁⁺[:,1,:] .= j₀⁺[:,1,:] .* expk'
     @inbounds @views j₁⁻[:,1,:] .= j₀⁻[:,1,:] .* expk'
-    j₀⁻ .= j₀⁻ .+ (tt_gp ⊠ (j₁⁻ .+ r⁻⁺ ⊠ j₀⁺))
-    j₀⁺ .= j₁⁺ .+ (tt_gp ⊠ (j₀⁺ .+ r⁻⁺ ⊠ j₁⁻))
+    # In-place (Phase 0) restatement of
+    #   j₀⁻ .= j₀⁻ .+ (tt_gp ⊠ (j₁⁻ .+ r⁻⁺ ⊠ j₀⁺))
+    #   j₀⁺ .= j₁⁺ .+ (tt_gp ⊠ (j₀⁺ .+ r⁻⁺ ⊠ j₁⁻))
+    # Identical operation order (each ⊠ replaced by the same batched GEMM,
+    # each dotted chain by the same fused broadcast), so results are
+    # bit-identical; only the ⊠ output allocations are gone. Note the j₀⁺
+    # update reads the PRE-update j₀⁺ — v1 snapshots the RHS before the
+    # assignment, exactly as the allocating form did.
+    _bmm!(v1, r⁻⁺, j₀⁺);  v1 .= j₁⁻ .+ v1
+    _bmm!(v2, tt_gp, v1); j₀⁻ .= j₀⁻ .+ v2
+    _bmm!(v1, r⁻⁺, j₁⁻);  v1 .= j₀⁺ .+ v1
+    _bmm!(v2, tt_gp, v1); j₀⁺ .= j₁⁺ .+ v2
     return nothing
 end
+
+# Back-compat allocating wrapper (non-hot callers / external code).
+@inline doubling_source_update!(j₀⁺, j₀⁻, j₁⁺, j₁⁻, r⁻⁺, tt_gp, expk) =
+    doubling_source_update!(j₀⁺, j₀⁻, j₁⁺, j₁⁻, r⁻⁺, tt_gp, expk,
+                            similar(j₀⁺), similar(j₀⁺))
 
 """
     doubling_rt_update!(r⁻⁺, t⁺⁺, tt_gp, expk)
@@ -168,23 +301,55 @@ collapses both updates to:
 between iterations: `n` doublings give layer thickness `2ⁿ · δτ`. That's
 the **logarithmic-in-τ** scaling that makes MOM cheap for thick atmospheres.
 """
-@inline function doubling_rt_update!(r⁻⁺, t⁺⁺, tt_gp, expk)
-    r⁻⁺ .= r⁻⁺ .+ (tt_gp ⊠ r⁻⁺ ⊠ t⁺⁺)
-    t⁺⁺ .= tt_gp ⊠ t⁺⁺
+@inline function doubling_rt_update!(r⁻⁺, t⁺⁺, tt_gp, expk, m1, m2)
+    # Phase-1 fused single-launch path (GPU; tolerance-equivalent — see
+    # ka_batched_kernels.jl contract + test_fused_doubling.jl). Includes the
+    # expk squaring, preserving the legacy op order (source update reads
+    # expk BEFORE rt_update squares it).
+    if _use_fused_doubling_rt(tt_gp)
+        ka_fused_doubling_rt!(r⁻⁺, t⁺⁺, tt_gp, expk,
+                              KernelAbstractions.get_backend(tt_gp))
+        return nothing
+    end
+    # In-place (Phase 0) restatement of
+    #   r⁻⁺ .= r⁻⁺ .+ (tt_gp ⊠ r⁻⁺ ⊠ t⁺⁺)   (⊠ is left-associative)
+    #   t⁺⁺ .= tt_gp ⊠ t⁺⁺
+    # Same GEMMs in the same order — bit-identical, allocation-free.
+    _bmm!(m1, tt_gp, r⁻⁺)
+    _bmm!(m2, m1, t⁺⁺);  r⁻⁺ .= r⁻⁺ .+ m2
+    _bmm!(m1, tt_gp, t⁺⁺); t⁺⁺ .= m1
     expk .= expk .^ 2
     return nothing
 end
+
+# Back-compat allocating wrapper (non-hot callers / external code).
+@inline doubling_rt_update!(r⁻⁺, t⁺⁺, tt_gp, expk) =
+    doubling_rt_update!(r⁻⁺, t⁺⁺, tt_gp, expk, similar(t⁺⁺), similar(t⁺⁺))
 
 """
     zero_added_noscat!(added_layer, τ_λ, qp_μN)
 
 Zero out reflectance/source fields and set Beer-law transmission for a
 non-scattering layer.  Replaces the repeated pattern in `rt_kernel!` methods.
+
+The added-layer buffer is reused across layers and Fourier moments, so BOTH
+source directions (`j₀⁺`, `j₀⁻`) and every per-source slot are cleared here;
+otherwise the previous layer's sources would be re-added. The caller injects
+any volume sources (thermal) afterwards, as the elastic `rt_kernel!` does
+with `contribute!`.
 """
 @inline function zero_added_noscat!(added_layer, τ_λ, qp_μN)
     added_layer.r⁻⁺[:] .= 0
     added_layer.r⁺⁻[:] .= 0
+    added_layer.j₀⁺[:] .= 0
     added_layer.j₀⁻[:] .= 0
+    # AddedLayerRS carries no per-source slots.
+    if hasproperty(added_layer, :j₀_by_src)
+        for slot in values(added_layer.j₀_by_src)
+            fill!(slot.j₀⁺, zero(eltype(slot.j₀⁺)))
+            fill!(slot.j₀⁻, zero(eltype(slot.j₀⁻)))
+        end
+    end
     _set_transmission_noscat!(added_layer.t⁺⁺, added_layer.t⁻⁻, τ_λ, qp_μN)
     return nothing
 end

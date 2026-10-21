@@ -27,7 +27,6 @@ radiative_transfer:
   quadrature_type:    GaussLegQuad()
   polarization_type:  Stokes_IQUV()
   max_m:              30
-  Δ_angle:            2.0
   l_trunc:            30
   depol:              0.0
   float_type:         Float64
@@ -39,7 +38,7 @@ geometry:
                        53.130102354, 60.0, 66.421821522, 72.542396876,
                        78.463040967, 84.260829523, 89.9999]
   vaz:                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-  obs_alt:            1000.0
+  obs_alt:            [0]
 
 atmospheric_profile:
   T: [231.62]

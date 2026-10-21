@@ -10,8 +10,11 @@ abstract type AbstractRamanType  end
 # parameterized by FT.
 
 """
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
+    RRS{FT<:AbstractFloat}
+
+Rotational Raman scattering by N₂ and O₂ (pure rotational transitions within
+the vibrational ground state), with the elastic Cabannes line treated
+separately.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
@@ -37,11 +40,16 @@ Base.@kwdef mutable struct RRS{FT<:AbstractFloat} <: AbstractRamanType
     iBand = 1
     F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
     SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+    "Direct-solar Raman phase columns, `(NquadN,nStokes)`; diffuse Z remains square"
+    Z₀⁻⁺_λ₁λ₀::Array{FT,2} = zeros(eltype(F₀),1,1)
+    Z₀⁺⁺_λ₁λ₀::Array{FT,2} = zeros(eltype(F₀),1,1)
 end
 
 """
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
+    VS_0to1{FT<:AbstractFloat}
+
+Vibrational Raman scattering by N₂ and O₂ from the ground to the first excited
+vibrational state, including the vibrational and rotational-vibrational line sets.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
@@ -69,8 +77,11 @@ Base.@kwdef struct VS_0to1{FT<:AbstractFloat} <: AbstractRamanType
 end
 
 """
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
+    VS_1to0{FT<:AbstractFloat}
+
+Vibrational Raman scattering by N₂ and O₂ from the first excited to the ground
+vibrational state (anti-Stokes), including the vibrational and
+rotational-vibrational line sets.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
@@ -215,8 +226,11 @@ end
 
 
 """
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
+    VS_0to1_plus{FT<:AbstractFloat}
+
+Vibrational Raman scattering by N₂ and O₂ from the ground to the first excited
+vibrational state (vibrational and rotational-vibrational lines), over
+concatenated spectral bands (`bandSpecLim`, `iBand`).
 # Fields
 $(DocStringExtensions.FIELDS)
 """
@@ -265,8 +279,11 @@ Base.@kwdef mutable struct VS_0to1_plus{FT<:AbstractFloat} <: AbstractRamanType
 end
 
 """
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
+    VS_1to0_plus{FT<:AbstractFloat}
+
+Vibrational Raman scattering by N₂ and O₂ from the first excited to the ground
+vibrational state (anti-Stokes; vibrational and rotational-vibrational lines),
+over concatenated spectral bands (`bandSpecLim`, `iBand`).
 # Fields
 $(DocStringExtensions.FIELDS)
 """
@@ -403,8 +420,10 @@ Base.@kwdef mutable struct sol_RRS{FT<:AbstractFloat} <: AbstractRamanType
 end
 
 """
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
+    sol_VS_0to1{FT<:AbstractFloat}
+
+Stellar/solar vibrational Raman mode for H₂-dominated atmospheres, ground to
+first excited state.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
@@ -430,8 +449,10 @@ Base.@kwdef struct sol_VS_0to1{FT<:AbstractFloat} <: AbstractRamanType
 end
 
 """
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
+    sol_VS_1to0{FT<:AbstractFloat}
+
+Stellar/solar vibrational Raman mode for H₂-dominated atmospheres, first
+excited to ground state.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
@@ -492,8 +513,10 @@ end
 
 
 """
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
+    sol_VS_0to1_plus{FT<:AbstractFloat}
+
+Stellar/solar vibrational Raman mode for H₂-dominated atmospheres, ground to
+first excited state, over concatenated spectral bands.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
@@ -534,8 +557,10 @@ Base.@kwdef mutable struct sol_VS_0to1_plus{FT<:AbstractFloat} <: AbstractRamanT
 end
 
 """
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
+    sol_VS_1to0_plus{FT<:AbstractFloat}
+
+Stellar/solar vibrational Raman mode for H₂-dominated atmospheres, first
+excited to ground state, over concatenated spectral bands.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
@@ -618,12 +643,21 @@ needs_rayleigh_expansion(rs::AbstractRamanType) = has_inelastic(rs)
 
 Normalize Raman redistribution weights for modes whose `ϖ_λ₁λ₀` represents a
 rotational Raman fraction. Modes that do not require this normalization are
-left unchanged.
+left unchanged. For `RRS`, throws an `ArgumentError` when the weights sum to
+zero (never filled by `getRamanSSProp!`), since the Raman fraction
+1 − ϖ_Cabannes would otherwise be lost.
 """
 normalize_raman_weights!(::AbstractRamanType, model, iBand) = nothing
 
 function normalize_raman_weights!(rs::RRS, model, iBand)
     iB = iBand[1]
-    rs.ϖ_λ₁λ₀ .*= (1 - model.ϖ_Cabannes[iB]) / sum(rs.ϖ_λ₁λ₀)
+    total = sum(rs.ϖ_λ₁λ₀)
+    # getRamanSSProp! already rejects a band without lines, so zero weights
+    # mean an RRS object whose line weights were never filled.
+    total > 0 || throw(ArgumentError(
+        "rotational Raman (RRS): the line weights ϖ_λ₁λ₀ sum to $(total), so the " *
+        "Raman fraction 1 − ϖ_Cabannes of band $(iB) would be lost. Fill them first " *
+        "with getRamanSSProp!(rs, 1e7 / mean(ν), ν) for this band's grid ν."))
+    rs.ϖ_λ₁λ₀ .*= (1 - model.ϖ_Cabannes[iB]) / total
     return nothing
 end

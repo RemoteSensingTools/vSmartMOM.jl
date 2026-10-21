@@ -12,7 +12,8 @@ using vSmartMOM.Scattering
 using Test
 
 const _CTX_30 = (; user_l_cap = 30, stream_l_cap = 30,
-                  m_max_override = nothing, truncation = nothing)
+                  m_max_override = nothing, truncation = nothing,
+                  greek_beta_cutoff = nothing)
 
 @testset "Phase C — component_m_max trait dispatch" begin
 
@@ -67,6 +68,31 @@ const _CTX_30 = (; user_l_cap = 30, stream_l_cap = 30,
         params.architecture = vSmartMOM.Architectures.CPU()
         m = model_from_parameters(params)
         @test CoreRT.component_m_max(m.optics.rayleigh, _CTX_30) == 2
+    end
+
+    @testset "Aerosol greek_beta_cutoff uses |β| and the last retained l" begin
+        β = [1.0, 0.2, 9e-6, -2e-5, -8e-6]
+        z = zeros(length(β))
+        g = Scattering.GreekCoefs(copy(z), β, copy(z), copy(z), copy(z), copy(z))
+        a = Scattering.AerosolOptics(greek_coefs=g, ω̃=1.0, k=1.0, fᵗ=0.0)
+        @test CoreRT.component_m_max(a, _CTX_30) == 4
+        ctx = merge(_CTX_30, (; greek_beta_cutoff=1e-5))
+        @test CoreRT.component_m_max(a, ctx) == 3
+
+        βspec = hcat(β, [1.0, 0.1, 8e-6, 7e-6, 3e-5])
+        gs = Scattering.GreekCoefs(zeros(size(βspec)), βspec,
+             zeros(size(βspec)), zeros(size(βspec)), zeros(size(βspec)),
+             zeros(size(βspec)))
+        as = Scattering.AerosolOptics(greek_coefs=gs, ω̃=[1.0, 1.0],
+                                      k=[1.0, 1.0], fᵗ=[0.0, 0.0])
+        @test CoreRT.component_m_max(as, ctx) == 4
+
+        # A spherical/isotropic phase function has only β₀ support.
+        giso = Scattering.GreekCoefs(zeros(1), ones(1), zeros(1),
+                                     zeros(1), zeros(1), zeros(1))
+        aiso = Scattering.AerosolOptics(
+            greek_coefs=giso, ω̃=1.0, k=1.0, fᵗ=0.0)
+        @test CoreRT.component_m_max(aiso, _CTX_30) == 0
     end
 end
 
@@ -125,4 +151,13 @@ end
     # PureRayleighParameters.yaml has max_m=3, so order cap = 2.
     @test m.solver.m_max_bands == fill(2, length(m.solver.m_max_bands))
     @test m.solver.n_fourier_moments_bands == fill(3, length(m.solver.n_fourier_moments_bands))
+
+    @test !CoreRT._rayleigh_active(zeros(2, 3))
+    @test CoreRT._rayleigh_active([0.0 0.0; 0.0 1e-12])
+    vacuum_components = CoreRT._band_components(
+        params, Any[], CoreRT.SolarBeam(), 1; rayleigh_active=false)
+    vacuum_ctx = (; user_l_cap=30, stream_l_cap=30,
+                  m_max_override=nothing, truncation=nothing,
+                  greek_beta_cutoff=nothing)
+    @test CoreRT._aggregate_m_max(vacuum_components, vacuum_ctx) == 0
 end

@@ -6,7 +6,11 @@ using Distributions
 using Unitful
 using UnitfulEquivalences
 using CanopyOptics
-using ..CoreRT: vSmartMOM_Parameters, RTNumericalParameters, AbsorptionParameters, ScatteringParameters, RT_Aerosol, AtmosphericProfile
+using ..CoreRT: vSmartMOM_Parameters, RTNumericalParameters,
+                AllFourierMoments, IntensityConvergence, StokesConvergence,
+                AbsorptionParameters, ScatteringParameters, RT_Aerosol,
+                AtmosphericProfile
+using ..CoreRT   # qualified access for strategy types (CoreRT.AllFourierMoments etc.)
 using ..Absorption: load_interpolation_model
 import AtmosphericAbsorption
 using ..Scattering
@@ -100,6 +104,18 @@ const QUAD_MAP = Dict(
 )
 
 """
+RAYLEIGH_ANISOTROPY_MAP
+
+String → polarizability-tensor dispersion for the automatic (`depol < 0`)
+Rayleigh depolarization. Keys: "DispersiveAnisotropy" (default),
+"ConstantAnisotropy".
+"""
+const RAYLEIGH_ANISOTROPY_MAP = Dict(
+    "DispersiveAnisotropy" => ()->Scattering.DispersiveAnisotropy(),
+    "ConstantAnisotropy"   => ()->Scattering.ConstantAnisotropy(),
+)
+
+"""
 DECOMP_MAP
 
 String → Fourier decomposition method mapping for scattering.
@@ -142,7 +158,8 @@ Supported:
 - LambertianSurfaceSpectrum([albedo_per_band])
 - LambertianSurfaceLegendre([coefficients])
 - rpvSurfaceScalar(ρ₀, ρ_c, k, Θ)
-- RossLiSurfaceScalar(fvol, fgeo, fiso)
+- RossLiSurfaceScalar(fvol, fgeo, fiso), optionally with `zenith_cap_deg=θ`
+  (default 80) or `zenith_cap_deg=nothing`/`null` (no cap)
 - CoxMunkSurface(wind_speed=U) or CoxMunkSurface(U)
 """
 const BRDF_MAP = Dict{String, Function}(
@@ -278,17 +295,25 @@ function _split_args(args_str::AbstractString)
     return args
 end
 
-"Parse a single argument into a number, boolean, or a vector of numbers (no eval)"
-function _parse_arg(arg::AbstractString, FT)
+"""
+    _parse_arg(arg, FT; allow_nothing = false)
+
+Parse a single argument into a number, boolean or vector of numbers (no
+eval). With `allow_nothing = true` (surface specifications), `nothing`,
+`null` and `none` parse to `nothing`.
+"""
+function _parse_arg(arg::AbstractString, FT; allow_nothing::Bool = false)
     a = strip(arg)
     if isempty(a)
         return nothing
     end
-    # Boolean literals
+    # Boolean and empty-value literals (`null` is the YAML/JSON spelling)
     if lowercase(a) == "true"
         return true
     elseif lowercase(a) == "false"
         return false
+    elseif allow_nothing && lowercase(a) in ("nothing", "null", "none")
+        return nothing
     end
     if startswith(a, "[") && endswith(a, "]")
         inner = strip(a[2:end-1])
@@ -339,8 +364,29 @@ function _construct_surface(::Val{:rpvSurfaceScalar}, FT, args)
 end
 
 function _construct_surface(::Val{:RossLiSurfaceScalar}, FT, args)
-    _require_nargs("RossLiSurfaceScalar", args, 3, "fvol, fgeo, fiso")
-    return CoreRT.RossLiSurfaceScalar(FT(args[1]), FT(args[2]), FT(args[3]))
+    # Forms: (fvol, fgeo, fiso); (fvol, fgeo, fiso, zenith_cap_deg=θ); or all
+    # keywords. `zenith_cap_deg=nothing` (or `null`) removes the 80° cap.
+    kw = !isempty(args) && last(args) isa AbstractDict ? last(args) : Dict{Symbol,Any}()
+    positional = !isempty(args) && last(args) isa AbstractDict ? args[1:end-1] : args
+    names = (:fvol, :fgeo, :fiso)
+    unknown = setdiff(keys(kw), (names..., :zenith_cap_deg))
+    _require_config(isempty(unknown),
+        "RossLiSurfaceScalar: unknown keyword argument(s) $(join(unknown, ", ")).")
+    if isempty(positional)
+        _require_config(all(k -> haskey(kw, k), names),
+            "RossLiSurfaceScalar keyword arguments require fvol, fgeo and fiso.")
+        coeffs = [kw[k] for k in names]
+    else
+        _require_nargs("RossLiSurfaceScalar", positional, 3, "fvol, fgeo, fiso")
+        _require_config(!any(k -> haskey(kw, k), names),
+            "RossLiSurfaceScalar: give fvol, fgeo, fiso either positionally or as keywords.")
+        coeffs = positional
+    end
+    cap = get(kw, :zenith_cap_deg, 80)
+    _require_config(cap === nothing || (cap isa Real && !(cap isa Bool) && 0 < cap <= 90),
+        "RossLiSurfaceScalar: zenith_cap_deg must lie in (0, 90] degrees or be nothing/null.")
+    return CoreRT.RossLiSurfaceScalar(FT(coeffs[1]), FT(coeffs[2]), FT(coeffs[3]);
+                                      zenith_cap_deg = cap)
 end
 
 function _construct_surface(::Val{:CoxMunkSurface}, FT, args)
@@ -372,7 +418,9 @@ Parse a surface spec like "LambertianSurfaceScalar(0.1)" or
 
 Supports both positional arguments and keyword arguments (key=value syntax).
 When keyword arguments are detected, a `Dict{Symbol,Any}` is passed as the
-sole element of the args list to the dispatching surface constructor.
+last element of the args list to the dispatching surface constructor, after
+any positional arguments (all-keyword specs therefore pass it as the sole
+element). Values `nothing`, `null` and `none` parse to `nothing`.
 """
 function parse_surface_str(s::AbstractString, FT)
     # Match "Name(args)" or "Name{Type}(args)" -- strip optional type parameter
@@ -391,18 +439,21 @@ function parse_surface_str(s::AbstractString, FT)
     has_kwargs = any(p -> occursin('=', p) && !startswith(strip(p), "["), raw_parts)
 
     if has_kwargs
-        # Pack keyword arguments into a Dict passed as args[1]
+        # Positional arguments first, then the keyword arguments as one Dict
+        positional = Any[]
         kwargs = Dict{Symbol,Any}()
         for part in raw_parts
             p = strip(part)
             if occursin('=', p) && !startswith(p, "[")
                 kv = split(p, '='; limit=2)
-                kwargs[Symbol(strip(kv[1]))] = _parse_arg(strip(kv[2]), FT)
+                kwargs[Symbol(strip(kv[1]))] = _parse_arg(strip(kv[2]), FT; allow_nothing = true)
+            else
+                push!(positional, _parse_arg(p, FT; allow_nothing = true))
             end
         end
-        return _construct_surface(Val(Symbol(name)), FT, Any[kwargs])
+        return _construct_surface(Val(Symbol(name)), FT, Any[positional..., kwargs])
     else
-        args_list = [_parse_arg(x, FT) for x in raw_parts]
+        args_list = [_parse_arg(x, FT; allow_nothing = true) for x in raw_parts]
         return _construct_surface(Val(Symbol(name)), FT, args_list)
     end
 end
@@ -534,12 +585,9 @@ When (z₀, σ₀) is provided (altitude-form, preferred), the profile is stored
 signature. When (p₀, σp) is provided (pressure-form, legacy), the profile is
 stored as `Normal(p₀, σp)` and consumed by the pressure-space signature.
 
-NOTE (Phase 1b): the altitude-form → pressure-grid integration path in
-`getAerosolLayerOptProp(total_τ, dist::Distribution, profile::AtmosphericProfile)`
-still interprets `dist` in pressure space. When τ_ref = 0 (e.g. the Phase 1b
-regression gate), this is a no-op. Proper altitude-form dispatch will land in a
-follow-up alongside the aerosol-module wire-in (Phase 1d) or the workspace
-landing (Phase 4), whichever proves more natural."""
+Altitude-form `LogNormal` profiles are integrated exactly between geometric
+layer interfaces; pressure-form `Normal` profiles retain pressure-space
+discretization."""
 function aerosol_params_to_obj(aerosols, FT)
     rt_aerosol_obj_list = RT_Aerosol{FT}[]
     for aerosol in aerosols
@@ -571,6 +619,53 @@ function aerosol_params_to_obj(aerosols, FT)
     return rt_aerosol_obj_list
 end
 
+# Keys of the sections that `schemas/vsmartmom-parameters.schema.json` closes
+# (`additionalProperties: false`); test_parameters_parser.jl keeps them in step.
+const _KNOWN_CONFIG_KEYS = (
+    top = ("radiative_transfer", "geometry", "atmospheric_profile", "absorption",
+           "scattering", "canopy", "_metadata"),
+    radiative_transfer = ("architecture", "depol", "float_type", "greek_beta_cutoff",
+                          "l_trunc", "m_max", "max_m", "nstreams", "numerics",
+                          "polarization_type", "quadrature_type",
+                          "rayleigh_anisotropy", "spec_bands",
+                          "surface", "truncation", "Δ_angle"),
+    geometry = ("obs_alt", "sza", "vaz", "vza"),
+)
+const _WARNED_UNKNOWN_KEYS = Set{String}()
+const _WARNED_UNKNOWN_KEYS_LOCK = ReentrantLock()
+
+"""
+    _warn_unknown_keys(params)
+
+Warn, once per key and session, about keys the parser does not read in the
+top level and in the `radiative_transfer` and `geometry` blocks (typically a
+misspelled optional key such as `nstream` or `quadrature`, which would
+otherwise leave the default in effect silently). Unknown keys stay non-fatal so that larger
+configuration files carrying their own sections keep working.
+"""
+function _warn_unknown_keys(params)
+    sections = (("", params, _KNOWN_CONFIG_KEYS.top),
+                ("radiative_transfer.", get(params, "radiative_transfer", nothing),
+                 _KNOWN_CONFIG_KEYS.radiative_transfer),
+                ("geometry.", get(params, "geometry", nothing), _KNOWN_CONFIG_KEYS.geometry))
+    for (prefix, block, known) in sections
+        block isa AbstractDict || continue
+        for key in keys(block)
+            name = prefix * string(key)
+            string(key) in known && continue
+            first_time = lock(_WARNED_UNKNOWN_KEYS_LOCK) do
+                name in _WARNED_UNKNOWN_KEYS ? false :
+                    (push!(_WARNED_UNKNOWN_KEYS, name); true)
+            end
+            first_time || continue
+            @warn "Configuration key `$name` is not read by vSmartMOM and is ignored " *
+                  "(check its spelling against the schema; known keys here: " *
+                  "$(join(known, ", ")))."
+        end
+    end
+    return nothing
+end
+
 "Given a parameter dictionary from a YAML file, validate the dictionary"
 function validate_yaml_parameters(params)
     # Required fields — must be present and well-typed.
@@ -584,7 +679,7 @@ function validate_yaml_parameters(params)
         (["geometry", "sza"], Real),
         (["geometry", "vza"], Array{<:Real}),
         (["geometry", "vaz"], Array{<:Real}),
-        (["geometry", "obs_alt"], Real),
+        (["geometry", "obs_alt"], Union{Real, AbstractVector}),
         (["atmospheric_profile", "T"], Array{<:Real}),
         (["atmospheric_profile", "p"], Array{<:Real}),
         (["atmospheric_profile", "profile_reduction"], Union{Integer, Nothing}),
@@ -600,6 +695,10 @@ function validate_yaml_parameters(params)
         (["radiative_transfer", "l_trunc"], Integer),            # Legacy
         (["radiative_transfer", "nstreams"], Integer),           # Phase D primary knob
         (["radiative_transfer", "m_max"], Union{Integer, Nothing}),  # Phase D explicit override
+        (["radiative_transfer", "greek_beta_cutoff"], Union{Real, Nothing}),
+        (["radiative_transfer", "rayleigh_anisotropy"], String,
+         ["DispersiveAnisotropy()", "ConstantAnisotropy()",
+          "DispersiveAnisotropy", "ConstantAnisotropy"]),
     ]
     section_fields = [
         (["absorption", "vmr"], Dict),
@@ -647,6 +746,33 @@ function validate_yaml_parameters(params)
     if haskey(rt, "nstreams") && haskey(rt, "l_trunc")
         @warn "Both `nstreams` and `l_trunc` set in radiative_transfer; `l_trunc` is legacy and will be ignored. Use only `nstreams` for new configs."
     end
+    if haskey(rt, "max_m") && haskey(rt, "m_max")
+        # Silent precedence would be a schema-migration trap: adding the
+        # documented `m_max` to an old config would have no effect and could
+        # leave structured surfaces under-resolved.
+        _require_config(false,
+            "Both legacy `max_m` (a count) and `m_max` (an order) are set in " *
+            "radiative_transfer; they conflict. Remove `max_m` from migrated " *
+            "configs (keep `m_max`), or remove `m_max` to stay on the legacy " *
+            "schema.")
+    end
+    if haskey(rt, "greek_beta_cutoff") && rt["greek_beta_cutoff"] !== nothing
+        cutoff = rt["greek_beta_cutoff"]
+        _require_config(cutoff isa Real && !(cutoff isa Bool) &&
+                        isfinite(cutoff) && cutoff > 0,
+                        "radiative_transfer/greek_beta_cutoff must be a finite positive number or null")
+    end
+
+    # Migration guard for the two-stage aerosol Fourier-support rule.  Keep
+    # omission backward compatible with `null`, but require users to make the
+    # computationally important choice visible when they next touch an
+    # aerosol YAML/TOML file.  Analytic and Mie aerosols are both included:
+    # the cutoff is harmless when their beta series is already compact.
+    scattering = get(params, "scattering", nothing)
+    aerosols = scattering isa AbstractDict ? get(scattering, "aerosols", Any[]) : Any[]
+    if !isempty(aerosols) && !haskey(rt, "greek_beta_cutoff")
+        @warn "Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility."
+    end
 
     if "scattering" in keys(params)
         validate_aerosols(params["scattering"]["aerosols"])
@@ -655,6 +781,16 @@ function validate_yaml_parameters(params)
         ab = params["absorption"]
         @assert haskey(ab, "molecules") || haskey(ab, "fixed_molecules") || haskey(ab, "variable_molecules") "absorption section must define `fixed_molecules` and/or `variable_molecules` (or legacy `molecules`)"
     end
+
+
+    obs_alt = params["geometry"]["obs_alt"]
+    values = obs_alt isa AbstractVector ? obs_alt : (obs_alt,)
+    _require_config(!(obs_alt isa AbstractVector) || !isempty(obs_alt),
+                    "geometry/obs_alt must not be an empty vector")
+    _require_config(all(x -> x isa Real && !(x isa Bool), values),
+                    "geometry/obs_alt must be a number or a vector of numbers")
+    _require_config(all(x -> isfinite(x) && x >= 0, values),
+                    "geometry/obs_alt values must be finite, nonnegative heights in km above BOA")
 end
 
 "Build parameters from a Dict (e.g., parsed YAML)"
@@ -877,6 +1013,23 @@ function _parse_quadrature(params_dict::Dict)
     return QUAD_MAP[qkey]()
 end
 
+"""
+    _parse_rayleigh_anisotropy(params_dict)
+
+Parse the optional `radiative_transfer.rayleigh_anisotropy`
+(`"DispersiveAnisotropy()"`, the default, or `"ConstantAnisotropy()"`): the
+wavelength dependence of the N₂/O₂ polarizability tensor behind the automatic
+(`depol < 0`) Rayleigh depolarization.
+"""
+function _parse_rayleigh_anisotropy(params_dict::Dict)
+    rt = params_dict["radiative_transfer"]
+    haskey(rt, "rayleigh_anisotropy") || return Scattering.DispersiveAnisotropy()
+    key = replace(String(rt["rayleigh_anisotropy"]), "()" => "")
+    _require_config(haskey(RAYLEIGH_ANISOTROPY_MAP, key),
+                    "Unknown rayleigh_anisotropy $(key); use DispersiveAnisotropy() or ConstantAnisotropy().")
+    return RAYLEIGH_ANISOTROPY_MAP[key]()
+end
+
 function _parse_polarization(params_dict::Dict, FT)
     pol_key = replace(String(params_dict["radiative_transfer"]["polarization_type"]),"()"=>"")
     _require_config(haskey(POLARIZATION_MAP, pol_key), "Unknown polarization_type $(pol_key).")
@@ -893,11 +1046,151 @@ function _parse_atmosphere(params_dict::Dict, FT)
     T = convert.(FT, params_dict["atmospheric_profile"]["T"]) # Level
     p = convert.(FT, params_dict["atmospheric_profile"]["p"]) # Boundaries
     q = haskey(params_dict["atmospheric_profile"], "q") ? convert.(FT, params_dict["atmospheric_profile"]["q"]) : zeros(FT, length(T))
-    prof_red = params_dict["atmospheric_profile"]["profile_reduction"]
+    raw_prof_red = params_dict["atmospheric_profile"]["profile_reduction"]
+    prof_red = raw_prof_red === nothing ? -1 : Int(raw_prof_red)
+    _require_config(prof_red == -1 || prof_red > 0,
+                    "atmospheric_profile/profile_reduction must be -1, null, or a positive integer")
     return T, p, q, prof_red
 end
 
-function _parse_absorption(params_dict::Dict, FT, q=nothing)
+function _oco2_absco_band(spec_band)
+    νlo, νhi = extrema(spec_band)
+    if νlo >= 12_000 && νhi <= 14_000
+        return :o2
+    elseif νlo >= 6_000 && νhi <= 7_000
+        return :wco2
+    elseif νlo >= 4_500 && νhi <= 5_500
+        return :sco2
+    end
+    throw(ArgumentError(
+        "Direct ABSCO HDF ingestion currently supports OCO-2 O2 (12000–14000 cm⁻¹), " *
+        "WCO2 (6000–7000 cm⁻¹), and SCO2 (4500–5500 cm⁻¹) bands; got " *
+        "$(νlo)–$(νhi) cm⁻¹",
+    ))
+end
+
+function _load_absorption_lut(path::AbstractString, spec_band, FT, architecture)
+    extension = lowercase(splitext(path)[2])
+    aa_architecture = CoreRT._to_aa_arch(architecture)
+    if extension in (".hdf", ".h5", ".hdf5")
+        return AtmosphericAbsorption.read_oco2_absco(
+            path,
+            _oco2_absco_band(spec_band);
+            FT,
+            architecture=aa_architecture,
+            broadener_vmr=:all,
+        )
+    elseif extension == ".absco"
+        lut = AtmosphericAbsorption.load_absco_lut(path; architecture=aa_architecture)
+        eltype(lut) === FT || throw(ArgumentError(
+            "ABSCO LUT $path stores $(eltype(lut)); expected $FT for this configuration",
+        ))
+        return lut
+    end
+    return load_interpolation_model(path)
+end
+
+"Parse observer heights without collapsing the scalar/vector distinction."
+function _parse_obs_alt(raw, FT)
+    if raw isa Real && !(raw isa Bool)
+        value = FT(raw)
+        _require_config(isfinite(value) && value >= zero(FT),
+                        "geometry/obs_alt must be finite and nonnegative")
+        return value
+    end
+    _require_config(raw isa AbstractVector && !isempty(raw),
+                    "geometry/obs_alt must be a number or a nonempty vector of numbers")
+    _require_config(all(x -> x isa Real && !(x isa Bool), raw),
+                    "geometry/obs_alt vector entries must be numbers")
+    values = FT.(raw)
+    _require_config(all(x -> isfinite(x) && x >= zero(FT), values),
+                    "geometry/obs_alt values must be finite, nonnegative heights in km above BOA")
+    return convert(Vector{FT}, values)
+end
+
+"""
+    _parse_cia_files(abs_dict)
+
+Parse `absorption.cia_files`. Each entry may be a legacy path string, or a
+mapping with `path`, optional `reference_codes` (one string or a nonempty list
+of strings), and optional `negative_policy` (`error` or `clamp_zero`).
+"""
+function _parse_cia_files(abs_dict::AbstractDict)
+    haskey(abs_dict, "cia_files") || return (
+        String[], Union{Nothing,Vector{String}}[], Symbol[])
+
+    entries = abs_dict["cia_files"]
+    _require_config(entries isa AbstractVector,
+        "absorption/cia_files must be a list of paths or configuration mappings")
+
+    paths = String[]
+    reference_codes = Union{Nothing,Vector{String}}[]
+    negative_policies = Symbol[]
+    allowed_keys = Set(["path", "reference_codes", "negative_policy"])
+
+    for (i, entry) in enumerate(entries)
+        if entry isa AbstractString
+            path = String(entry)
+            refs = nothing
+            policy = :error
+        else
+            _require_config(entry isa AbstractDict,
+                "absorption/cia_files[$i] must be a path string or mapping")
+            keys_string = Set(String.(keys(entry)))
+            unknown = setdiff(keys_string, allowed_keys)
+            _require_config(isempty(unknown),
+                "absorption/cia_files[$i] has unknown field(s): $(join(sort!(collect(unknown)), ", "))")
+            _require_config(haskey(entry, "path"),
+                "absorption/cia_files[$i] mapping requires `path`")
+            _require_config(entry["path"] isa AbstractString,
+                "absorption/cia_files[$i]/path must be a string")
+            path = String(entry["path"])
+
+            raw_refs = get(entry, "reference_codes", nothing)
+            if raw_refs === nothing
+                refs = nothing
+            elseif raw_refs isa AbstractString
+                refs = [strip(String(raw_refs))]
+            else
+                _require_config(raw_refs isa AbstractVector && !isempty(raw_refs),
+                    "absorption/cia_files[$i]/reference_codes must be a nonempty string or list of strings")
+                _require_config(all(code -> code isa AbstractString, raw_refs),
+                    "absorption/cia_files[$i]/reference_codes entries must be strings")
+                refs = unique(strip.(String.(raw_refs)))
+            end
+            _require_config(refs === nothing ||
+                            (!isempty(refs) && all(!isempty, refs)),
+                "absorption/cia_files[$i]/reference_codes must not contain empty codes")
+
+            raw_policy = get(entry, "negative_policy", "error")
+            _require_config(raw_policy isa AbstractString || raw_policy isa Symbol,
+                "absorption/cia_files[$i]/negative_policy must be `error` or `clamp_zero`")
+            policy = Symbol(raw_policy)
+            _require_config(policy in (:error, :clamp_zero),
+                "absorption/cia_files[$i]/negative_policy must be `error` or `clamp_zero`")
+        end
+
+        _require_config(!isempty(strip(path)),
+            "absorption/cia_files[$i]/path must not be empty")
+        push!(paths, _expand_env_path(path))
+        push!(reference_codes, refs)
+        push!(negative_policies, policy)
+    end
+    return paths, reference_codes, negative_policies
+end
+
+"""
+    _parse_absorption(params_dict, FT, q=nothing, spec_bands=nothing,
+                      architecture=nothing)
+
+Parse the `absorption:` YAML block. `spec_bands` and `architecture` are only
+required when the block requests direct LUT ingestion (`LUTfiles` with ABSCO
+HDF entries) — the band range selects the ABSCO band and the architecture
+places the table; every other absorption path (line-by-line, legacy
+interpolation tables, CIA, MT_CKD) parses without them.
+"""
+function _parse_absorption(params_dict::Dict, FT, q=nothing, spec_bands=nothing,
+                           architecture=nothing)
     if !haskey(params_dict, "absorption")
         return nothing
     end
@@ -970,14 +1263,25 @@ function _parse_absorption(params_dict::Dict, FT, q=nothing)
     #    `vcat(fixed_molecules[band], variable_molecules[band])`. ───────────
     luts = []
     h2o_lut = Vector{Any}(nothing, n_bands)
+    h2o_absorption = haskey(abs_dict, "h2o_absorption") ?
+        Bool.(Array(abs_dict["h2o_absorption"])) : fill(true, n_bands)
+    _require_config(length(h2o_absorption) == n_bands,
+        "h2o_absorption must have one Boolean entry per band ($n_bands); " *
+        "got $(length(h2o_absorption))")
     if haskey(abs_dict, "LUTfiles")
+        _require_config(spec_bands !== nothing && architecture !== nothing,
+            "absorption.LUTfiles requires the spectral bands and compute " *
+            "architecture to be parsed first (band selection + table placement)")
         files_lut = Array(abs_dict["LUTfiles"])
         _require_config(length(files_lut) == n_bands,
             "LUTfiles must have one entry per band ($(n_bands)); got $(length(files_lut))")
         for ib in 1:n_bands
-            band_models = [load_interpolation_model(_expand_env_path(f)) for f in files_lut[ib]]
+            band_models = [_load_absorption_lut(_expand_env_path(f), spec_bands[ib], FT,
+                                                architecture) for f in files_lut[ib]]
             h2o_idx = findfirst(m -> getfield(m, :mol) == 1, band_models)
             if h2o_idx !== nothing
+                _require_config(h2o_absorption[ib],
+                    "band $ib disables H2O absorption but also supplies an H2O LUT")
                 h2o_lut[ib] = band_models[h2o_idx]
                 deleteat!(band_models, h2o_idx)
             end
@@ -987,17 +1291,22 @@ function _parse_absorption(params_dict::Dict, FT, q=nothing)
             push!(luts, band_models)
         end
     end
+    for ib in 1:n_bands
+        h2o_absorption[ib] || (h2o_lut[ib] = :disabled)
+    end
 
-    cia_files = haskey(abs_dict, "cia_files") ?
-                String.(Array(abs_dict["cia_files"])) :
-                String[]
+    cia_files, cia_reference_codes, cia_negative_policies =
+        _parse_cia_files(abs_dict)
+    # `${ENV:NAME}` markers resolve here, as for `LUTfiles`.
     mtckd_file = haskey(abs_dict, "mtckd_file") ?
-                 String(abs_dict["mtckd_file"]) :
+                 _expand_env_path(String(abs_dict["mtckd_file"])) :
                  ""
 
     return AbsorptionParameters(fixed_molecules, variable_molecules, vmr,
                                 broadening_function, CEF, wing_cutoff,
-                                luts, h2o_lut, cia_files, mtckd_file)
+                                luts, h2o_lut, cia_files,
+                                cia_reference_codes, cia_negative_policies,
+                                mtckd_file)
 end
 
 function _parse_scattering(params_dict::Dict, FT::Type{<:AbstractFloat}=Float64)
@@ -1007,6 +1316,15 @@ function _parse_scattering(params_dict::Dict, FT::Type{<:AbstractFloat}=Float64)
     FTa = FT
     aerosols = aerosol_params_to_obj(params_dict["scattering"]["aerosols"], FTa)
     r_max = FTa(params_dict["scattering"]["r_max"])
+    # Optional fixed lower bound of the radius quadrature (µm). The nodes do not
+    # depend on the size distributions, so the size Jacobians are exact
+    # derivatives of the discretized optics.
+    r_min_value = get(params_dict["scattering"], "r_min", Scattering.DEFAULT_R_MIN)
+    _require_config(r_min_value isa Real && !(r_min_value isa Bool),
+        "scattering.r_min must be a number (µm); got $(repr(r_min_value))")
+    r_min = FTa(r_min_value)
+    _require_config(isfinite(r_min) && isfinite(r_max) && 0 < r_min < r_max,
+        "scattering.r_min must satisfy 0 < r_min < r_max; got r_min = $r_min, r_max = $r_max")
     nquad_radius = params_dict["scattering"]["nquad_radius"]
     λ_ref = FTa(params_dict["scattering"]["λ_ref"])
     dkey = replace(String(params_dict["scattering"]["decomp_type"]),"()"=>"")
@@ -1017,7 +1335,7 @@ function _parse_scattering(params_dict::Dict, FT::Type{<:AbstractFloat}=Float64)
     else
         parse(Complex{FTa}, params_dict["scattering"]["n_ref"])
     end
-    return ScatteringParameters(aerosols, r_max, nquad_radius, λ_ref, n_ref, decomp_type)
+    return ScatteringParameters(aerosols, r_max, nquad_radius, λ_ref, n_ref, decomp_type, r_min)
 end
 
 """
@@ -1028,15 +1346,22 @@ Validates schema and parses radiative_transfer, geometry, atmospheric_profile,
 and optional absorption/scattering sections.
 """
 function parameters_from_dict(params_dict::Dict)
+    _warn_unknown_keys(params_dict)
     validate_yaml_parameters(params_dict)
     FT = _parse_float_type(params_dict)
     spec_bands = _parse_spec_bands(params_dict, FT)
     BRDF_per_band = _parse_surfaces(params_dict, FT)
+    # Surface i belongs to band i; entries beyond the last band are never
+    # used. Warn rather than fail, so existing configurations keep running.
+    length(BRDF_per_band) > length(spec_bands) && @warn(
+        "radiative_transfer.surface has $(length(BRDF_per_band)) entries for " *
+        "$(length(spec_bands)) spectral band(s); entries beyond band " *
+        "$(length(spec_bands)) are ignored.", maxlog = 1)
     quadrature_type = _parse_quadrature(params_dict)
     polarization_type = _parse_polarization(params_dict, FT)
     architecture = _parse_architecture(params_dict)
     T, p, q, profile_reduction = _parse_atmosphere(params_dict, FT)
-    absorption_params = _parse_absorption(params_dict, FT, q)
+    absorption_params = _parse_absorption(params_dict, FT, q, spec_bands, architecture)
     scattering_params = _parse_scattering(params_dict, FT)
 
     if haskey(params_dict, "canopy")
@@ -1047,14 +1372,19 @@ function parameters_from_dict(params_dict::Dict)
     # `_resolve_resolution_knobs` for the exact precedence rules.
     res = _resolve_resolution_knobs(params_dict)
 
-    # Δ_angle is optional (default 0.0 — no forward-peak exclusion in δBGE).
-    # When the legacy parser path resolves `truncation` to `δBGE`, this is the
-    # forward-peak half-angle in degrees. Ignored when `truncation` resolves to
-    # `NoTruncation()` or when `truncation: auto` decides the phase function
-    # already fits within `stream_l_cap`.
-    Δ_angle = FT(get(params_dict["radiative_transfer"], "Δ_angle", 0.0))
+    # Δ_angle (the δBGE forward-peak exclusion cone) is retired: the key is
+    # still accepted for old configurations, but the stored value is 0.
+    Δ_angle_in = get(params_dict["radiative_transfer"], "Δ_angle", 0.0)
+    iszero(Δ_angle_in) || @warn(
+        "radiative_transfer.Δ_angle = $(Δ_angle_in) is retired and ignored (stored as 0): " *
+        "the δBGE fit always uses the full angular domain. Remove the key.", maxlog = 1)
+    Δ_angle = zero(FT)
     truncation = _parse_truncation(params_dict, res.l_trunc, Δ_angle, FT)
     numerics = _parse_numerics(params_dict, FT)
+    greek_beta_cutoff_raw = get(params_dict["radiative_transfer"],
+                                "greek_beta_cutoff", nothing)
+    greek_beta_cutoff = greek_beta_cutoff_raw === nothing ? nothing :
+                        FT(greek_beta_cutoff_raw)
 
     return vSmartMOM_Parameters(
         spec_bands, BRDF_per_band, quadrature_type, polarization_type,
@@ -1063,10 +1393,11 @@ function parameters_from_dict(params_dict::Dict)
         numerics, FT,
         architecture,
         FT(params_dict["geometry"]["sza"]), convert.(FT, params_dict["geometry"]["vza"]),
-        convert.(FT, params_dict["geometry"]["vaz"]), FT(params_dict["geometry"]["obs_alt"]),
+        convert.(FT, params_dict["geometry"]["vaz"]), _parse_obs_alt(params_dict["geometry"]["obs_alt"], FT),
         T, p, q, profile_reduction,
         absorption_params, scattering_params,
         res.nstreams, res.m_max_override, res.stream_l_cap, res.legacy_l_cap_override,
+        greek_beta_cutoff, _parse_rayleigh_anisotropy(params_dict),
     )
 end
 
@@ -1188,6 +1519,18 @@ function _parse_numerics(params_dict, FT)
         return RTNumericalParameters{FT}()
     end
     n = rt["numerics"]
+    n isa AbstractDict || throw(ArgumentError("radiative_transfer.numerics must be a mapping"))
+    allowed = ("dτ_max_threshold", "dtau_max_threshold", "dτ_min_floor",
+               "dtau_min_floor", "blas_threads", "verbose", "fourier_convergence",
+               "fourier_tolerance", "fourier_min_m", "fourier_n_consecutive", "ss_correction")
+    unknown = setdiff(collect(keys(n)), allowed)
+    isempty(unknown) || throw(ArgumentError("Unknown numerics keys: $(join(unknown, ", "))"))
+    for (unicode, ascii) in (("dτ_max_threshold", "dtau_max_threshold"),
+                             ("dτ_min_floor", "dtau_min_floor"))
+        if haskey(n, unicode) && haskey(n, ascii) && n[unicode] != n[ascii]
+            throw(ArgumentError("Conflicting numerics aliases $unicode and $ascii"))
+        end
+    end
     kwargs = Dict{Symbol, Any}()
     if haskey(n, "dτ_max_threshold") || haskey(n, "dtau_max_threshold")
         v = haskey(n, "dτ_max_threshold") ? n["dτ_max_threshold"] : n["dtau_max_threshold"]
@@ -1205,6 +1548,51 @@ function _parse_numerics(params_dict, FT)
     end
     if haskey(n, "verbose")
         kwargs[:verbose] = Bool(n["verbose"])
+    end
+    if haskey(n, "fourier_convergence")
+        selection = n["fourier_convergence"]
+        name = selection === nothing ? "all" : lowercase(String(selection))
+        if name in ("all", "none")
+            any(k -> haskey(n, k), ("fourier_tolerance", "fourier_min_m", "fourier_n_consecutive")) &&
+                throw(ArgumentError("Fourier convergence thresholds require intensity or stokes convergence"))
+            kwargs[:fourier_convergence] = AllFourierMoments()
+        elseif name == "intensity"
+            tolerance = FT(get(n, "fourier_tolerance", 1e-5))
+            min_m = Int(get(n, "fourier_min_m", 3))
+            n_consecutive = Int(get(n, "fourier_n_consecutive", 2))
+            kwargs[:fourier_convergence] = IntensityConvergence(
+                tolerance; min_m, n_consecutive)
+        elseif name in ("stokes", "iqu")
+            tolerance = FT(get(n, "fourier_tolerance", 1e-5))
+            min_m = Int(get(n, "fourier_min_m", 3))
+            n_consecutive = Int(get(n, "fourier_n_consecutive", 2))
+            kwargs[:fourier_convergence] = StokesConvergence(
+                tolerance; min_m, n_consecutive)
+        else
+            throw(ArgumentError(
+                "numerics.fourier_convergence must be 'all', 'intensity', " *
+                "or 'stokes'; " *
+                "received '$selection'"))
+        end
+    elseif haskey(n, "fourier_tolerance") ||
+           haskey(n, "fourier_min_m") ||
+           haskey(n, "fourier_n_consecutive")
+        throw(ArgumentError(
+            "fourier_tolerance/fourier_min_m/fourier_n_consecutive require " *
+            "numerics.fourier_convergence: intensity or stokes"))
+    end
+    if haskey(n, "ss_correction")
+        selection = n["ss_correction"]
+        name = selection === nothing ? "none" : lowercase(String(selection))
+        if name == "none"
+            kwargs[:ss_correction] = CoreRT.NoSSCorrection()
+        elseif name == "tms"
+            kwargs[:ss_correction] = CoreRT.TMSCorrection()
+        else
+            throw(ArgumentError(
+                "numerics.ss_correction must be 'none' or 'tms'; " *
+                "received '$selection'"))
+        end
     end
     return RTNumericalParameters{FT}(; kwargs...)
 end

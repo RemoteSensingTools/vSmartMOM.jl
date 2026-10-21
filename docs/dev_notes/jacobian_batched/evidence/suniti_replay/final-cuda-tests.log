@@ -1,0 +1,18 @@
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:31[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:21[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:10[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:06[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:20[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:13[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:05[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:04[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:03[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:07[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:04[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:03[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:03[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Test Summary:            | Pass  Total     Time
+Local optical basis CUDA | 1021   1021  4m47.0s
+Test Summary:                     | Pass  Total     Time
+Equivalent-source adding with SIF |  284    284  1m37.5s
+Test Summary:            | Pass  Total   Time
+Equivalent-source adding |   92     92  10.4s

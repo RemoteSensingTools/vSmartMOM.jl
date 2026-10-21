@@ -284,6 +284,26 @@ function gauleg_log(n, r_min, r_max; norm=false)
     return r, w
 end
 
+"""
+    radius_quadrature(model::MieModel, ::Type{T}=typeof(model.r_max); norm=false) -> (r, wᵣ)
+
+Radius nodes and weights of `model`'s size-distribution quadrature:
+`gauleg_log` with `model.nquad_radius` nodes on `[model.r_min, model.r_max]`.
+The bounds are converted to `T`; the nodes and weights come back in
+`promote_type(T, Float64)` (the Gauss–Legendre abscissae are `Float64`).
+
+The nodes depend only on `r_min`, `r_max` and `nquad_radius`, not on the size
+distribution, so a change of the distribution parameters changes only the
+weights (`compute_wₓ`); the linearized NAI-2 path differentiates exactly those
+weights. Every log-normal Mie path (NAI-2 CPU and GPU, linearized NAI-2, PCW)
+builds its nodes here.
+"""
+function radius_quadrature(model::MieModel, ::Type{T}=typeof(model.r_max);
+                           norm=false) where {T}
+    _check_radius_bounds(model.r_min, model.r_max)
+    return gauleg_log(model.nquad_radius, T(model.r_min), T(model.r_max); norm=norm)
+end
+
 @doc raw"""
     reconstruct_phase(greek_coefs, μ; returnLeg = false)
 
@@ -494,7 +514,9 @@ construct_Π_matrix(mod::Stokes_I, P, R, T, l::Int, m::Int; sign_change=false) =
 """
     $(FUNCTIONNAME)(mod::Stokes_IQUV, α, β, γ, δ, ϵ, ζ, l::Int)
 Compute B matrix for all stokes vector elements used in computations of the phase matrix
-See Sanghavi 2014, eq. 16
+See Sanghavi 2014, eq. 16. Storage convention: `+ϵ` at [3,4] is Siewert's (and
+Sanghavi & Stephens 2015, Eq. 22) `-ε`, because the code's γ and ϵ carry the
+opposite sign to Siewert's; see the conventions page, §2.
 """
 construct_B_matrix(mod::Stokes_IQUV, α, β, γ, δ, ϵ, ζ, l::Int) = SMatrix{4,4}([β[l] γ[l] 0 0 ; γ[l] α[l] 0 0; 0 0 ζ[l] ϵ[l]; 0 0 -ϵ[l] δ[l]])
 

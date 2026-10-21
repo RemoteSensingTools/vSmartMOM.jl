@@ -37,16 +37,15 @@ default.
 # Fields
 - `F₀ :: Union{Nothing, AbstractMatrix}`: solar irradiance Stokes vector
   or `nothing` for the unit default. Stored without an `eltype`
-  constraint so users can pass a `Vector{Float32}` matrix into a
+  constraint so users can pass a `Matrix{Float32}` into a
   `Float64` model (or vice versa) — the conversion happens once in
   `prepare_source`.
-- `sza :: Union{Nothing, Real}`: **advisory only in v0.6.** vSmartMOM
-  currently always reads SZA from `RTModel.obs_geom.sza` (which is fixed
-  at model construction by `parameters_from_yaml(...).sza`). The
-  `SolarBeam.sza` field is reserved for a future per-source-geometry
-  override (rt_run will rebuild quad_points from this when set), but
-  setting it today is a no-op — the model's geometry wins. To change
-  SZA today, set `params.sza` before `model_from_parameters(params)`.
+- `sza :: Union{Nothing, Real}`: optional solar zenith angle in degrees.
+  When supplied, it must match the model geometry at the model's floating-point
+  precision; a mismatch throws `ArgumentError` at solve time. To change SZA,
+  set `params.sza` before `model_from_parameters(params)` or use
+  `remake_geometry`. A solve supports at most one `SolarBeam` (including
+  `BlackbodySource`); sum irradiance spectra into one beam for a shared geometry.
 
 # AD mode
 [`source_ad_mode`](@ref) returns [`AnalyticSourceJacobian`](@ref); Phase 3
@@ -57,7 +56,7 @@ provides the analytic `source_tangent!` body (relocated from
 
 ```julia
 sb = SolarBeam()                                   # default unit Stokes I
-sb = SolarBeam(; sza = 35.0)                       # override SZA
+sb = SolarBeam(; sza = 35.0)                       # requires model SZA = 35 degrees
 sb = SolarBeam(; F₀ = my_solar_irradiance)         # custom spectrum
 ```
 """
@@ -156,9 +155,8 @@ end
 Return the `F₀` matrix carried by the first
 [`PreparedSolarBeam`](@ref) in `prepared` (a [`PreparedSolarBeam`](@ref),
 a `SourceSet` of prepared sources, or [`NoSource`](@ref)). When no
-`PreparedSolarBeam` is present, return the unit Stokes-I default — the
-same matrix today's `rt_run` would have allocated when
-`size(RS_type.F₀) != (pol_type.n, nSpec)`.
+`PreparedSolarBeam` is present, return zeros. The unit Stokes-I default
+comes from a default `SolarBeam()`, not from the absence of a beam.
 
 This helper is the Phase-2 bridge between the new source vocabulary and
 the legacy `RS_type.F₀` channel still consumed by the kernels. Phase 5
@@ -218,10 +216,12 @@ end
 #   F₀  [mW · m⁻² · cm⁻¹]  spectral irradiance (Stokes vector by component)
 #   B(ν,T) returned by `vSmartMOM.SolarModel.planck_spectrum_wn` is the
 #   Planck SPECTRAL RADIANCE in mW · m⁻² · sr⁻¹ · cm⁻¹. Multiplying by
-#   `factor=π` converts radiance from a Lambertian disk to incident
-#   hemispheric irradiance (mW · m⁻² · cm⁻¹) — directly comparable to
+#   `factor=π` gives πB, the exitance (hemispheric flux leaving a Lambertian
+#   emitter), in irradiance units (mW · m⁻² · cm⁻¹) — directly comparable to
 #   `SolarBeam` F₀ = 1 (which we adopt as 1 mW · m⁻² · cm⁻¹ for unit
-#   normalization). All sources in a `SourceSet` should share these units;
+#   normalization). The irradiance from a distant disk of radius R at
+#   distance d is πB·(R/d)², i.e. `scale = (R/d)²`. All sources in a
+#   `SourceSet` should share these units;
 #   `R = rt_run(model; sources=...)` is then in mW · m⁻² · sr⁻¹ · cm⁻¹.
 #
 # `BlackbodySource` is a constructor function (not a struct) — it
@@ -244,9 +244,13 @@ hot lab source illuminating CO₂/CH₄/H₂O absorption.
 
 `F₀[pol_component, :] = factor · scale · B(ν, T)` where
 `B(ν,T)` is the Planck radiance from `planck_spectrum_wn` in
-mW · m⁻² · sr⁻¹ · cm⁻¹. The default `factor = π` converts radiance to
-hemispheric irradiance for a Lambertian-disk source — set `factor = 1`
-for a head-on collimated lab beam where `F₀` is the radiance directly.
+mW · m⁻² · sr⁻¹ · cm⁻¹. The default `factor = π` gives πB, the exitance of
+a Lambertian emitter at `T`; for the irradiance from a distant disk of
+radius R at distance d, also set `scale = (R/d)²` (2.1629e-5 for the Sun at
+1 AU). `F₀` is an irradiance, so `factor = 1` alone does not describe a
+collimated lab beam (it leaves the radiance B in `F₀`); for lab illumination
+set `factor · scale` to the solid angle subtended by the source, or the
+throughput of the optics, that converts B into the irradiance of the beam.
 
 # Arguments
 - `T :: Real`: blackbody temperature in K.
@@ -257,7 +261,7 @@ for a head-on collimated lab beam where `F₀` is the radiance directly.
 - `pol_n :: Integer = 3`: number of Stokes components in the model
   (1=Stokes_I, 3=Stokes_IQU, 4=Stokes_IQUV). Match the model's
   polarization to avoid `prepare_source` shape errors.
-- `factor :: Real = π`: geometric factor (π for Lambertian-disk → hemisphere irradiance).
+- `factor :: Real = π`: geometric factor (π: radiance → exitance of a Lambertian emitter).
 - `scale :: Real = 1`: extra normalization multiplier.
 
 # Units
@@ -344,7 +348,7 @@ function source_tangent!(prep::PreparedSolarBeam,
                          ϖ_λ, dτ_λ, τ_sum, τ̇_sum,
                          Z⁻⁺, Z⁺⁺,
                          dτ̇, ϖ̇, Ż⁻⁺, Ż⁺⁺,
-                         qp_μN, ndoubl, wct02, nStokes, I₀, iμ0, D, nparams,
+                         qp_μN, ndoubl, wct02, nStokes, I₀, μ0, iμ0, D, nparams,
                          architecture)
     # Reuse the existing fused SFI + chain-rule kernel. `get_elem_rt_SFI_fused!`
     # is forward-referenced here — its definition lives in
@@ -358,7 +362,7 @@ function source_tangent!(prep::PreparedSolarBeam,
             Z⁻⁺, Z⁺⁺, prep.F₀,
             dτ̇, ϖ̇, Ż⁻⁺, Ż⁺⁺,
             qp_μN, ndoubl, wct02,
-            nStokes, I₀, iμ0, D, nparams,
+            nStokes, I₀, μ0, iμ0, D, nparams,
             ndrange = size(j₀⁺))
     return nothing
 end

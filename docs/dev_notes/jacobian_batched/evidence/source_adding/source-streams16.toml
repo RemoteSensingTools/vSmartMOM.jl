@@ -1,0 +1,45 @@
+source_sha256 = "a5b00feb60cefc8358c31cf8fbda3839999035882c2c6255ec1a8d8b9497213a"
+backend = "cuda"
+julia_version = "1.12.6"
+threads = 4
+end_to_end = false
+spectral_points = 512
+chunk_size = 512
+
+[totals_seconds]
+forward = [11.065244387, 11.073442119, 11.005343741]
+source = [29.366338044, 29.357161874, 29.44498319]
+
+[medians_seconds]
+forward = 11.065244387
+source = 29.366338044
+
+[configuration]
+AUDIT_NU_MIN = "6150"
+AUDIT_PROFILE_MODE = "source"
+AUDIT_BACKEND = "cuda"
+AUDIT_STREAMS = "16"
+AUDIT_NSPEC = "512"
+AUDIT_OUTPUT = "/tmp/vsmartmom-jacobian-evidence/source-streams16.toml"
+AUDIT_PROFILE_ONLY = "true"
+AUDIT_NU_MAX = "6250"
+AUDIT_EXTERNAL_SOLAR = "false"
+AUDIT_GASES = "CO2,CH4,H2O"
+AUDIT_LAYERS = "20"
+
+[[measurements]]
+device_allocated_bytes = [157875514652, 157875514652, 157875514652]
+peak_pool_used_bytes = [21552738272, 21552738272, 21552738272]
+mode = "source"
+chunk = 1
+seconds = [29.366338044, 29.357161874, 29.44498319]
+max_parity_error = 0.0
+host_bytes = [1723316808, 1718252592, 1718275616]
+[[measurements]]
+device_allocated_bytes = [18726779636, 18726779636, 18726779636]
+peak_pool_used_bytes = [18726781004, 18726781004, 18726781004]
+mode = "forward"
+chunk = 1
+seconds = [11.065244387, 11.073442119, 11.005343741]
+max_parity_error = 5.204170427930421e-18
+host_bytes = [972551832, 972547992, 972581320]

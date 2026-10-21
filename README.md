@@ -25,14 +25,18 @@
 
 <p align="center">
   <a href="#installation">Installation</a> •
-  <a href="#modules">Modules</a> (<a href="#vsmartmom">vSmartMOM</a>, <a href="#vsmartmomabsorption">Absorption</a>, <a href="#vsmartmomscattering">Scattering</a>) •
-  <a href="#support">Support</a> •
-  <a href="#license">License</a>
+  <a href="#modules">Modules</a> (<a href="#vsmartmom">vSmartMOM</a>, <a href="#legacy-vsmartmomabsorption-deprecated">Absorption</a>, <a href="#vsmartmomscattering">Scattering</a>) •
+  <a href="#how-to-contribute">Support</a> •
+  <a href="#copyright-notice">License</a>
 </p>
 </div>
 This project aims to revamp and modernize key atmospheric remote sensing tools. Specifically, it will enable the fast computation of atmospheric optical properties, full-polarized radiative transfer simulations, and commonly-used inversion routines.
 
-The core of the code is based on recent publications:
+The scientific development of vSmartMOM, including its linearization and Raman
+formulations, is led by Suniti Sanghavi. Christian Frankenberg contributes
+software engineering, performance improvements, and release integration.
+
+The core of the code is based on these publications:
 
 - Sanghavi, S., Davis, A. B., & Eldering, A. (2014). vSmartMOM: A vector matrix operator method-based radiative transfer model linearized with respect to aerosol properties. Journal of Quantitative Spectroscopy and Radiative Transfer, 133, 412-433. [Download](https://www.sciencedirect.com/science/article/pii/S0022407313003592)
 
@@ -73,26 +77,26 @@ The vSmartMOM module allows end-to-end simulation of radiative transfer (RT) thr
   - `parameters_from_yaml(filepath::String)`: YAML-specific alias (still works; raises `ArgumentError` for `.toml` paths).
   - `default_parameters()`: Load a default set of RT parameters.
   - `model_from_parameters(params::vSmartMOM_Parameters)`: Build an `RTModel` with all derived optical properties (cross-section profiles, scattering phase functions, etc.) ready for simulation.
-  - `rt_run(model::RTModel)`: Perform forward RT simulation, returning reflectance and transmittance.
+  - `rt_run(model::RTModel)`: Perform forward RT simulation, returning named TOA/BOA Stokes radiances and optional observer levels.
   - `model_from_parameters(LinMode(), params)`: Build both an `RTModel` and an `RTModelLin` for analytic Jacobian computation.
-  - `rt_run(model, lin_model, NAer, NGas, NSurf)`: Linearized RT returning `(R, T, dR, dT)` with exact Jacobians.
+  - `rt_run(model, lin_model, NAer, NGas, NSurf)`: Linearized RT returning named radiances/Jacobians; iterable as `(R, T, dR, dT)` for compatibility.
 
 #### Forward run (minimal)
 
 ```julia
 using vSmartMOM
-params = read_parameters("config/quickstart.yaml")        # YAML, TOML, or Dict
+params = read_parameters(joinpath(pkgdir(vSmartMOM), "config", "quickstart.yaml"))        # YAML, TOML, or Dict
 model  = model_from_parameters(params)
-R, T   = rt_run(model)                                    # reflectance, transmittance
+R, T   = rt_run(model)                                    # TOA upwelling, BOA downwelling
 ```
 
 #### Linearized run (analytic Jacobians)
 
 ```julia
 using vSmartMOM
-params = read_parameters("config/ocean_coxmunk.yaml")
+params = read_parameters(joinpath(pkgdir(vSmartMOM), "config", "quickstart.toml"))
 model, lin_model = model_from_parameters(LinMode(), params)
-NAer  = length(params.scattering_params.rt_aerosols)
+NAer  = params.scattering_params === nothing ? 0 : length(params.scattering_params.rt_aerosols)
 NGas  = size(lin_model.τ̇_abs[1], 1)
 NSurf = 1
 R, T, dR, dT = rt_run(model, lin_model, NAer, NGas, NSurf)
@@ -101,7 +105,15 @@ R, T, dR, dT = rt_run(model, lin_model, NAer, NGas, NSurf)
 `dR` and `dT` carry the exact analytic derivatives of `R`, `T` w.r.t.
 aerosol, gas, and surface parameters laid out via `ParameterLayout`.
 
-### vSmartMOM.Absorption
+### Legacy `vSmartMOM.Absorption` (deprecated)
+
+> **Deprecation notice:** AtmosphericAbsorption.jl is the supported absorption
+> dependency for vSmartMOM going forward; the RT pipeline already uses it. The internal
+> standalone line-by-line model (`make_hitran_model`, `HitranModel`) is deprecated in 2.2 and
+> will be removed in 3.0: use
+> [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl)
+> for line-by-line calculations and GPU execution. Lookup tables: YAML `LUTfiles` accept OCO-2 ABSCO HDF files and AtmosphericAbsorption `.absco` tables (`save_absco_lut`), as well as vSmartMOM JLD2 tables from `make_interpolation_model`; AtmosphericAbsorption's own interpolation tables (`build_interpolation_model`/`save_interpolation_model`) are not read by the 2.x loader.
+> CIA and MT_CKD continuum readers stay in `vSmartMOM.Absorption`.
 
 This module enables absorption cross-section calculations of atmospheric gases at different pressures, temperatures, and broadeners (Doppler, Lorentzian, Voigt). It uses the <a href="https://hitran.org">HITRAN</a> energy transition database for calculations. While it enables lineshape calculations from scratch, it also allows users to create and save an interpolator object at specified wavelength, pressure, and temperature grids. It can perform these computations either on CPU or GPU. <br><img src="docs/src/assets/CrossSectionGIF.gif" alt="Absorption cross-section" /><br>
 
@@ -126,22 +138,92 @@ hitran_info("CO2")  # returns metadata dict with SHA-256, download date, etc.
 
 See the full <a href="https://RemoteSensingTools.github.io/vSmartMOM.jl/dev/pages/Absorption/HITRAN_Data/">HITRAN Data Management</a> documentation for details on edition switching, custom wavenumber ranges, and cache management.
 
+> **Please cite HITRAN.** If you publish results computed with HITRAN line data, cite the HITRAN edition you used: HITRAN2016 for the default artifacts, or the current edition (HITRAN2024 at the time of writing) for data downloaded from hitran.org. See [Citing](#citing).
+
 #### Key functions
 
   - `artifact(molecule::String)`: Retrieve the path to a HITRAN `.par` file for a molecule. Routes through legacy artifacts or hitran.org depending on the active edition.
   - `fetch_hitran(molecule; numin, numax, edition)`: Download HITRAN data directly from hitran.org with optional wavenumber filtering.
   - `read_hitran(filepath::String)`: Creates a HitranTable struct from a fixed-width HITRAN `.par` file.
-  - `make_hitran_model(hitran::HitranTable, broadening::AbstractBroadeningFunction, ...)`: Create a HitranModel struct that holds all of the model parameters needed to perform an absorption cross-section calculation (transitions, broadening type, wing_cutoff, etc.)
-  - `make_interpolation_model(hitran::HitranTable, broadening::AbstractBroadeningFunction, ...)`: Similar to creating a HitranModel, but this will perform the interpolation at the given wavelength, pressure, and temperature grids and store the interpolator in InterpolationModel.
-  - `absorption_cross_section(model::AbstractCrossSectionModel, grid::AbstractRange{<:Real}, pressure::Real, temperature::Real, ...)`: Performs an absorption cross-section calculation with the given model (HitranModel or InterpolationModel), at a given wavelength grid, pressure and temperature
+  - `make_hitran_model(hitran::HitranTable, broadening::AbstractBroadeningFunction, ...)` (deprecated; removal in 3.0): Create a HitranModel struct that holds all of the model parameters needed to perform an absorption cross-section calculation (transitions, broadening type, wing_cutoff, etc.)
+  - `make_interpolation_model(hitran::HitranTable, broadening::AbstractBroadeningFunction, wave_grid, p_grid, t_grid; ...)`: Similar to creating a HitranModel, but this will perform the interpolation at the given uniform wavenumber, pressure, and temperature grids and store the interpolator in InterpolationModel (wavelength grids are rejected).
+  - `absorption_cross_section(model::AbstractCrossSectionModel, grid::AbstractRange{<:Real}, pressure::Real, temperature::Real; wavelength_flag=false)`: Performs an absorption cross-section calculation with the given model (HitranModel or InterpolationModel), at a given wavenumber grid (cm⁻¹; wavelength in nm with `wavelength_flag=true`), pressure (hPa) and temperature (K)
 
 ### vSmartMOM.Scattering
 
 This module enables scattering phase-function calculation of atmospheric aerosols with different size distributions, incident wavelengths, and refractive indices. It can perform the calculation using either the Siewert NAI-2 or Domke PCW methods ([Suniti Sanghavi 2014](https://www.sciencedirect.com/science/article/pii/S0022407313004962)). <br><br><img src="docs/src/assets/ScatteringGIF.gif" alt="Scattering phase function" /><br> Key functions:
 
-  - `make_univariate_aerosol(size_distribution::ContinuousUnivariateDistribution, r_max, nquad_radius::Int, nᵣ, nᵢ`: Create an aerosol object with size distribution and complex refractive index.
-  - `make_mie_model(computation_type::AbstractFourierDecompositionType, aerosol::AbstractAerosolType, λ::Real, polarization::AbstractPolarizationType, truncation_type::AbstractTruncationType, ...)`: Create a MieModel struct that holds all of the model parameters needed to perform a phase function calculation (computation type, aerosol, incident wavelength, etc. )
+  - `Aerosol(size_distribution::ContinuousUnivariateDistribution, nᵣ, nᵢ)`: Create an aerosol object with size distribution and complex refractive index.
+  - `make_mie_model(computation_type::AbstractFourierDecompositionType, aerosol::Aerosol, λ::Real, polarization::AbstractPolarizationType, truncation_type::AbstractTruncationType, r_max, nquad_radius, ...)`: Create a MieModel struct that holds all of the model parameters needed to perform a phase function calculation (computation type, aerosol, incident wavelength, etc. )
   - `compute_aerosol_optical_properties(model::MieModel)`: Compute the aerosol optical properties using the specified model parameters
+
+## Citing
+
+If you use vSmartMOM.jl, please cite the vSmartMOM model paper and the
+software paper:
+
+- Sanghavi, S., Davis, A. B., & Eldering, A. (2014). vSmartMOM: A vector matrix
+  operator method-based radiative transfer model linearized with respect to
+  aerosol properties. *JQSRT*, 133, 412–433.
+  [doi:10.1016/j.jqsrt.2013.09.004](https://doi.org/10.1016/j.jqsrt.2013.09.004)
+- Jeyaram, R., Sanghavi, S., & Frankenberg, C. (2022). vSmartMOM.jl: An
+  open-source Julia package for atmospheric radiative transfer and remote
+  sensing tools. *Journal of Open Source Software*, 7(80), 4575.
+  [doi:10.21105/joss.04575](https://doi.org/10.21105/joss.04575)
+
+For rotational Raman scattering (RRS), please also cite:
+
+- Sanghavi, S. (2022). Raman scattering in the Earth's atmosphere, Part I:
+  Optical properties. *JQSRT*, 291, 108328.
+  [doi:10.1016/j.jqsrt.2022.108328](https://doi.org/10.1016/j.jqsrt.2022.108328)
+- Sanghavi, S., & Frankenberg, C. (2023). Raman scattering in the Earth's
+  atmosphere, Part II: Radiative transfer modeling for remote sensing
+  applications. *JQSRT*, 311, 108791.
+  [doi:10.1016/j.jqsrt.2023.108791](https://doi.org/10.1016/j.jqsrt.2023.108791)
+- Sanghavi, S. (2026). Isolating Cabannes and rotational Raman scattering to
+  determine forward modeling error due to Rayleigh scattering in the Earth's
+  atmosphere. *JQSRT*, 363, 110077.
+  [doi:10.1016/j.jqsrt.2026.110077](https://doi.org/10.1016/j.jqsrt.2026.110077)
+
+For exoplanets and brown dwarfs, please also cite:
+
+- Sanghavi, S., & Shporer, A. (2018). Photopolarimetric characteristics of
+  brown dwarfs. I. Uniform cloud decks. *ApJ*, 866, 28.
+  [doi:10.3847/1538-4357/aadf94](https://doi.org/10.3847/1538-4357/aadf94)
+- Sanghavi, S., & West, R. (2019). Spectropolarimetric characteristics of brown
+  dwarfs. II. Uniform clouds. *ApJ*, 877, 134.
+  [doi:10.3847/1538-4357/ab1b4e](https://doi.org/10.3847/1538-4357/ab1b4e)
+- Sanghavi, S., West, R., & Jiang, J. (2021). Cloudy atmospheres on directly
+  imaged exoplanets: The need for accurate particulate representation in
+  photopolarimetric simulations. *ApJ*, 907, 30.
+  [doi:10.3847/1538-4357/abcd99](https://doi.org/10.3847/1538-4357/abcd99)
+
+Please also cite the other method papers relevant to your work (linearization,
+truncation, Mie Fourier decomposition). BibTeX for all of them is in
+[`CITATION.bib`](CITATION.bib).
+
+vSmartMOM is open-source research software developed through substantial
+scientific and programming effort. If the model contributes substantially to a
+study, we kindly ask that you contact the original developer(s) before
+submitting the manuscript. This provides an opportunity to discuss whether the
+model has been applied and its results interpreted appropriately, and to
+consider appropriate scientific credit, including co-authorship where warranted
+by the developers’ contributions.
+
+Gas absorption is computed from [HITRAN](https://hitran.org) line parameters.
+If your results use them, please also cite the HITRAN edition you used:
+
+- HITRAN2016 — the default `"artifact"` data: Gordon et al. (2017),
+  [doi:10.1016/j.jqsrt.2017.06.038](https://doi.org/10.1016/j.jqsrt.2017.06.038);
+- HITRAN2024 — data downloaded from hitran.org at the time of writing: Gordon et
+  al. (2026), [doi:10.1016/j.jqsrt.2026.109807](https://doi.org/10.1016/j.jqsrt.2026.109807);
+- HITRAN2020 — if your own `.par` files come from it: Gordon et al. (2022),
+  [doi:10.1016/j.jqsrt.2021.107949](https://doi.org/10.1016/j.jqsrt.2021.107949).
+
+Partition sums, HAPI (non-Voigt profiles), HITRAN collision-induced absorption
+and MT_CKD continuum references are listed on the
+[References](https://RemoteSensingTools.github.io/vSmartMOM.jl/dev/pages/vSmartMOM/References/)
+page and in `CITATION.bib`.
 
 ## How to Contribute
 

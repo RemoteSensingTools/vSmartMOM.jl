@@ -10,7 +10,7 @@ using Test
 const CO = CanopyOptics
 
 function _canopy_test_quad_points(; FT=Float64, l_trunc=15, pol_type=CoreRT.Stokes_I())
-    obs = CoreRT.ObsGeometry(FT(30), FT[0, 30], FT[0, 0], FT(1000))
+    obs = CoreRT.ObsGeometry(FT(30), FT[0, 30], FT[0, 0], FT[0])
     return CoreRT.rt_set_streams(CoreRT.GaussLegQuad(), l_trunc, obs,
                                  pol_type, Array)
 end
@@ -151,6 +151,22 @@ end
     @test all(R[:, 1, :] .> 0)
 end
 
+@testset "CanopySurface radiance is linear in the solar F₀" begin
+    # Leaf scattering and the soil must both see the solar Stokes vector:
+    # scaling F₀ per spectral point scales the TOA radiance the same way.
+    build() = begin
+        p = parameters_from_yaml("test_parameters/CanopyTest.yaml")
+        p.architecture = vSmartMOM.Architectures.CPU()
+        model_from_parameters(p)
+    end
+    model = build()
+    nspec = size(model.τ_abs[1], 1)
+    R1 = rt_run(model; sources=SolarBeam()).toa
+    scale = collect(range(0.5, 2.0; length=nspec))
+    R2 = rt_run(build(); sources=SolarBeam(F₀=reshape(scale, 1, :))).toa
+    @test R2 ≈ R1 .* reshape(scale, 1, 1, :) rtol=1e-10
+end
+
 @testset "CanopySurface bright-soil coupling stays positive" begin
     ν_800nm = 1e7 / 800.0
     params = parameters_from_dict(Dict{String,Any}(
@@ -160,7 +176,6 @@ end
             "quadrature_type" => "RadauQuad()",
             "polarization_type" => "Stokes_I()",
             "max_m" => 4,
-            "Δ_angle" => 2.0,
             "l_trunc" => 20,
             "depol" => -1.0,
             "float_type" => "Float64",
@@ -170,7 +185,7 @@ end
             "sza" => 30.0,
             "vza" => [30.0, 0.0, 30.0],
             "vaz" => [180.0, 0.0, 0.0],
-            "obs_alt" => 1000.0,
+            "obs_alt" => [0.0],
         ),
         "atmospheric_profile" => Dict{String,Any}(
             "T" => [285.0],
@@ -208,7 +223,7 @@ end
     arch = vSmartMOM.Architectures.CPU()
     arr_type = Array
 
-    qp = CoreRT.rt_set_streams(CoreRT.RadauQuad(), 4, CoreRT.ObsGeometry(FT(30), FT[30.0], FT[0.0], FT(1000)), pol_type, arr_type)
+    qp = CoreRT.rt_set_streams(CoreRT.RadauQuad(), 4, CoreRT.ObsGeometry(FT(30), FT[30.0], FT[0.0], FT[0]), pol_type, arr_type)
     nμ   = size(qp.qp_μ, 1) * n_stokes
     nSpec = 1
 

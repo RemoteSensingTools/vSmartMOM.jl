@@ -5,6 +5,131 @@ are defined in atmo_prof.jl; this file contains only the lin-mode extensions.
 =#
 
 """
+Profile tangents for the default [`FixedPressureGrid`](@ref): the interfaces
+above the surface are fixed, so only the bottom layer's columns, thickness,
+and mid-layer pressure (`dp_full[end]/dp_surf = 1/2`) respond to `p_surf`.
+"""
+function psurf_profile_tangents(profile::AtmosphericProfile{FT}; g₀=FT(9.8032465)) where FT
+    n = length(profile.T)
+    vcd_dry_dot = zeros(FT, n)
+    vcd_h2o_dot = zeros(FT, n)
+    Δz_dot = zeros(FT, n)
+    dry_mass = FT(28.9644e-3)
+    wet_mass = FT(18.01534e-3)
+    Nₐ = FT(6.02214179e23)
+    R = FT(8.3144598)
+    vmr_h2o = profile.vmr_h2o[end]
+    x_dry = inv(one(FT) + vmr_h2o)
+    x_h2o = vmr_h2o * x_dry
+    M = x_dry * dry_mass + x_h2o * wet_mass
+    vcd_dot = Nₐ / (M * g₀ * FT(100)^2) * FT(100)
+    vcd_dry_dot[end] = x_dry * vcd_dot
+    vcd_h2o_dot[end] = x_h2o * vcd_dot
+    Δz_dot[end] = R * profile.T[end] / (g₀ * M * profile.p_half[end])
+    p_full_dot = zeros(FT, n)
+    p_full_dot[end] = one(FT) / 2
+    return (; vcd_dry_dot, vcd_h2o_dot, Δz_dot, p_full_dot)
+end
+
+"""
+Return a normalized column fraction and its tangent without squaring the
+column total. The factored quotient rule is algebraically equivalent to
+`(x_dot*sum(x) - x*sum(x_dot))/sum(x)^2`, but remains finite in `Float32` for
+atmospheric molecular columns of order `1e25`.
+"""
+function _normalized_column_fraction_tangent(column, column_dot)
+    total = sum(column)
+    isfinite(total) && total > zero(total) || throw(ArgumentError(
+        "column total must be finite and positive"))
+    fraction = column ./ total
+    fraction_dot = (column_dot .- fraction .* sum(column_dot)) ./ total
+    return fraction, fraction_dot
+end
+
+"Derivative of a normalized aerosol allocation with respect to p_surf."
+function aerosol_profile_psurf_tangent(dist::Normal, profile::AtmosphericProfile,
+                                        Δz_dot)
+    p = profile.p_full
+    ρ = pdf.(dist, p) .* profile.Δz
+    ρdot = zero(ρ)
+    pdot = one(eltype(p)) / 2
+    ρdot[end] = pdf(dist, p[end]) * Δz_dot[end] +
+                ρ[end] * (-(p[end] - dist.μ) / dist.σ^2) * pdot
+    return (ρdot .- ρ .* (sum(ρdot) / sum(ρ))) ./ sum(ρ)
+end
+
+function aerosol_profile_psurf_tangent(dist::LogNormal, profile::AtmosphericProfile,
+                                        Δz_dot)
+    z_half = half_level_altitudes(profile)
+    FT = eltype(z_half)
+    z_half_dot = zeros(FT, length(z_half))
+    for i in length(profile.Δz):-1:1
+        z_half_dot[i] = z_half_dot[i + 1] + Δz_dot[i] / FT(1000)
+    end
+    cdf_slope(z) = z <= zero(FT) ? zero(FT) : pdf(dist, z)
+    ρ = [_altitude_lognormal_cdf(z_half[i], dist) -
+         _altitude_lognormal_cdf(z_half[i + 1], dist)
+         for i in eachindex(profile.Δz)]
+    ρdot = [cdf_slope(z_half[i]) * z_half_dot[i] -
+            cdf_slope(z_half[i + 1]) * z_half_dot[i + 1]
+            for i in eachindex(profile.Δz)]
+    return (ρdot .- ρ .* (sum(ρdot) / sum(ρ))) ./ sum(ρ)
+end
+
+"""
+    psurf_profile_tangents(convention, profile)
+
+Derivatives of the final-grid profile fields with respect to surface pressure
+`p_surf = profile.p_half[end]` [hPa], at fixed layer `T`, `q`, and mixing
+ratios. Returns a named tuple of layer vectors `vcd_dry_dot`, `vcd_h2o_dot`
+[molec cm⁻² hPa⁻¹], `Δz_dot` [m hPa⁻¹], and `p_full_dot` [1]. See
+[`FixedPressureGrid`](@ref) and [`FixedAltitudeGrid`](@ref) for the two
+conventions.
+"""
+psurf_profile_tangents(::FixedPressureGrid, profile::AtmosphericProfile) =
+    psurf_profile_tangents(profile)
+
+function psurf_profile_tangents(::FixedAltitudeGrid,
+                                profile::AtmosphericProfile{FT}) where FT
+    # Every interface pressure scales with p_surf (see FixedAltitudeGrid):
+    # columns are proportional to their pressure thickness, mid-layer
+    # pressures to p_surf, and the geometric thicknesses do not change.
+    p_surf = profile.p_half[end]
+    vcd_dry_dot = profile.vcd_dry ./ p_surf
+    vcd_h2o_dot = profile.vcd_h2o ./ p_surf
+    Δz_dot = zeros(FT, length(profile.T))
+    p_full_dot = profile.p_full ./ p_surf
+    return (; vcd_dry_dot, vcd_h2o_dot, Δz_dot, p_full_dot)
+end
+
+"""
+    aerosol_profile_psurf_tangent(convention, dist, profile, tangents)
+
+Derivative of the normalized aerosol layer allocation with respect to
+`p_surf`. Under [`FixedPressureGrid`](@ref) this is the bottom-boundary
+tangent above. Under [`FixedAltitudeGrid`](@ref) an altitude-form
+`LogNormal` profile has an exactly zero tangent (no interface moves in
+altitude), while a pressure-form `Normal(p₀, σp)` profile is redistributed as
+every mid-layer pressure scales with `p_surf`.
+"""
+aerosol_profile_psurf_tangent(::FixedPressureGrid, dist, profile::AtmosphericProfile,
+                              tangents) =
+    aerosol_profile_psurf_tangent(dist, profile, tangents.Δz_dot)
+
+aerosol_profile_psurf_tangent(::FixedAltitudeGrid, ::LogNormal,
+                              profile::AtmosphericProfile{FT}, tangents) where FT =
+    zeros(FT, length(profile.Δz))
+
+function aerosol_profile_psurf_tangent(::FixedAltitudeGrid, dist::Normal,
+                                       profile::AtmosphericProfile, tangents)
+    p = profile.p_full
+    ρ = pdf.(dist, p) .* profile.Δz
+    # Δz is fixed; each mid-layer pressure moves by p_full_dot = p_full/p_surf.
+    ρdot = ρ .* (-(p .- dist.μ) ./ dist.σ^2) .* tangents.p_full_dot
+    return (ρdot .- ρ .* (sum(ρdot) / sum(ρ))) ./ sum(ρ)
+end
+
+"""
     $(FUNCTIONNAME)(total_τ, p₀, σp, p_half)
     
 Returns the aerosol optical depths per layer using a Gaussian distribution function with p₀ and σp on a pressure grid
@@ -119,6 +244,86 @@ function getAerosolLayerOptProp(lin::LinMode, total_τ, p₀, σp, p_half)
     return convert.(FT, τAer), convert.(FT, dτ_dp₀), convert.(FT, dτ_dσp)
 end
 
+"Apply the quotient rule to two tangents of an unnormalized aerosol profile."
+function _normalized_aerosol_profile_tangents(total_τ, dist::Distribution,
+                                               profile::AtmosphericProfile,
+                                               ρ, dρ₁, dρ₂)
+    # Obtain the base column from the production forward helper itself. This is
+    # deliberately not reconstructed from distribution moments: LinMode must
+    # retain bit-exact base-state parity for every supported Distribution.
+    τAer = getAerosolLayerOptProp(total_τ, dist, profile)
+    norm_ρ = sum(ρ)
+    scale = total_τ / norm_ρ
+    dτ₁ = scale .* (dρ₁ .- ρ .* (sum(dρ₁) / norm_ρ))
+    dτ₂ = scale .* (dρ₂ .- ρ .* (sum(dρ₂) / norm_ρ))
+    return τAer, dτ₁, dτ₂
+end
+
+"""
+    getAerosolLayerOptProp(lin::LinMode, total_τ, dist, profile)
+
+Return the exact production forward aerosol column and two profile-shape
+tangents. The tangent convention depends on the distribution:
+
+- `Normal(μ, σ)`: derivatives with respect to `μ` (`p₀`) and `σ` (`σp`).
+- `LogNormal(log(z₀), σ₀)`: derivatives with respect to the user-facing
+  altitude parameters `z₀ = exp(μ)` and `σ₀ = σ`.
+
+Other `Distribution` types throw an `ArgumentError` because the fixed
+two-column aerosol layout does not define a safe parameter mapping for them.
+"""
+function getAerosolLayerOptProp(::LinMode, total_τ, dist::Distribution,
+                                profile::AtmosphericProfile)
+    throw(ArgumentError(
+        "LinMode aerosol-profile tangents support Normal and LogNormal; " *
+        "got $(typeof(dist))"))
+end
+
+function getAerosolLayerOptProp(::LinMode, total_τ, dist::Normal,
+                                profile::AtmosphericProfile)
+    (; p_full, Δz) = profile
+    ρ = pdf.(dist, p_full) .* Δz
+    offset = p_full .- dist.μ
+    dρ_dμ = ρ .* offset ./ dist.σ^2
+    dρ_dσ = ρ .* (offset.^2 ./ dist.σ^3 .- inv(dist.σ))
+    return _normalized_aerosol_profile_tangents(
+        total_τ, dist, profile, ρ, dρ_dμ, dρ_dσ)
+end
+
+function getAerosolLayerOptProp(::LinMode, total_τ, dist::LogNormal,
+                                profile::AtmosphericProfile)
+    z_half = half_level_altitudes(profile)
+    z₀ = exp(dist.μ)
+    FT = eltype(z_half)
+    function cdf_and_tangents(z)
+        z <= zero(FT) && return (zero(FT), zero(FT), zero(FT))
+        a = (log(z) - dist.μ) / dist.σ
+        φ = exp(-a^2 / FT(2)) / sqrt(FT(2π))
+        F = _altitude_lognormal_cdf(z, dist)
+        return F, -φ / (dist.σ * z₀), -φ * a / dist.σ
+    end
+    vals = cdf_and_tangents.(z_half)
+    F = first.(vals)
+    dF_dz₀ = getindex.(vals, 2)
+    dF_dσ₀ = getindex.(vals, 3)
+    ρ = F[1:end-1] .- F[2:end]
+    dρ_dz₀ = dF_dz₀[1:end-1] .- dF_dz₀[2:end]
+    dρ_dσ₀ = dF_dσ₀[1:end-1] .- dF_dσ₀[2:end]
+    return _normalized_aerosol_profile_tangents(
+        total_τ, dist, profile, ρ, dρ_dz₀, dρ_dσ₀)
+end
+
+"""
+    getAerosolLayerOptProp(lin::LinMode, total_τ, p₀, σp, profile)
+
+Backward-compatible pressure-profile entry point. This is equivalent to the
+`Normal(p₀, σp)` distribution dispatch above.
+"""
+function getAerosolLayerOptProp(lin::LinMode, total_τ, p₀, σp,
+                                profile::AtmosphericProfile)
+    return getAerosolLayerOptProp(lin, total_τ, Normal(p₀, σp), profile)
+end
+
 "Given the CrossSectionModel, the grid, and the AtmosphericProfile, fill up the τ_abs array with the cross section at each layer
 (using pressures/temperatures) from the profile" 
 function compute_absorption_profile!(τ_abs::Array{FT,2}, 
@@ -128,6 +333,10 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
                                     grid,
                                     vmr,
                                     profile::AtmosphericProfile,
+                                    ;
+                                    self_broadener_vmr=nothing,
+                                    pressure_tangent=nothing,
+                                    vertical_grid::AbstractVerticalGridConvention=FixedPressureGrid(),
                                     ) where FT 
 
     # The array to store the cross-sections must be same length as number of layers
@@ -141,6 +350,8 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
 
         # Either use the current layer's vmr, or use the uniform vmr
         vmr_curr = vmr isa AbstractArray ? vmr[iz] : vmr
+        broadener_curr = self_broadener_vmr isa AbstractArray ?
+            self_broadener_vmr[iz] : self_broadener_vmr
 
         # Changed index order
         # @show iz,p,T,profile.vcd_dry[iz], vmr_curr
@@ -149,8 +360,122 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         #temp = collect(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
         #@show minimum(temp), p, T, profile.vcd_dry[iz] * vmr_curr
         #@show iz, profile.vcd_dry[iz], vmr_curr, p, T
-        τ_abs[:,iz] += collect(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
-        τ̇_abs[jac_idx,:,iz] = collect(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz]
+        # An explicit kwarg wins (LBL self-broadening); otherwise the model
+        # type decides whether the profile supplies a broadener (ABSCO only)
+        # — same `_default_broadener` rule as the forward path in atmo_prof.jl.
+        broadener_curr = broadener_curr === nothing ?
+            _default_broadener(absorption_model, profile, iz) : broadener_curr
+        σ = collect(_layer_absorption_cross_section(
+            absorption_model, grid, p, T, broadener_curr))
+        τ_abs[:,iz] += σ * profile.vcd_dry[iz] * vmr_curr
+        # Species-major flattened ordering: (igas - 1) * Nz + iz.
+        # Keeping all other layers zero yields dτ(z)/dVMR(igas, iz).
+        gas_layer_idx = (jac_idx - 1) * length(profile.p_full) + iz
+        τ̇_abs[gas_layer_idx,:,iz] = σ * profile.vcd_dry[iz]
     end
+    _accumulate_absorption_pressure!(pressure_tangent, vertical_grid, absorption_model,
+        grid, vmr, profile, self_broadener_vmr)
     
 end
+
+"""
+    compute_h2o_absorption_profile!(τ_abs, τ̇_abs, jac_idx,
+                                    absorption_model, grid, profile)
+
+Linearized H₂O line-absorption accumulation using the same layerwise moist
+H₂O mole fraction for self broadening as the forward path. An ABSCO table's
+H₂O-broadener response is added to the H₂O column (see
+`_accumulate_broadener_tangent!`); line-by-line self broadening is not
+differentiated.
+"""
+function compute_h2o_absorption_profile!(τ_abs::Array{FT,2},
+                                         τ̇_abs::Array{FT,3},
+                                         jac_idx::Integer,
+                                         absorption_model,
+                                         grid,
+                                         profile::AtmosphericProfile;
+                                         pressure_tangent=nothing,
+                                         vertical_grid::AbstractVerticalGridConvention=FixedPressureGrid()) where FT
+    x_h2o = _h2o_moist_mole_fraction.(profile.vmr_h2o)
+    compute_absorption_profile!(
+        τ_abs, τ̇_abs, jac_idx, absorption_model, grid,
+        profile.vmr_h2o, profile; self_broadener_vmr=x_h2o, pressure_tangent, vertical_grid)
+    # The broadener is x = r/(1+r) of the H₂O ratio r, so dx/dr = 1/(1+r)².
+    # The call above assigns the H₂O rows (`=`) and every broadener response
+    # is added to them (`.+=`), so each band's H₂O block must run before the
+    # other gases' (as in `model_from_parameters(::LinMode, ...)`).
+    _accumulate_broadener_tangent!(
+        τ̇_abs, jac_idx, absorption_model, grid, profile.vmr_h2o, profile;
+        broadener=x_h2o, dbroadener_dr=inv.((1 .+ profile.vmr_h2o) .^ 2))
+    return nothing
+end
+
+"""
+    _absorption_broadener_derivative(model, grid, p, T, broadener)
+
+Cross-section derivative with respect to the H₂O broadener abundance at fixed
+pressure and temperature, for tables that tabulate that abundance.
+"""
+function _absorption_broadener_derivative end
+
+# ABSCO interpolates linearly in its broadener VMR, so dσ/dvmr is the slope of
+# the bracketing interval at the layer's (p, T). Evaluating the two nodes
+# through the public API keeps the pressure, temperature and spectral rules of
+# the forward call, as `_absorption_pressure_derivative` does for pressure.
+# The interval is AA's own bracket: the right one at an interior node, and the
+# first one at the lower node, which is the physical bound VMR = 0. Outside the
+# table the forward query clamps, so the derivative is zero.
+function _absorption_broadener_derivative(model::AtmosphericAbsorption.AbscoLUT{FT},
+                                          grid, p, T, broadener) where FT
+    nodes = model.vmr
+    b = FT(broadener)
+    if length(nodes) < 2 || b < first(nodes) || b > last(nodes)
+        return zeros(FT, length(grid))
+    end
+    lo = clamp(searchsortedlast(nodes, b), 1, length(nodes) - 1)
+    hi = lo + 1
+    σlo = _layer_absorption_cross_section(model, grid, p, T, nodes[lo])
+    σhi = _layer_absorption_cross_section(model, grid, p, T, nodes[hi])
+    return Array((σhi .- σlo) ./ (nodes[hi] - nodes[lo]))
+end
+
+"""
+    _accumulate_broadener_tangent!(τ̇_abs, h2o_idx, model, grid, vmr, profile;
+                                   broadener=nothing, dbroadener_dr=nothing)
+
+Add an absorber's H₂O-broadener response, `N_dry·vmr·(∂σ/∂b)·(db/dr)`, to the
+q-driven H₂O columns (gas slot `h2o_idx`) of `τ̇_abs`, where `r` is the H₂O
+ratio `profile.vmr_h2o`. `broadener` is the per-layer abundance `b` that the
+forward call passed (`nothing`: the model's default, `b = r` for ABSCO) and
+`dbroadener_dr` its derivative (`nothing`: 1). A no-op for models whose cross
+section does not interpolate a broadener axis.
+"""
+_accumulate_broadener_tangent!(τ̇_abs, h2o_idx, model, grid, vmr, profile;
+                               broadener=nothing, dbroadener_dr=nothing) = nothing
+
+function _accumulate_broadener_tangent!(τ̇_abs, h2o_idx,
+                                        model::AtmosphericAbsorption.AbscoLUT,
+                                        grid, vmr, profile;
+                                        broadener=nothing, dbroadener_dr=nothing)
+    _cross_section_uses_broadener(model) || return nothing
+    Nz = length(profile.p_full)
+    for iz in 1:Nz
+        abundance = vmr isa AbstractArray ? vmr[iz] : vmr
+        iszero(abundance) && continue
+        b = broadener === nothing ? _default_broadener(model, profile, iz) :
+            broadener isa AbstractArray ? broadener[iz] : broadener
+        db = dbroadener_dr === nothing ? one(abundance) :
+             dbroadener_dr isa AbstractArray ? dbroadener_dr[iz] : dbroadener_dr
+        σb = _absorption_broadener_derivative(
+            model, grid, profile.p_full[iz], profile.T[iz], b)
+        # Species-major flattened ordering, as in compute_absorption_profile!.
+        gas_layer_idx = (h2o_idx - 1) * Nz + iz
+        view(τ̇_abs, gas_layer_idx, :, iz) .+= σb .* (profile.vcd_dry[iz] * abundance * db)
+    end
+    return nothing
+end
+
+# Whether `_accumulate_broadener_tangent!` differentiates the model's
+# broadener response (ABSCO axes); line-by-line self broadening is omitted.
+_has_broadener_tangent(model) = false
+_has_broadener_tangent(::AtmosphericAbsorption.AbscoLUT) = true

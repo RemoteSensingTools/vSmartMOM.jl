@@ -45,9 +45,12 @@ truncate_phase_lowconf(::NoTruncation, aero::AerosolOptics; kwargs...) =
 
 Legacy/low-confidence δ-BGE truncation variant.
 
-Fits truncated coefficients outside the forward exclusion cone (`Δ_angle`) and
-rescales by retained scattering fraction ``c_0``. The returned truncation factor
-is:
+Fits truncated coefficients over the full angular domain and
+rescales by retained scattering fraction ``c_0``. All six Greek families are
+renormalised by ``1/c_0``; the ``(\beta_l - c_l)`` forward-peak subtraction
+applies only to the diagonal families ``\alpha, \beta, \delta, \zeta`` because
+the Dirac spike has ``\gamma_l^\delta = \epsilon_l^\delta = 0``. The returned
+truncation factor is:
 
 ```math
 f^t = 1 - c_0.
@@ -56,8 +59,7 @@ f^t = 1 - c_0.
 function truncate_phase_lowconf(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) where {FT}
     (; greek_coefs, ω̃, k) = aero
     (; α, β, γ, δ, ϵ, ζ) = greek_coefs
-    (; l_max, Δ_angle) = mod
-
+    (; l_max) = mod
 
     # Obtain Gauss-Legendre quadrature points and weights for phase function:
     μ, w_μ = gausslegendre(length(β));
@@ -67,29 +69,26 @@ function truncate_phase_lowconf(mod::δBGE, aero::AerosolOptics{FT}; reportFit=f
 
     (; f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄) = scattering_matrix
 
-    # Find elements that exclude the peak (if wanted!)
-    iμ = findall(x -> x < cosd(Δ_angle), μ)
-
     # Prefactor for P2:
     fac = zeros(FT,l_max);
     for l = 2:l_max - 1
         fac[l + 1] = sqrt(FT(1) / ( ( l - FT(1)) * l * (l + FT(1)) * (l + FT(2)) ));
     end
 
-    # Create subsets (for Ax=y weighted least-squares fits):
-    y₁₁ = view(f₁₁, iμ)
-    y₁₂ = view(f₁₂, iμ)
-    y₃₄ = view(f₃₄, iμ)
-    A   = view(P, iμ, 1:l_max)
-    B   = fac[3:end]' .* view(P², iμ, 3:l_max)
+    # Ax=y weighted least-squares fits over the FULL angular domain (the
+    # forward-peak exclusion cone Δ_angle is retired; the Gauss nodes are
+    # strictly interior, so this is identical to the historical Δ_angle=0):
+    y₁₁ = f₁₁
+    y₁₂ = f₁₂
+    y₃₄ = f₃₄
+    A   = view(P, :, 1:l_max)
+    B   = fac[3:end]' .* view(P², :, 3:l_max)
 
     # Weights (also avoid division by 0)
-    minY = zeros(length(iμ)) .+ FT(1e-8);
-    W₁₁ = Diagonal(w_μ[iμ] ./ max(abs.(y₁₁), minY));
-    W₁₂ = Diagonal(w_μ[iμ] ./ max(abs.(y₁₂), minY));
-    W₃₄ = Diagonal(w_μ[iμ] ./ max(abs.(y₃₄), minY));
-    # W₁₂ = Diagonal(w_μ[iμ]);
-    # W₃₄ = Diagonal(w_μ[iμ]);
+    minY = zeros(length(μ)) .+ FT(1e-8);
+    W₁₁ = Diagonal(w_μ ./ max.(abs.(y₁₁), minY));
+    W₁₂ = Diagonal(w_μ ./ max.(abs.(y₁₂), minY));
+    W₃₄ = Diagonal(w_μ ./ max.(abs.(y₃₄), minY));
     # Julia backslash operator for least squares (just like Matlab);
     cl = ((W₁₁ * A) \ (W₁₁ * y₁₁))   # B in δ-BGR (β)
     γᵗ = similar(cl); γᵗ[1:2] .=0
@@ -115,6 +114,17 @@ function truncate_phase_lowconf(mod::δBGE, aero::AerosolOptics{FT}; reportFit=f
     δᵗ = (δ[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38b, derived from β
     αᵗ = (α[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38c, derived from β
     ζᵗ = (ζ[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38d, derived from β
+    # γᵗ / ϵᵗ: the least-squares fits above reproduce the *untruncated*
+    # b₁(μ), b₂(μ). The δBGE phase matrix is Zᵗ = (Z − fᵗ·δ(cosΘ−1)·E)/(1−fᵗ)
+    # (SS2015 Eq. 8), so **all six** Greek families carry the same 1/c₀
+    # renormalisation. Unlike α/β/δ/ζ there is no peak subtraction here,
+    # because the forward δ-spike is diagonal: γ_l^δ = ϵ_l^δ = 0
+    # (S2014 Eqs. A.5–A.10). Compare SS2015 Eqs. (27c,d) — the δ-m analogue —
+    # which read γⁿ_l = γ_l/(1−f_tr), ϵⁿ_l = ϵ_l/(1−f_tr). Omitting the 1/c₀
+    # dilutes the truncated degree of linear polarisation f₁₂/f₁₁ by exactly
+    # c₀ (a 29 % Q error at fᵗ = 0.29). No-op when fᵗ = 0 ⇒ c₀ = 1.
+    γᵗ = γᵗ / c₀
+    ϵᵗ = ϵᵗ / c₀
 
     # Truncated Greek coefficients only — ω̃ and k pass through. The
     # τ / ω rescaling per Sanghavi & Stephens 2015 Eq. 8 is applied
@@ -129,7 +139,13 @@ function truncate_phase_lowconf(mod::δBGE, aero::AerosolOptics{FT}; reportFit=f
     # mirroring the Mie generators (internal Float64, output FT).
     greek_coefs = GreekCoefs(convert.(FT, αᵗ), convert.(FT, βᵗ), convert.(FT, γᵗ),
                              convert.(FT, δᵗ), convert.(FT, ϵᵗ), convert.(FT, ζᵗ))
-    return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, fᵗ=(FT(1) - c₀))
+    # Retain the untruncated Greek set so the TMS single-scattering
+    # correction can evaluate the exact phase function at view geometries
+    # without re-running Mie (see AbstractSingleScatteringCorrection).
+    return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, fᵗ=(FT(1) - c₀),
+                         phase_greek_raw=[GreekCoefs(convert.(FT, α), convert.(FT, β),
+                                                     convert.(FT, γ), convert.(FT, δ),
+                                                     convert.(FT, ϵ), convert.(FT, ζ))])
 end
 
 @doc raw"""
@@ -138,23 +154,37 @@ end
 Apply δ-BGE truncation to aerosol Greek coefficients.
 
 The method removes/approximates the forward peak using a least-squares fit over
-angles outside `Δ_angle`, then renormalizes with retained scattering fraction
+all quadrature angles, then renormalizes with retained scattering fraction
 ``c_0``:
 
 ```math
 \beta^t = \frac{c}{c_0},\qquad
+\gamma^t = \frac{g}{c_0},\qquad
+\epsilon^t = \frac{e}{c_0},\qquad
 \delta^t,\alpha^t,\zeta^t \text{ adjusted consistently from } \beta^t,
+\qquad
+\gamma^t = \frac{g}{c_0},\quad \epsilon^t = \frac{e}{c_0},
 \qquad
 f^t = 1-c_0.
 ```
 
+All six families share the ``1/c_0`` renormalisation (SS2015 Eq. 8:
+``Z^t = (Z - f^t\delta(\cos\Theta-1)E)/(1-f^t)``). Only the diagonal families
+additionally have the forward-peak amount ``(\beta_l - c_l)`` removed — the
+Dirac spike is diagonal, so ``\gamma_l^\delta = \epsilon_l^\delta = 0``
+(S2014 Eqs. A.5–A.10; cf. SS2015 Eqs. 27c,d for the δ-m analogue). This keeps
+the degree of linear polarisation ``-f_{12}/f_{11}`` invariant under
+truncation outside the exclusion cone.
+
 Returns a new [`AerosolOptics`](@ref) with truncated coefficients and updated
-`fᵗ`.
+`fᵗ`. The common `1/c₀` normalization is required because all three fits
+target the unnormalized original matrix outside the forward cone; downstream
+δ-scaling multiplies the smooth remainder by `c₀ = 1-fᵗ`.
 """
 function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) where {FT}
     (; greek_coefs, ω̃, k) = aero
     (; α, β, γ, δ, ϵ, ζ) = greek_coefs
-    (; l_max, Δ_angle) = mod
+    (; l_max) = mod
 
     l_tr = l_max
     # Obtain Gauss-Legendre quadrature points and weights for phase function:
@@ -165,23 +195,23 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) wh
 
     (; f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄) = scattering_matrix
 
-    # Find elements that exclude the peak (if wanted!)
-    iμ = findall(x -> x < cosd(Δ_angle), μ)
-
     # Prefactor for P2:
     fac = zeros(FT,l_tr);
     for l = 2:l_tr - 1
         fac[l + 1] = sqrt(FT(1) / ( ( l - FT(1)) * l * (l + FT(1)) * (l + FT(2)) ));
     end
 
-    # Restrict all fit sums to the iμ subset (outside the forward exclusion cone),
-    # mirroring truncate_phase_lowconf and Sanghavi & Stephens 2015 §3.
-    w_μ_sub  = w_μ[iμ]
-    P_sub    = view(P,  iμ, :)
-    P²_sub   = view(P², iμ, :)
-    y₁₁     = view(f₁₁, iμ)
-    y₁₂     = view(f₁₂, iμ)
-    y₃₄     = view(f₃₄, iμ)
+    # Fit sums run over the FULL angular domain: the forward-peak exclusion
+    # cone (δBGE.Δ_angle) is retired, and the Gauss nodes are strictly
+    # interior, so this is identical to the historical Δ_angle = 0 default.
+    # Keeping one domain also makes truncate_phase_lin's tangents
+    # differentiate exactly this fit.
+    w_μ_sub  = w_μ
+    P_sub    = P
+    P²_sub   = P²
+    y₁₁     = f₁₁
+    y₁₂     = f₁₂
+    y₃₄     = f₃₄
 
     #= for β
        Ax=b, where
@@ -224,7 +254,10 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) wh
         end
     end
     γᵗ = similar(cl); γᵗ[1:2] .=0
-    γᵗ[3:end] = A[3:end,3:end] \ b[3:end]   # G in δ-BGE (γ)
+    # An identically zero f₁₂ (e.g. an unpolarized Henyey–Greenstein phase
+    # function) truncates to zero; its 1/f₁₂² weights are undefined.
+    γᵗ[3:end] = all(iszero, y₁₂) ? zero(γᵗ[3:end]) :
+                A[3:end,3:end] \ b[3:end]   # G in δ-BGE (γ)
 
     if reportFit
         B_sub = fac[3:end]' .* P²_sub[:, 3:l_tr]
@@ -251,7 +284,8 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) wh
     end
 
     ϵᵗ = similar(cl); ϵᵗ[1:2] .=0
-    ϵᵗ[3:end] = A[3:end,3:end] \ b[3:end]   # E in δ-BGE (ϵ)
+    ϵᵗ[3:end] = all(iszero, y₃₄) ? zero(ϵᵗ[3:end]) :
+                A[3:end,3:end] \ b[3:end]   # E in δ-BGE (ϵ), zero for f₃₄ ≡ 0
 
     if reportFit
         B_sub = fac[3:end]' .* P²_sub[:, 3:l_tr]
@@ -268,6 +302,17 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) wh
     δᵗ = (δ[1:l_tr] .- (β[1:l_tr] .- cl)) / c₀    # Eq. 38b, derived from β
     αᵗ = (α[1:l_tr] .- (β[1:l_tr] .- cl)) / c₀    # Eq. 38c, derived from β
     ζᵗ = (ζ[1:l_tr] .- (β[1:l_tr] .- cl)) / c₀    # Eq. 38d, derived from β
+    # γᵗ / ϵᵗ: the normal-equation fits above reproduce the *untruncated*
+    # b₁(μ), b₂(μ). The δBGE phase matrix is Zᵗ = (Z − fᵗ·δ(cosΘ−1)·E)/(1−fᵗ)
+    # (SS2015 Eq. 8), so **all six** Greek families carry the same 1/c₀
+    # renormalisation. Unlike α/β/δ/ζ there is no peak subtraction here,
+    # because the forward δ-spike is diagonal: γ_l^δ = ϵ_l^δ = 0
+    # (S2014 Eqs. A.5–A.10). Compare SS2015 Eqs. (27c,d) — the δ-m analogue —
+    # which read γⁿ_l = γ_l/(1−f_tr), ϵⁿ_l = ϵ_l/(1−f_tr). Omitting the 1/c₀
+    # dilutes the truncated degree of linear polarisation f₁₂/f₁₁ by exactly
+    # c₀ (a 29 % Q error at fᵗ = 0.29). No-op when fᵗ = 0 ⇒ c₀ = 1.
+    γᵗ = γᵗ / c₀
+    ϵᵗ = ϵᵗ / c₀
 
     # Truncated Greek coefficients only — ω̃ and k pass through. The
     # τ / ω rescaling per Sanghavi & Stephens 2015 Eq. 8 is applied
@@ -282,5 +327,11 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) wh
     # mirroring the Mie generators (internal Float64, output FT).
     greek_coefs = GreekCoefs(convert.(FT, αᵗ), convert.(FT, βᵗ), convert.(FT, γᵗ),
                              convert.(FT, δᵗ), convert.(FT, ϵᵗ), convert.(FT, ζᵗ))
-    return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, fᵗ=(FT(1) - c₀))
+    # Retain the untruncated Greek set so the TMS single-scattering
+    # correction can evaluate the exact phase function at view geometries
+    # without re-running Mie (see AbstractSingleScatteringCorrection).
+    return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, fᵗ=(FT(1) - c₀),
+                         phase_greek_raw=[GreekCoefs(convert.(FT, α), convert.(FT, β),
+                                                     convert.(FT, γ), convert.(FT, δ),
+                                                     convert.(FT, ϵ), convert.(FT, ζ))])
 end

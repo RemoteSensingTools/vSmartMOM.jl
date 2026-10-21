@@ -47,6 +47,12 @@ vSmartMOM supports Julia 1.10 or later.
 pkg> add vSmartMOM
 ```
 
+## Start Here
+
+New to vSmartMOM? [Quick Start](pages/quickstart.md) →
+[Conventions](pages/conventions.md) →
+[Configure a Scene (step by step)](pages/IO/ConfigurationGuide.md).
+
 ## Public Modules
 
 - **[CoreRT](pages/api/core_rt.md)** — adding-doubling solver, model types, optical-property assembly, surface coupling, Jacobian kernels.
@@ -59,4 +65,4 @@ pkg> add vSmartMOM
 
 ## Cite
 
-If you use vSmartMOM.jl in published work, please cite the JOSS software paper and the underlying methodology papers — see [References](pages/vSmartMOM/References.md).
+If you use vSmartMOM.jl in published work, please cite the vSmartMOM model paper (Sanghavi, Davis & Eldering 2014) and the JOSS software paper (Jeyaram, Sanghavi & Frankenberg 2022). For rotational Raman scattering and for exoplanets and brown dwarfs, please also cite the papers listed for them in [References](pages/vSmartMOM/References.md), together with the other methodology papers relevant to your work.

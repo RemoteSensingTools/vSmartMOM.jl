@@ -1,0 +1,88 @@
+[[records]]
+solver = "reference"
+state = "reference"
+
+    [[records.moments]]
+    n_consecutive = 1
+    guard_through_m = 2
+    m_used = 3
+    m_max = 15
+    tolerance = 9.999999747378752e-6
+    [[records.moments]]
+    n_consecutive = 1
+    guard_through_m = 2
+    m_used = 3
+    m_max = 15
+    tolerance = 9.999999747378752e-6
+    [[records.moments]]
+    n_consecutive = 1
+    guard_through_m = 2
+    m_used = 3
+    m_max = 15
+    tolerance = 9.999999747378752e-6
+[[records]]
+solver = "optimized"
+state = "reference"
+
+    [[records.moments]]
+    n_consecutive = 1
+    guard_through_m = 2
+    m_used = 3
+    m_max = 15
+    tolerance = 9.999999747378752e-6
+    [[records.moments]]
+    n_consecutive = 1
+    guard_through_m = 2
+    m_used = 3
+    m_max = 15
+    tolerance = 9.999999747378752e-6
+    [[records.moments]]
+    n_consecutive = 1
+    guard_through_m = 2
+    m_used = 3
+    m_max = 15
+    tolerance = 9.999999747378752e-6
+[[records]]
+solver = "reference"
+state = "optimized"
+
+    [[records.moments]]
+    n_consecutive = 1
+    guard_through_m = 2
+    m_used = 3
+    m_max = 15
+    tolerance = 9.999999747378752e-6
+    [[records.moments]]
+    n_consecutive = 1
+    guard_through_m = 2
+    m_used = 3
+    m_max = 15
+    tolerance = 9.999999747378752e-6
+    [[records.moments]]
+    n_consecutive = 1
+    guard_through_m = 2
+    m_used = 3
+    m_max = 15
+    tolerance = 9.999999747378752e-6
+[[records]]
+solver = "optimized"
+state = "optimized"
+
+    [[records.moments]]
+    n_consecutive = 1
+    guard_through_m = 2
+    m_used = 3
+    m_max = 15
+    tolerance = 9.999999747378752e-6
+    [[records.moments]]
+    n_consecutive = 1
+    guard_through_m = 2
+    m_used = 3
+    m_max = 15
+    tolerance = 9.999999747378752e-6
+    [[records.moments]]
+    n_consecutive = 1
+    guard_through_m = 2
+    m_used = 3
+    m_max = 15
+    tolerance = 9.999999747378752e-6

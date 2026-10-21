@@ -48,17 +48,17 @@ $(DocStringExtensions.FIELDS)
 """
 mutable struct linGreekCoefs{FT<:AbstractFloat}
     "Greek matrix coefficient α, is in B[2,2]"
-    α̇::Array{FT,2} 
+    α̇::AbstractArray{FT}
     "Greek matrix coefficient β, is in `B[1,1]` (only important one for scalar!)"
-    β̇::Array{FT,2}
+    β̇::AbstractArray{FT}
     "Greek matrix coefficient γ, is in B[2,1],B[1,2]"
-    γ̇::Array{FT,2}
+    γ̇::AbstractArray{FT}
     "Greek matrix coefficient δ, is in B[4,4]"
-    δ̇::Array{FT,2}
+    δ̇::AbstractArray{FT}
     "Greek matrix coefficient ϵ, is in B[3,4] and - in B[4,3]"
-    ϵ̇::Array{FT,2}
+    ϵ̇::AbstractArray{FT}
     "Greek matrix coefficient ζ, is in B[3,3]"
-    ζ̇::Array{FT,2}
+    ζ̇::AbstractArray{FT}
 end
 """ 
     struct ScatteringMatrix
@@ -96,6 +96,10 @@ Base.@kwdef struct linAerosolOptics{FT<:AbstractFloat}
     k̇::AbstractArray{FT}
     "Truncation factor" 
     ḟᵗ::AbstractArray{FT}
+    "Wavenumber nodes corresponding to `phase_lin_greek`"
+    phase_ν::Union{Nothing,Vector{FT}} = nothing
+    "Post-truncation Greek-coefficient tangents retained at phase nodes"
+    phase_lin_greek::Union{Nothing,Vector{linGreekCoefs{FT}}} = nothing
     #"Derivatives"
     #derivs = zeros(1)
 end

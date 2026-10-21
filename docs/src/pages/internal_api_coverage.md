@@ -40,9 +40,14 @@ vSmartMOM.Absorption.compute_τ_h2o_continuum!
 ```@docs
 vSmartMOM.Scattering.greek_coefficients_from_scattering_matrix
 vSmartMOM.Scattering.compute_aerosol_optical_properties_gpu
+vSmartMOM.Scattering.compute_aerosol_optical_properties_nodes_gpu
+vSmartMOM.Scattering.compute_aerosol_extinction_nodes_gpu
+vSmartMOM.Scattering.compute_aerosol_optical_properties_nodes_batched_gpu
+vSmartMOM.Scattering.compute_aerosol_extinction_nodes_batched_gpu
 vSmartMOM.Scattering.MiePrecisionPolicy
 vSmartMOM.Scattering.NativeFloat64
 vSmartMOM.Scattering.DSEmulated
+vSmartMOM.Scattering.NativeFloat32
 vSmartMOM.Scattering.DoubleSingle
 vSmartMOM.Scattering.ComplexDS
 vSmartMOM.Scattering.NeumaierAccum
@@ -56,6 +61,7 @@ vSmartMOM.Scattering.compute_mie_π_τ
 
 ```@docs
 vSmartMOM.CoreRT.RTModelLin
+vSmartMOM.CoreRT.AbundanceTangentContract
 vSmartMOM.CoreRT.OpticalPropertyJacobian
 vSmartMOM.CoreRT.RawAerosolJacobian
 vSmartMOM.CoreRT.rt_run_ss
@@ -99,6 +105,7 @@ vSmartMOM.StandaloneSS.chain_rule_combine_surface_brdf
 
 ```@docs
 vSmartMOM.InelasticScattering.get_greek_raman_VS
+vSmartMOM.InelasticScattering.q_branch_mean_b
 vSmartMOM.InelasticScattering.has_inelastic
 vSmartMOM.InelasticScattering.uses_cabannes_phase
 vSmartMOM.InelasticScattering.needs_interaction_workspace

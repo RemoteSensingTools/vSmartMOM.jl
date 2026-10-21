@@ -62,17 +62,18 @@ NAer  = isnothing(params.scattering_params) ? 0 : length(params.scattering_param
 NGas  = size(lin_model.τ̇_abs[1], 1)
 NSurf = 1
 
-R, T, dR, dT = rt_run_lin(model, lin_model, NAer, NGas, NSurf)
+result = rt_run_lin(model, lin_model, NAer, NGas, NSurf)
+R, T, dR, dT = result
 
 println("R  shape: ", size(R))
 println("dR shape: ", size(dR))
 ```
 
-Plot the forward reflectance spectrum:
+Plot the forward radiance spectrum:
 
 ```julia
 fig = Figure(size=(700, 400))
-ax = Axis(fig[1,1], xlabel="Spectral index", ylabel="TOA Reflectance (Stokes I)")
+ax = Axis(fig[1,1], xlabel="Spectral index", ylabel="TOA radiance (Stokes I)")
 lines!(ax, R[1, 1, :], label="Nadir")
 axislegend(ax, position=:rt)
 fig
@@ -84,15 +85,15 @@ The derivative dimension of `dR` is ordered by `ParameterLayout`:
 
 | Index range                | Parameter                        |
 |:---------------------------|:---------------------------------|
-| `1 : NAer*7`               | Aerosol properties (7 per type)  |
-| `NAer*7+1 : NAer*7+NGas`   | Gas VMRs (per variable molecule) |
-| `NAer*7+NGas+1 : end`      | Surface albedo                   |
+| `1`                         | Surface pressure `p_surf`        |
+| `aerosol_range(layout, i)`  | Aerosol properties (7 per type)  |
+| `gas_profile_range(layout, i, Nz)` | Gas VMRs for every layer of gas `i` |
+| `surface_range(layout)`     | Surface parameters               |
 
 For this test case:
 
 ```julia
-layout = CoreRT.ParameterLayout(aerosol_params=7, n_aerosols=NAer,
-                                n_gases=NGas, n_surface=NSurf)
+layout = result.layout
 Nparams = CoreRT.n_total(layout)
 println("Total Jacobian parameters: ", Nparams,
         " (NAer×7=", NAer*7, ", NGas=", NGas, ", NSurf=", NSurf, ")")
@@ -109,14 +110,20 @@ println("dR/d(albedo) at nadir, first 5 spectral points: ",
         round.(dR_albedo[1, 1:min(5,end)], digits=6))
 ```
 
-Gas VMR Jacobians:
+Gas VMR Jacobians are vertical profiles in TOA-to-BOA layer order. Gas slot 1
+is always the q-driven H₂O profile, followed by any `variable_molecules`.
+This YAML lists O₂ under the legacy `molecules:` key (fixed, no Jacobian
+column) and sets no humidity (q ≡ 0), so the slot-1 columns printed below are
+structural zeros, not derivatives:
 
 ```julia
 if NGas > 0
-    igas_start = first(CoreRT.gas_range(layout))
-    dR_gas1 = dR[:, 1, :, igas_start]
-    println("dR/d(gas₁ VMR) at nadir, first 5 points: ",
-            round.(dR_gas1[1, 1:min(5,end)], digits=6))
+    Nz = length(model.profile.p_full)
+    gas1 = CoreRT.gas_profile_range(layout, 1, Nz)
+    dR_gas1 = dR[:, 1, :, gas1]
+    iz = Nz
+    println("dR/d(gas₁ VMR in bottom layer), first 5 points: ",
+            round.(dR_gas1[1, 1:min(5,end), iz], digits=6))
 end
 ```
 
@@ -144,7 +151,7 @@ fig
 ```
 
 The rendered docs use Plotly for the visible figure. The top panel shows the
-forward reflectance; the bottom panel shows the `τ_ref` Jacobian for the same
+forward radiance; the bottom panel shows the `τ_ref` Jacobian for the same
 viewing angles.
 
 ```@raw html

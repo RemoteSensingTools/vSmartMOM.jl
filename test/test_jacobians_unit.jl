@@ -24,41 +24,19 @@ using LinearAlgebra
 const YAML_FAST = "test_parameters/JacobianTestFast.yaml"
 
 # ---------------------------------------------------------------
-# Shared helpers
+# Shared helpers (single contract: test_helpers.jl)
 # ---------------------------------------------------------------
-function run_lin_rt(params)
-    model, lin_model = model_from_parameters(LinMode(), params)
-    NAer = length(params.scattering_params.rt_aerosols)
-    NGas = size(lin_model.τ̇_abs[1], 1)
-    NSurf = 1
-    R, T, dR, dT = rt_run(model, lin_model, NAer, NGas, NSurf)
-    return R, dR, NAer, NGas, NSurf, model, lin_model
-end
-
-function run_fwd_only(params)
-    R, _, _, _, _, _, _ = run_lin_rt(params)
-    return R
-end
-
-"""Compute max and mean relative error, ignoring entries where |fd| < threshold."""
-function rel_errors(analytic, fd; threshold=1e-12)
-    mask = abs.(fd) .> threshold
-    if any(mask)
-        errs = abs.(analytic[mask] .- fd[mask]) ./ abs.(fd[mask])
-        return (max=maximum(errs), mean=mean(errs), median=median(errs))
-    else
-        ae = abs.(analytic .- fd)
-        return (max=maximum(ae), mean=mean(ae), median=median(ae))
-    end
-end
+isdefined(@__MODULE__, :VSmartMOMTestSupport) || include("test_helpers.jl")
+using .VSmartMOMTestSupport
 
 # =====================================================================
 # Run base model once (shared by all tests)
 # =====================================================================
 println("Setting up base model (with Mie)...")
 params_base = parameters_from_yaml(YAML_FAST)
-R_base, dR_base, NAer, NGas, NSurf, model_base, lin_model_base = run_lin_rt(params_base)
-Nparams = NAer * 7 + NGas + NSurf
+R_base, dR_base, NAer, NGas, NSurf, model_base, lin_model_base = run_linearized_rt(params_base)
+layout = CoreRT.ParameterLayout(n_aerosols=NAer, n_gases=NGas, n_surface=NSurf)
+Nparams = CoreRT.n_total(layout)
 
 # Extract base values for perturbations
 τ_ref_base = params_base.scattering_params.rt_aerosols[1].τ_ref
@@ -73,6 +51,60 @@ println("  nλ=$(size(R_base,3)), nVZA=$(size(R_base,1)), nStokes=$(size(R_base,
 # =====================================================================
 @testset "Jacobian Unit Tests" begin
 # =====================================================================
+
+@testset "Level 0: p_surf Jacobian, fixed grid" begin
+    p = parameters_from_yaml("test_parameters/JacobianTestRayleigh.yaml")
+    p.architecture = vSmartMOM.Architectures.CPU()
+    p.profile_reduction_n = -1
+    R, dR, na, ng, ns, _, _ = run_linearized_rt(p)
+    layout_ps = CoreRT.ParameterLayout(n_aerosols=na, n_gases=ng, n_surface=ns)
+    analytic = dR[:, :, :, CoreRT.psurf_index(layout_ps)]
+    δp = 0.01
+    pp = deepcopy(p); pp.p[end] += δp
+    pm = deepcopy(p); pm.p[end] -= δp
+    fd = (linearized_R(pp) .- linearized_R(pm)) ./ (2δp)
+    err = rel_errors(analytic, fd)
+    @test err.n > 0   # nonzero sensitivity was actually compared
+    @test err.max < 1e-4
+    @test err.mean < 1e-5
+end
+
+@testset "Level 0b: layer-resolved gas VMR Jacobian" begin
+    Nz = length(model_base.profile.p_full)
+    @test NGas % Nz == 0
+    layout_gas = CoreRT.ParameterLayout(
+        n_aerosols=NAer, n_gases=NGas, n_surface=NSurf)
+    @test length(CoreRT.gas_profile_range(layout_gas, 1, Nz)) == Nz
+
+    # JacobianTestFast treats O2 as fixed, so promote one layer locally for this
+    # plumbing test. τ/O2_VMR is exactly dτ/dVMR at fixed p, T, and cross section.
+    layer_norms = [maximum(abs, @view model_base.τ_abs[1][:, z]) for z in 1:Nz]
+    iz = argmax(layer_norms)
+    @test layer_norms[iz] > 0
+    igas = 1
+    local_col = iz
+    idx = CoreRT.gas_layer_index(layout_gas, igas, iz, Nz)
+
+    lin_local = deepcopy(lin_model_base)
+    local_τdot = model_base.τ_abs[1][:, iz] ./ 0.21
+    lin_local.τ̇_abs[1][local_col, :, iz] .= local_τdot
+    _, _, dR, dT = rt_run(model_base, lin_local, NAer, NGas, NSurf)
+    δvmr = 1e-6
+    mp = deepcopy(model_base)
+    mm = deepcopy(model_base)
+    mp.τ_abs[1][:, iz] .+= δvmr .* local_τdot
+    mm.τ_abs[1][:, iz] .-= δvmr .* local_τdot
+    Rp, Tp = rt_run(mp)
+    Rm, Tm = rt_run(mm)
+    fdR = (Rp .- Rm) ./ (2δvmr)
+    fdT = (Tp .- Tm) ./ (2δvmr)
+    errR = rel_errors(dR[:, :, :, idx], fdR; threshold=1e-10)
+    @test errR.n > 0   # nonzero sensitivity was actually compared
+    errT = rel_errors(dT[:, :, :, idx], fdT; threshold=1e-10)
+    @test errT.n > 0   # nonzero sensitivity was actually compared
+    @test errR.max < 1e-4
+    @test errT.max < 1e-4
+end
 
 # -----------------------------------------------------------------
 @testset "Level 1: Mie Interpolation Sanity" begin
@@ -108,14 +140,15 @@ end
     albedo_base = 0.05
     δ = 1e-4
     
-    analytic = dR_base[:, :, :, Nparams]  # last param = surface
+    analytic = dR_base[:, :, :, first(CoreRT.surface_range(layout))]
     
     params_pert = parameters_from_yaml(YAML_FAST)
     params_pert.brdf = [LambertianSurfaceScalar(albedo_base + δ)]
-    R_pert = run_fwd_only(params_pert)
+    R_pert = linearized_R(params_pert)
     fd = (R_pert .- R_base) ./ δ
     
     err = rel_errors(analytic, fd)
+    @test err.n > 0   # nonzero sensitivity was actually compared
     println("  Surface albedo: max_rel=$(round(err.max, sigdigits=3)), mean_rel=$(round(err.mean, sigdigits=3))")
     
     @test err.max < 1e-3   # Surface albedo Jacobian max rel error
@@ -128,14 +161,15 @@ end
     # createAero → constructCoreOpticalProperties → RT kernel
     δ = τ_ref_base * 1e-3
     
-    analytic = dR_base[:, :, :, 1]  # param 1 = τ_ref
+    analytic = dR_base[:, :, :, first(CoreRT.aerosol_range(layout, 1))]
     
     params_pert = parameters_from_yaml(YAML_FAST)
     params_pert.scattering_params.rt_aerosols[1].τ_ref = τ_ref_base + δ
-    R_pert = run_fwd_only(params_pert)
+    R_pert = linearized_R(params_pert)
     fd = (R_pert .- R_base) ./ δ
     
     err = rel_errors(analytic, fd)
+    @test err.n > 0   # nonzero sensitivity was actually compared
     println("  τ_ref: max_rel=$(round(err.max, sigdigits=3)), mean_rel=$(round(err.mean, sigdigits=3))")
     
     @test err.max < 0.50   # τ_ref Jacobian max rel error < 50%
@@ -147,14 +181,15 @@ end
     # Profile parameter — bypasses Mie, tests profile derivatives + RT
     δ = p0_base * 1e-2
     
-    analytic = dR_base[:, :, :, 6]  # param 6 = p₀
+    analytic = dR_base[:, :, :, CoreRT.aerosol_range(layout, 1)[6]]
     
     params_pert = parameters_from_yaml(YAML_FAST)
     params_pert.scattering_params.rt_aerosols[1].profile = Normal(p0_base + δ, σp_base)
-    R_pert = run_fwd_only(params_pert)
+    R_pert = linearized_R(params_pert)
     fd = (R_pert .- R_base) ./ δ
     
     err = rel_errors(analytic, fd)
+    @test err.n > 0   # nonzero sensitivity was actually compared
     println("  p₀: max_rel=$(round(err.max, sigdigits=3)), mean_rel=$(round(err.mean, sigdigits=3))")
     
     # NOTE: p₀ is a profile redistribution parameter (Σ τ̇ ≈ 0 across layers),
@@ -174,14 +209,15 @@ end
     # Mie → interpolation (Bug 20 fix) → τ̇_aer (Bug 21 fix) → createAero → RT
     δ = 1e-3
     
-    analytic = dR_base[:, :, :, 2]  # param 2 = nᵣ
+    analytic = dR_base[:, :, :, CoreRT.aerosol_range(layout, 1)[2]]
     
     params_pert = parameters_from_yaml(YAML_FAST)
     params_pert.scattering_params.rt_aerosols[1].aerosol.nᵣ = nᵣ_base + δ
-    R_pert = run_fwd_only(params_pert)
+    R_pert = linearized_R(params_pert)
     fd = (R_pert .- R_base) ./ δ
     
     err = rel_errors(analytic, fd)
+    @test err.n > 0   # nonzero sensitivity was actually compared
     println("  nᵣ: max_rel=$(round(err.max, sigdigits=3)), mean_rel=$(round(err.mean, sigdigits=3))")
     
     @test err.max < 1.0    # nᵣ Jacobian max rel error < 100%
@@ -193,15 +229,16 @@ end
     # Size distribution width — exercises Mie derivatives via ẇₓ
     δ = sd_base.σ * 1e-2
     
-    analytic = dR_base[:, :, :, 5]  # param 5 = σ of LogNormal
+    analytic = dR_base[:, :, :, CoreRT.aerosol_range(layout, 1)[5]]
     
     params_pert = parameters_from_yaml(YAML_FAST)
     params_pert.scattering_params.rt_aerosols[1].aerosol.size_distribution = 
         LogNormal(sd_base.μ, sd_base.σ + δ)
-    R_pert = run_fwd_only(params_pert)
+    R_pert = linearized_R(params_pert)
     fd = (R_pert .- R_base) ./ δ
     
     err = rel_errors(analytic, fd)
+    @test err.n > 0   # nonzero sensitivity was actually compared
     println("  σ_dist: max_rel=$(round(err.max, sigdigits=3)), mean_rel=$(round(err.mean, sigdigits=3))")
     
     @test err.max < 1.0    # σ_dist Jacobian max rel error < 100%
@@ -215,6 +252,14 @@ end
     @test all(isfinite.(R_base))          # R is finite
     @test all(isfinite.(dR_base))         # dR is finite
     @test all(R_base[:, 1, :] .>= 0)     # Stokes I ≥ 0
+
+    # Independent ordinary-forward solve (model_from_parameters(params), not
+    # LinMode). Measured agreement is ~2e-16 relative; this is not a FD step.
+    fwd = run_forward_rt(params_base)
+    @test size(fwd.R) == size(R_base)
+    @test all(isfinite, fwd.R)
+    @test all(isfinite, fwd.T)
+    @test all(isapprox.(R_base, fwd.R; rtol=1e-12))
 end
 
 # =====================================================================

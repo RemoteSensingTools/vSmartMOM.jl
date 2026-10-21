@@ -1,0 +1,228 @@
+source_sha256 = "a5b00feb60cefc8358c31cf8fbda3839999035882c2c6255ec1a8d8b9497213a"
+backend = "cuda"
+julia_version = "1.12.6"
+threads = 4
+end_to_end = true
+spectral_points = 10000
+chunk_size = 1000
+
+[totals_seconds]
+forward = [28.220371717, 28.120141578, 28.142699227000005]
+source = [32.285045219, 32.553941906, 32.456143832]
+
+[medians_seconds]
+forward = 28.142699227000005
+source = 32.456143832
+
+[configuration]
+AUDIT_BACKEND = "cuda"
+AUDIT_NU_MIN = "6150"
+AUDIT_CHUNKS = "10"
+AUDIT_LAYERS = "20"
+AUDIT_OUTPUT = "/tmp/vsmartmom-jacobian-evidence/source-end-to-end-10000.toml"
+AUDIT_GASES = "CO2,CH4,H2O"
+AUDIT_END_TO_END = "true"
+AUDIT_NSPEC = "1000"
+AUDIT_NU_MAX = "6250"
+AUDIT_EXTERNAL_SOLAR = "false"
+
+[[measurements]]
+solve_seconds = [0.562417401, 0.567217725, 0.756596767]
+construction_seconds = [2.935810779, 2.852231035, 2.570407675]
+device_allocated_bytes = [7133399608, 7133399608, 7133399608]
+peak_pool_used_bytes = [5250887888, 5250887888, 5250887888]
+mode = "source"
+chunk = 1
+seconds = [3.498367221, 3.419779903, 3.327279378]
+max_parity_error = 0.0
+host_bytes = [1205441904, 1205507440, 1205447936]
+[[measurements]]
+solve_seconds = [0.18245874, 0.19417089, 0.195573978]
+construction_seconds = [2.549370284, 2.469516384, 2.513621715]
+device_allocated_bytes = [735365352, 735365352, 735365352]
+peak_pool_used_bytes = [727487784, 727487784, 727487784]
+mode = "forward"
+chunk = 1
+seconds = [2.732097319, 2.663954517, 2.709451323]
+max_parity_error = 2.0816681711721685e-17
+host_bytes = [948560904, 948753704, 948739640]
+[[measurements]]
+solve_seconds = [0.551336308, 0.540765544, 0.489069723]
+construction_seconds = [2.57699005, 2.593101741, 2.591108814]
+device_allocated_bytes = [7133133056, 7133133056, 7133133056]
+peak_pool_used_bytes = [7127343024, 7127343024, 7127343024]
+mode = "source"
+chunk = 2
+seconds = [3.1285828, 3.134054316, 3.080380817]
+max_parity_error = 0.0
+host_bytes = [1205213424, 1205238496, 1205074000]
+[[measurements]]
+solve_seconds = [0.204296186, 0.199944615, 0.205774846]
+construction_seconds = [2.602034023, 2.685940031, 2.626277352]
+device_allocated_bytes = [735098800, 735098800, 735098800]
+peak_pool_used_bytes = [727537064, 727537064, 727537064]
+mode = "forward"
+chunk = 2
+seconds = [2.806637398, 2.886220076, 2.832320853]
+max_parity_error = 1.0408340855860843e-17
+host_bytes = [948388536, 948422056, 948327992]
+[[measurements]]
+solve_seconds = [0.559625912, 0.83938858, 0.818179575]
+construction_seconds = [2.585155411, 2.423135045, 2.397658688]
+device_allocated_bytes = [7132715960, 7132715960, 7132715960]
+peak_pool_used_bytes = [7127224336, 6307802096, 5381139824]
+mode = "source"
+chunk = 3
+seconds = [3.145044458, 3.263089639, 3.216169336]
+max_parity_error = 0.0
+host_bytes = [1204594400, 1204739520, 1204658880]
+[[measurements]]
+solve_seconds = [0.200155682, 0.228548983, 0.19780351]
+construction_seconds = [2.583459082, 2.571792678, 2.608412766]
+device_allocated_bytes = [734681064, 734681064, 734681064]
+peak_pool_used_bytes = [727583968, 727583968, 727583968]
+mode = "forward"
+chunk = 3
+seconds = [2.78390549, 2.800661562, 2.806488527]
+max_parity_error = 1.9081958235744878e-17
+host_bytes = [947468488, 947497032, 947470856]
+[[measurements]]
+solve_seconds = [0.532539108, 0.790674414, 0.904651416]
+construction_seconds = [2.631862352, 2.35119249, 2.304260886]
+device_allocated_bytes = [7132558616, 7132558616, 7132558616]
+peak_pool_used_bytes = [7127058720, 6307802096, 5381139824]
+mode = "source"
+chunk = 4
+seconds = [3.164566741, 3.142291662, 3.20929888]
+max_parity_error = 0.0
+host_bytes = [1204841568, 1204895152, 1204965808]
+[[measurements]]
+solve_seconds = [0.202294023, 0.19186761, 0.195558729]
+construction_seconds = [2.554972696, 2.567637617, 2.52403943]
+device_allocated_bytes = [734523720, 734523720, 734523720]
+peak_pool_used_bytes = [727616792, 727616792, 727616792]
+mode = "forward"
+chunk = 4
+seconds = [2.757546945, 2.759769273, 2.719865061]
+max_parity_error = 2.42861286636753e-17
+host_bytes = [947842328, 947800888, 947751112]
+[[measurements]]
+solve_seconds = [0.555319026, 0.846143699, 0.791253422]
+construction_seconds = [2.590366978, 2.380544523, 2.391557769]
+device_allocated_bytes = [7132388600, 7132388600, 7132388600]
+peak_pool_used_bytes = [7127045696, 6307802096, 6307802096]
+mode = "source"
+chunk = 5
+seconds = [3.145894506, 3.227215253, 3.183163463]
+max_parity_error = 0.0
+host_bytes = [1204663216, 1204797488, 1204731296]
+[[measurements]]
+solve_seconds = [0.197273113, 0.207112421, 0.200538622]
+construction_seconds = [2.564100126, 2.60883528, 2.653872633]
+device_allocated_bytes = [734353704, 734353704, 734353704]
+peak_pool_used_bytes = [727655952, 727655952, 727655952]
+mode = "forward"
+chunk = 5
+seconds = [2.761681408, 2.816226595, 2.854720165]
+max_parity_error = 3.469446951953614e-17
+host_bytes = [947527624, 947630808, 947664808]
+[[measurements]]
+solve_seconds = [0.56973048, 0.807473587, 0.801981102]
+construction_seconds = [2.60965955, 2.422773766, 2.445100401]
+device_allocated_bytes = [7132249912, 7132249912, 7132249912]
+peak_pool_used_bytes = [7127015776, 7119789648, 7119789648]
+mode = "source"
+chunk = 6
+seconds = [3.179618529, 3.230698692, 3.247477948]
+max_parity_error = 0.0
+host_bytes = [1204633504, 1204616176, 1204605056]
+[[measurements]]
+solve_seconds = [0.206576984, 0.199630645, 0.200018053]
+construction_seconds = [2.658010081, 2.614062147, 2.588070722]
+device_allocated_bytes = [734215016, 734215016, 734215016]
+peak_pool_used_bytes = [727715880, 727715880, 727715880]
+mode = "forward"
+chunk = 6
+seconds = [2.864920703, 2.814072436, 2.788434115]
+max_parity_error = 3.8163916471489756e-17
+host_bytes = [947485864, 947433608, 947599160]
+[[measurements]]
+solve_seconds = [0.819393348, 0.826467247, 0.814947569]
+construction_seconds = [2.402358044, 2.475412268, 2.489948838]
+device_allocated_bytes = [7132897416, 7132897416, 7132897416]
+peak_pool_used_bytes = [7119789648, 6307802096, 7119789648]
+mode = "source"
+chunk = 7
+seconds = [3.222084758, 3.302442594, 3.305283365]
+max_parity_error = 0.0
+host_bytes = [1205674912, 1205684208, 1205601296]
+[[measurements]]
+solve_seconds = [0.204425479, 0.201974181, 0.200028623]
+construction_seconds = [2.627027212, 2.639486595, 2.595672704]
+device_allocated_bytes = [734862520, 734862520, 734862520]
+peak_pool_used_bytes = [727745360, 727745360, 727745360]
+mode = "forward"
+chunk = 7
+seconds = [2.831732668, 2.841809402, 2.795989519]
+max_parity_error = 2.2551405187698492e-17
+host_bytes = [948542184, 948563976, 948615784]
+[[measurements]]
+solve_seconds = [0.821560962, 0.788170346, 0.816029483]
+construction_seconds = [2.423998339, 2.426830553, 2.459474965]
+device_allocated_bytes = [7133585136, 7133585136, 7133585136]
+peak_pool_used_bytes = [7119789648, 6307802096, 6307802096]
+mode = "source"
+chunk = 8
+seconds = [3.24590473, 3.215398867, 3.275924829]
+max_parity_error = 0.0
+host_bytes = [1205912352, 1205911648, 1205882000]
+[[measurements]]
+solve_seconds = [0.208035697, 0.202033422, 0.20036783]
+construction_seconds = [2.688823141, 2.627717971, 2.680198326]
+device_allocated_bytes = [735550240, 735550240, 735550240]
+peak_pool_used_bytes = [727772640, 727772640, 727772640]
+mode = "forward"
+chunk = 8
+seconds = [2.897173439, 2.830027472, 2.880910063]
+max_parity_error = 4.163336342344337e-17
+host_bytes = [948755512, 948877832, 948617816]
+[[measurements]]
+solve_seconds = [0.819757442, 0.869146104, 0.821234528]
+construction_seconds = [2.496780191, 2.437595151, 2.481929722]
+device_allocated_bytes = [7134145696, 7134145696, 7134145696]
+peak_pool_used_bytes = [7119789648, 6307802096, 6307802096]
+mode = "source"
+chunk = 9
+seconds = [3.316899613, 3.307141859, 3.303540278]
+max_parity_error = 0.0
+host_bytes = [1206470368, 1206580992, 1206499392]
+[[measurements]]
+solve_seconds = [0.204308599, 0.195008064, 0.20836224]
+construction_seconds = [2.710264802, 2.656918108, 2.663130428]
+device_allocated_bytes = [736110800, 736110800, 736110800]
+peak_pool_used_bytes = [727828784, 727828784, 727828784]
+mode = "forward"
+chunk = 9
+seconds = [2.914859249, 2.852199567, 2.871753859]
+max_parity_error = 1.734723475976807e-17
+host_bytes = [949255496, 949357944, 949307016]
+[[measurements]]
+solve_seconds = [0.783947337, 0.84556987, 0.863326334]
+construction_seconds = [2.45373278, 2.465781152, 2.443940229]
+device_allocated_bytes = [7134939544, 7134939544, 7134939544]
+peak_pool_used_bytes = [7119789648, 6307802096, 6307802096]
+mode = "source"
+chunk = 10
+seconds = [3.238081863, 3.311829121, 3.307625538]
+max_parity_error = 0.0
+host_bytes = [1206851344, 1206983744, 1207003824]
+[[measurements]]
+solve_seconds = [0.190303809, 0.182870916, 0.179499608]
+construction_seconds = [2.679204288, 2.671894134, 2.702965759]
+device_allocated_bytes = [736904648, 736904648, 736904648]
+peak_pool_used_bytes = [727871552, 727871552, 727871552]
+mode = "forward"
+chunk = 10
+seconds = [2.869817098, 2.855200678, 2.882765742]
+max_parity_error = 8.673617379884035e-18
+host_bytes = [949537528, 949681784, 949581192]

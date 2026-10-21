@@ -185,6 +185,12 @@ end
 
 A struct which defines Stokes Vector ([I,Q]) RT code.
 
+The CoreRT solvers reject `Stokes_IQ`: neglecting U in multiple scattering
+can cause intensity errors of several percent (in the tested aerosol scene,
+largest in the principal plane). The type remains for the Scattering-level
+functions and StandaloneSS `ExactSSConfig` single-scattering runs. Use
+[`Stokes_IQU`](@ref) for RT.
+
 # Fields
 $(DocStringExtensions.FIELDS)
 """
@@ -260,13 +266,13 @@ Base.@kwdef struct NoTruncation <: AbstractTruncationType
 end
 
 """
-    δBGE{FT}(l_max, Δ_angle)
+    δBGE{FT}(l_max)
 
 δ-BGE-fit truncation, vector form (Sanghavi & Stephens 2015, JQSRT 159,
 §3 — extension of Hu et al. 2000 to vector RT). Fits truncated Legendre
-coefficients outside the forward exclusion cone of half-angle
-`Δ_angle` and renormalises by the retained scattering fraction
-``c_0 = 1 - f^t``.
+coefficients over the full angular domain and renormalises by the
+retained scattering fraction ``c_0 = 1 - f^t``. (The former forward
+exclusion cone `Δ_angle` is retired and always `0`; see the field docs.)
 
 Recommended over plain δ-m for hyperspectral retrievals because δ-m
 has known DSE and PTE errors near exact backscatter (Sanghavi &
@@ -278,9 +284,36 @@ $(DocStringExtensions.FIELDS)
 struct δBGE{FT} <: AbstractTruncationType
     "Truncation length for Legendre terms"
     l_max::Int
-    "Exclusion angle for forward peak (in fitting procedure) `[degrees]`"
+    """
+    RETIRED — always `0` (design decision 2026-08-23). The δBGE
+    least-squares fit always uses the full angular domain; the former
+    forward-peak exclusion cone was honoured only by the forward
+    `truncate_phase`, never by the linearized overload, so any non-zero
+    value made LinMode Jacobians differentiate a different truncated
+    phase function than the forward model evaluated. The field remains
+    (fixed at zero) only so stored objects and printing stay compatible.
+    """
     Δ_angle::FT
+    function δBGE{FT}(l_max::Integer, Δ_angle::Real = zero(FT)) where {FT}
+        iszero(Δ_angle) || @warn(
+            "δBGE's Δ_angle is retired and forced to 0 — the fit always " *
+            "uses the full angular domain (a non-zero cone was never " *
+            "honoured by the linearized path).", maxlog = 1)
+        return new{FT}(Int(l_max), zero(FT))
+    end
 end
+
+"""
+    δBGE(l_max)
+    δBGE{FT}(l_max)
+
+Canonical constructors. A legacy second `Δ_angle` argument is still
+accepted for backward compatibility but is retired: non-zero values warn
+once and are forced to `0` (see the field docs). The untyped form yields
+`δBGE{Float64}`; use the parameterised form to match a `Float32` model.
+"""
+δBGE(l_max::Integer) = δBGE{Float64}(Int(l_max))
+δBGE(l_max::Integer, Δ_angle::Real) = δBGE{Float64}(Int(l_max), Δ_angle)
 
 """
     AutoTruncation()
@@ -293,7 +326,7 @@ Phase D — deferred-decision marker for `truncation: auto` in YAML
   fits within `stream_l_cap` ⇒ `NoTruncation()` (typical for
   Rayleigh-only or smooth-aerosol scenes).
 - Aerosols with `phase_lmax > stream_l_cap` ⇒
-  `δBGE(stream_l_cap, Δ_angle)`.
+  `δBGE(stream_l_cap)` (the retired `Δ_angle` is always 0).
 
 The resolver emits an `@info` line stating which branch was taken
 so the user can always see what was applied. `AutoTruncation` is
@@ -306,7 +339,7 @@ User-facing knobs in YAML:
 |---------------------------|----------------------------------------------------|
 | `truncation: auto`        | This deferred-decision mode (Phase D recommended)  |
 | `truncation: NoTruncation()` / `null` | Exactly no transform; errors if coefs exceed cap |
-| `truncation: δBGE(N, Δ)`  | Explicit; used for benchmarks / cross-validation   |
+| `truncation: δBGE(N, Δ)`  | Explicit; used for benchmarks / cross-validation (Δ is retired and forced to 0) |
 """
 struct AutoTruncation <: AbstractTruncationType end
 
@@ -330,11 +363,41 @@ Model that specifies the Mie computation details
 =#
 
 """
+    DEFAULT_R_MIN
+
+Default lower bound of the radius quadrature, `1e-3` µm (a radius of 1 nm,
+the smallest atmospheric aerosol particles).
+
+The bound is fixed: the radius nodes depend only on `r_min`, `r_max` and
+`nquad_radius`, never on the size-distribution parameters, so the analytic
+size-parameter tangents are exact derivatives of the discretized optics. For
+the size distributions in the shipped configurations, at most `1e-14` of the
+particle number lies below `1e-3` µm; the extinction cross-section falls at
+least as fast as `r²` towards small radii, so their optical contribution is
+smaller still.
+"""
+const DEFAULT_R_MIN = 1.0e-3
+
+"""
+    _check_radius_bounds(r_min, r_max)
+
+Require a finite radius interval `0 < r_min < r_max` for the size quadrature.
+"""
+function _check_radius_bounds(r_min, r_max)
+    (isfinite(r_min) && isfinite(r_max) && 0 < r_min < r_max) ||
+        throw(ArgumentError("the radius quadrature needs 0 < r_min < r_max; " *
+                            "got r_min = $r_min, r_max = $r_max"))
+    return nothing
+end
+
+"""
     MieModel{FDT<:AbstractFourierDecompositionType, FT, ARCH}
 
 Configuration for a Lorenz–Mie scattering computation.  Specifies the aerosol
 (size distribution + refractive index), wavelength, polarization type,
 truncation strategy, integration parameters, and the compute architecture.
+The size integral uses `nquad_radius` Gauss–Legendre nodes in `ln r` on the
+fixed interval `[r_min, r_max]` ([`radius_quadrature`](@ref)).
 The `computation_type` selects between NAI-2 (Siewert) and PCW (Domke) Fourier
 decomposition algorithms.
 
@@ -345,8 +408,8 @@ when unused (NAI2 path).
 # FT semantics (three orthogonal precision axes)
 
 `FT` is the **output** float type of the returned Greek coefficients and
-optical scalars.  It is carried by `λ`, `r_max`, and `aerosol` (which must all
-share the same `FT`) so that the entire `MieModel` is FT-consistent. This is
+optical scalars.  It is carried by `λ`, `r_max`, `r_min`, and `aerosol` (which
+must all share the same `FT`) so that the entire `MieModel` is FT-consistent. This is
 independent of two other precision choices:
 
 1. `FT` (output type) — what the user consumes downstream in the RT pipeline.
@@ -380,6 +443,8 @@ struct MieModel{FDT<:AbstractFourierDecompositionType, FT, ARCH}
 
     "Maximum radius `[μm]`"
     r_max::FT
+    "Minimum radius `[μm]`; fixed, independent of the size distribution (default [`DEFAULT_R_MIN`](@ref))"
+    r_min::FT
     "Number of quadrature points for integration over size distribution"
     nquad_radius::Int
 
@@ -396,19 +461,33 @@ struct MieModel{FDT<:AbstractFourierDecompositionType, FT, ARCH}
 end
 
 # Keyword constructor — preserves the public `MieModel(; …)` API that the former
-# `Base.@kwdef` provided, while enforcing the FT-consistent field types. `λ`, `r_max`
-# and the (placeholder) Wigner tables are promoted to the aerosol's float type `FT`,
+# `Base.@kwdef` provided, while enforcing the FT-consistent field types. `λ`, `r_max`,
+# `r_min` and the (placeholder) Wigner tables are promoted to the aerosol's float type `FT`,
 # exactly as `make_mie_model` does, so an `Aerosol{FT}` always yields a `MieModel{…,FT,…}`.
 # (FT is read from the aerosol inside the body: a `where {FT}` param cannot be bound from
 # a keyword argument — only positional args do that — so the type annotation route fails.)
 function MieModel(; computation_type, aerosol, λ, polarization_type, truncation_type,
-                  r_max, nquad_radius, wigner_A = nothing, wigner_B = nothing,
+                  r_max, nquad_radius, r_min = DEFAULT_R_MIN,
+                  wigner_A = nothing, wigner_B = nothing,
                   architecture = Architectures.CPU(), precision_policy = nothing)
     FT = typeof(aerosol.nᵣ)   # aerosol::Aerosol{FT}
+    _check_radius_bounds(FT(r_min), FT(r_max))
     wA = wigner_A === nothing ? zeros(FT, 1, 1, 1) : convert(Array{FT,3}, wigner_A)
     wB = wigner_B === nothing ? zeros(FT, 1, 1, 1) : convert(Array{FT,3}, wigner_B)
     return MieModel(computation_type, aerosol, FT(λ), polarization_type, truncation_type,
-                    FT(r_max), nquad_radius, wA, wB, architecture, precision_policy)
+                    FT(r_max), FT(r_min), nquad_radius, wA, wB, architecture, precision_policy)
+end
+
+# Positional form without `r_min` (the field order before the fixed radius grid):
+# the quadrature starts at `DEFAULT_R_MIN`.
+function MieModel(computation_type::AbstractFourierDecompositionType, aerosol::Aerosol{FT},
+                  λ, polarization_type, truncation_type, r_max, nquad_radius::Integer,
+                  wigner_A, wigner_B, architecture, precision_policy) where {FT}
+    _check_radius_bounds(FT(DEFAULT_R_MIN), FT(r_max))
+    return MieModel(computation_type, aerosol, FT(λ), polarization_type, truncation_type,
+                    FT(r_max), FT(DEFAULT_R_MIN), Int(nquad_radius),
+                    convert(Array{FT,3}, wigner_A), convert(Array{FT,3}, wigner_B),
+                    architecture, precision_policy)
 end
 
 #=
@@ -434,23 +513,23 @@ $(DocStringExtensions.FIELDS)
 """
 mutable struct GreekCoefs{FT<:Real}
     "Greek matrix coefficient α, is in B[2,2]"
-    α::Array{FT,1} 
+    α::AbstractArray{FT}
     "Greek matrix coefficient β, is in `B[1,1]` (only important one for scalar!)"
-    β::Array{FT,1}
+    β::AbstractArray{FT}
     "Greek matrix coefficient γ, is in B[2,1],B[1,2]"
-    γ::Array{FT,1}
+    γ::AbstractArray{FT}
     "Greek matrix coefficient δ, is in B[4,4]"
-    δ::Array{FT,1}
+    δ::AbstractArray{FT}
     "Greek matrix coefficient ϵ, is in B[3,4] and - in B[4,3]"
-    ϵ::Array{FT,1}
+    ϵ::AbstractArray{FT}
     "Greek matrix coefficient ζ, is in B[3,3]"
-    ζ::Array{FT,1}
+    ζ::AbstractArray{FT}
 end
 
-""" Extend Base.isapprox (≈) to compare two GreekCoefs """
-function Base.:isapprox(greek_coefs_a::GreekCoefs, greek_coefs_b::GreekCoefs) 
-    field_names = fieldnames(GreekCoefs)
-    return all([getproperty(greek_coefs_a, field) ≈ getproperty(greek_coefs_b, field) for field in field_names])
+"""Compare each physical coefficient array, forwarding standard tolerances."""
+function Base.isapprox(a::GreekCoefs, b::GreekCoefs; kwargs...)
+    return all(field -> isapprox(getproperty(a, field), getproperty(b, field); kwargs...),
+               fieldnames(typeof(a)))
 end
 
 """ 
@@ -493,10 +572,25 @@ Base.@kwdef struct AerosolOptics{FT<:Real}
     fᵗ::Union{FT, AbstractArray{FT}}
     "Derivatives"
     derivs = zeros(1)
+    "Wavenumber nodes (cm⁻¹) at which the post-truncation phase coefficients were evaluated"
+    phase_ν::Union{Nothing,Vector{FT}} = nothing
+    "Post-truncation Greek coefficients at `phase_ν`; retained so Z is evaluated only at these nodes"
+    phase_greek::Union{Nothing,Vector{GreekCoefs{FT}}} = nothing
+    "UNTRUNCATED Greek coefficients at `phase_ν` (or at the single Mie
+    wavelength when `phase_ν === nothing`). Retained when δ-BGE truncation
+    actually removed a forward peak, so the TMS single-scattering correction
+    can evaluate the exact phase function at the view geometries without a
+    rebuild. `nothing` when no truncation occurred (exact == truncated)."
+    phase_greek_raw::Union{Nothing,Vector{GreekCoefs{FT}}} = nothing
 end
 
 """ Extend Base.isapprox (≈) to compare two AerosolOptics """
-function Base.:isapprox(aerosol_optics_a::AerosolOptics, aerosol_optics_b::AerosolOptics) 
-    field_names = fieldnames(AerosolOptics)
-    return all([getproperty(aerosol_optics_a, field) ≈ getproperty(aerosol_optics_b, field) for field in field_names])
+function Base.:isapprox(aerosol_optics_a::AerosolOptics, aerosol_optics_b::AerosolOptics)
+    # Optional fields may legitimately be `nothing` on both sides;
+    # `nothing ≈ nothing` throws, so treat that pair as equal.
+    _approx(a, b) = a === nothing && b === nothing ? true :
+                    (a === nothing || b === nothing ? false : a ≈ b)
+    return all(_approx(getproperty(aerosol_optics_a, f),
+                       getproperty(aerosol_optics_b, f))
+               for f in fieldnames(AerosolOptics))
 end

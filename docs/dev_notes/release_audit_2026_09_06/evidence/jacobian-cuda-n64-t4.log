@@ -1,0 +1,37 @@
+BENCH_BEGIN cuda-n64-t4
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:23[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:15[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:19[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:12[K
+MODEL nSpec=64 nLayers=5 operator=6 full_columns=14 selected_columns=4
+PARITY forward=3.2959746043559335e-17 selected_radiance=0.0 selected_jacobian=0.0
+MEASURE cuda-n64-t4 build_forward median_seconds=0.006307008 median_host_bytes=3.8006e6 median_gc_seconds=0.0 samples=[(time = 0.006745724, bytes = 3800600, gctime = 0.0), (time = 0.005317538, bytes = 3801384, gctime = 0.0), (time = 0.006307008, bytes = 3800344, gctime = 0.0)]
+MEASURE cuda-n64-t4 build_full median_seconds=0.120091392 median_host_bytes=8.8838624e7 median_gc_seconds=0.0 samples=[(time = 0.096167849, bytes = 88838800, gctime = 0.0), (time = 0.120091392, bytes = 88838624, gctime = 0.0), (time = 0.158352723, bytes = 88838624, gctime = 0.0)]
+MEASURE cuda-n64-t4 build_fixed_microphysics median_seconds=0.007673127 median_host_bytes=7.82444e6 median_gc_seconds=0.0 samples=[(time = 0.008239422, bytes = 7824440, gctime = 0.0), (time = 0.007673127, bytes = 7824440, gctime = 0.0), (time = 0.006658679, bytes = 7824440, gctime = 0.0)]
+MEASURE cuda-n64-t4 solve_forward median_seconds=0.084395101 median_host_bytes=4.452144e7 median_gc_seconds=0.0 samples=[(time = 0.078992814, bytes = 44536688, gctime = 0.0), (time = 0.084395101, bytes = 44521440, gctime = 0.0), (time = 0.086227145, bytes = 44518832, gctime = 0.0)]
+MEASURE cuda-n64-t4 solve_full median_seconds=3.077734644 median_host_bytes=2.63371552e8 median_gc_seconds=0.0 samples=[(time = 3.149491607, bytes = 263756400, gctime = 0.0), (time = 3.029540226, bytes = 263369712, gctime = 0.0), (time = 3.077734644, bytes = 263371552, gctime = 0.0)]
+MEASURE cuda-n64-t4 solve_selected median_seconds=0.852394164 median_host_bytes=6.8771048e7 median_gc_seconds=0.0 samples=[(time = 0.852394164, bytes = 69419920, gctime = 0.0), (time = 0.851344761, bytes = 68753944, gctime = 0.0), (time = 0.858353209, bytes = 68771048, gctime = 0.0)]
+RATIO full_forward=36.46816707998252 full_selected=3.61069417645614
+TIMER_BREAKDOWN_FULL cuda-n64-t4
+───────────────────────────────────────────────────────────────────────────────────
+                                          Time                    Allocations
+                                 ───────────────────────   ────────────────────────
+        Tot / % measured:             5.70s /  56.4%            396MiB /  61.5%
+
+Section                  ncalls     time    %tot     avg     alloc    %tot      avg
+───────────────────────────────────────────────────────────────────────────────────
+doubling                     25    2.23s   69.5%  89.4ms    151MiB   62.0%  6.04MiB
+  getri_strided             165   5.84ms    0.2%  35.4μs    444KiB    0.2%  2.69KiB
+  getrf_strided             165   4.55ms    0.1%  27.6μs    289KiB    0.1%  1.75KiB
+interaction                  25    663ms   20.6%  26.5ms   46.2MiB   19.0%  1.85MiB
+  interaction inv1           25   3.08ms    0.1%   123μs    188KiB    0.1%  7.54KiB
+    getri_strided            25    866μs    0.0%  34.6μs   67.2KiB    0.0%  2.69KiB
+    getrf_strided            25    730μs    0.0%  29.2μs   43.8KiB    0.0%  1.75KiB
+  interaction inv2           25   3.08ms    0.1%   123μs    188KiB    0.1%  7.54KiB
+    getri_strided            25    868μs    0.0%  34.7μs   67.2KiB    0.0%  2.69KiB
+    getrf_strided            25    678μs    0.0%  27.1μs   43.8KiB    0.0%  1.75KiB
+OpticalProps                 30    295ms    9.2%  9.83ms   39.7MiB   16.3%  1.32MiB
+elemental                    25   16.4ms    0.5%   658μs   1.08MiB    0.4%  44.3KiB
+Creating layers               3   3.67ms    0.1%  1.22ms   5.29MiB    2.2%  1.76MiB
+OpticalProps invariant        1   2.10ms    0.1%  2.10ms    255KiB    0.1%   255KiB
+Creating arrays               1    166μs    0.0%   166μs   4.30KiB    0.0%  4.30KiB
+───────────────────────────────────────────────────────────────────────────────────
+BENCH_DONE cuda-n64-t4

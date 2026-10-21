@@ -1,0 +1,83 @@
+Test Summary:                                                |  Pass  Fail  Error  Broken  Total      Time
+vSmartMOM                                                    | 12429     1      1      14  12445  25m10.9s
+  Absorption                                                 |   116                         116   1m52.9s
+  HITRAN cache                                               |    13                          13     32.9s
+  Parameter copies                                           |    53                          53   1m06.7s
+  Absorption column integration                              |    35                          35      5.1s
+  H2O self broadening                                        |    12                          12      6.1s
+  Scattering                                                 |    47                          47      9.6s
+  Mie caller-node API                                        |   165                    7    172     19.8s
+  Mie caller-node batched API                                |   711                    3    714     39.4s
+  CoreRT                                                     |    17                          17     34.9s
+  Batched Kernels                                            |    39                          39      9.0s
+  SolarModel                                                 |     9                           9      0.7s
+  Forward noRS                                               |    32                    1     33     11.0s
+  Multi-sensor heights                                       |   228                         228   1m35.4s
+  Rayleigh/Cabannes Raman                                    |    38                          38      0.7s
+  Jacobian Unit                                              |    36                          36     15.7s
+  Batched Jacobians                                          |   416                         416     15.5s
+  Elemental boundary Jacobians                               |   160                         160      5.3s
+  CUDA Jacobian plans                                        |                                 0      0.0s
+  Blocked Jacobians                                          |   192                         192      9.8s
+  Phase interpolation                                        |    81                          81     12.8s
+  Aerosol reference                                          |    46                          46     17.8s
+  Local optical Jacobians                                    |  5164                        5164   1m42.6s
+  Source adding Jacobians                                    |    92                          92      9.0s
+  Source adding SIF Jacobians                                |   284                         284     36.5s
+  Tabulated phase Jacobians                                  |   656                         656     26.8s
+  Batched Lambertian Jacobians                               |  1536                        1536      4.5s
+  Selective Jacobians                                        |    51                          51      6.5s
+  Jacobian upstream contract                                 |    21            1             22      1.9s
+    Selected derivatives require upstream availability       |    17                          17      0.1s
+    Forward source declarations do not imply tangent support |     4            1              5      1.6s
+  Type Stability                                             |    55                          55      2.5s
+  Float32 Consistency                                        |     7                           7      4.7s
+  Quality Gates                                              |    11                          11      4.1s
+  Aqua                                                       |    10                          10     30.0s
+  JET                                                        |     1                           1   1m27.9s
+  IO Exports                                                 |    28                          28      3.1s
+  Parameter Parser                                           |    97                          97     14.1s
+  IO Validation                                              |    39                          39     11.0s
+  Canopy Surface                                             |    66                          66     16.9s
+  QuadPoints streams                                         |    91                          91      2.1s
+  External solar SFI                                         |    73                          73      8.3s
+  Forward/lin m_max parity                                   |    34                          34   1m51.4s
+  Fourier convergence                                        |    47                          47      3.8s
+  Component m_max traits                                     |    27                          27      0.5s
+  Schema docs                                                |    63     1                    64      2.3s
+    Schema docs invariants                                   |    63     1                    64      1.4s
+      Per-block pages exist                                  |     7                           7      0.0s
+      Schema index links each per-block page                 |    10                          10      0.0s
+      JSON Schema lists v0.7 fields                          |    11                          11      0.0s
+      JSON Schema choice fields expose flat enum completions |    14                          14      0.0s
+      Taplo wires JSON schema to TOML configs                |    10     1                    11      1.4s
+      VS Code wires JSON schema to YAML setup files          |    11                          11      0.0s
+  Truncation                                                 |   139                         139      8.2s
+  Inelastic VS smoke                                         |     8                           8      0.7s
+  Hybrid AD                                                  |     6                    1      7      7.9s
+  Cox-Munk Surface                                           |   154                         154      4.6s
+  Cox-Munk RT contract                                       |    10                          10     10.2s
+  Lambertian surfaces                                        |    53                          53     10.6s
+  Surface split                                              |    64                          64     21.4s
+  Lambertian closure                                         |    60                          60     14.6s
+  Scenario sweep                                             |    54                          54      7.9s
+  Phase 0 in-place                                           |    31                          31      2.6s
+  Fused doubling                                             |    14                          14      3.0s
+  Fused interaction                                          |    25                          25      1.5s
+  Sparse aerosol combine                                     |    10                          10      1.4s
+  Z-moment tables                                            |   168                         168      4.3s
+  m-invariant dτ cache                                       |     4                           4      0.4s
+  TMS SS correction                                          |    26                          26   2m31.9s
+  Phase 1b RRS regression                                    |    12                          12     40.2s
+  External-solar RRS columns                                 |     9                           9     40.8s
+  Phase 1c SS driver                                         |    30                          30     15.2s
+  StandaloneSS                                               |   242                    1    243   1m22.6s
+  Aerosols                                                   |    69                          69      3.0s
+  Phase 1e perturb_parameters                                |    12                          12      0.6s
+  Phase 3a SIF                                               |    21                          21      5.4s
+  Phase 6 script ports                                       |    28                          28      1.0s
+  BatchContext update_model!                                 |    62                    1     63     15.9s
+  Sources (v0.6)                                             |    86                          86      9.8s
+  ThermalEmission (v0.7 Phase A)                             |    91                          91      4.3s
+  VLIDORT baseline                                           |    42                          42     29.2s
+RNG of the outermost testset: Xoshiro(0x41364bf28e9f3db9, 0xb484ae05d0334946, 0x1489e519b94ca814, 0x9572b48ceeb90181, 0xdb98bf5f24c76c76)

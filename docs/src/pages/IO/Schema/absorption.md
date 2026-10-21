@@ -3,14 +3,21 @@
 Gas absorption configuration: which molecules are active, where to
 load HITRAN line data from, broadening / line-shape choices, and the
 volume mixing ratios (VMRs) per molecule. Skip this block entirely
-for clear-sky / Rayleigh-only / canopy-only runs.
+for clear-sky / Rayleigh-only / canopy-only runs: without it the forward
+and the linearized (`LinMode()`) models have no gas absorption at all,
+H₂O included (`q` still sets the dry-air column).
 
 ## Required when present
 
-- **`vmr`** — `Dict{String, Union{Real, Vector{Real}}}`. Volume mixing
-  ratios per molecule, on the same vertical grid as
-  `atmospheric_profile.T`. Scalar = uniform VMR; vector = profile.
-  Example: `{ O2: 0.21, H2O: [1e-6, 1e-5, 1e-4, 1e-3] }`.
+- **`vmr`** — `Dict{String, Union{Real, Vector{Real}}}`. Dry-air molar
+  ratios (mol species per mol dry air) for non-H₂O molecules. Scalar =
+  uniform VMR; a vector may use the `N`
+  layer centers or the `N+1` pressure interfaces. Interface-defined vectors
+  are interpolated to layer centers in log pressure before observer-height
+  reframing.
+  Example: `{ O2: 0.21, CO2: [3.8e-4, 3.9e-4, 4.0e-4, 4.1e-4] }`.
+  H₂O is derived from the atmospheric-profile `q` field; a legacy H₂O key in
+  this dictionary is ignored.
 - **`broadening`** — `String`. Line shape function. One of
   `"Voigt()"`, `"Doppler()"`, `"Lorentz()"`. Voigt is correct across
   the troposphere and stratosphere; Doppler/Lorentz are diagnostic
@@ -24,31 +31,131 @@ for clear-sky / Rayleigh-only / canopy-only runs.
 
 ### Molecule-list fields (one of)
 
+Without `LUTfiles`, line data are read from HITRAN, so molecule names are
+HITRAN molecule formulas (`O2`, `CO2`, `CH4`, `N2O`, …); a species without
+HITRAN line data, such as Ar, cannot be listed.
+
 - **`fixed_molecules`** — `Vector{Vector{String}}`, one inner list per
   spec_band. Molecules whose VMR is *not* a state variable in the
   linearization. Preferred form.
 - **`variable_molecules`** — `Vector{Vector{String}}`, one inner list
   per spec_band. Molecules whose VMR *is* a state variable
   (Jacobians computed via the analytic `lin_*` path).
-- **`molecules`** — *legacy*. Single molecule list applied to all
-  bands; treated as fully-fixed. Don't combine with
-  `variable_molecules` in new configs.
+- **`molecules`** — *legacy*. One inner list per spec_band, as for
+  `fixed_molecules`; treated as fully-fixed. If combined with
+  `variable_molecules`, the fixed set of each band is `molecules` minus
+  that band's variable molecules. Prefer `fixed_molecules` in new configs.
 
 H₂O is auto-handled when `q` is set in the profile — don't list it
-manually.
+manually (H₂O in any molecule list is rejected). The optional
+**`h2o_absorption`** list, one Boolean per band (default all `true`),
+turns H₂O absorption off for individual bands. Its internal `vmr_h2o` value is also a dry-air molar ratio,
+`N_H2O/N_dry`, rather than a moist-air mole fraction.
+
+## Optional CIA and continuum fields
+
+- **`cia_files`** — list of HITRAN CIA inputs. An entry may be a legacy path
+  string, or a mapping with:
+  - **`path`** — required CIA file path.
+  - **`reference_codes`** — optional reference-code string or nonempty list
+    of strings, such as `"54"` or `["54"]`.
+  - **`negative_policy`** — optional `error` (default) or `clamp_zero`.
+- **`mtckd_file`** — optional AER MT_CKD H₂O-continuum NetCDF path.
+
+Like `LUTfiles`, CIA and MT_CKD paths may start with `${ENV:NAME}`, which is
+replaced by the value of environment variable `NAME` when the file is parsed.
+
+A bare CIA path is accepted only when different HITRAN reference families do
+not overlap on the requested model grid. Ambiguous overlap fails closed and
+must be resolved with `reference_codes`. Negative cross sections likewise
+fail by default; `clamp_zero` must be requested explicitly.
+
+The surface-pressure tangent includes the hydrostatic-column and midpoint-
+pressure response of CIA and MT_CKD at fixed temperature, humidity, and VMR.
+Their abundance response is not differentiated. A Jacobian request for an
+abundance they depend on (H₂O for MT_CKD and every CIA pair, or a variable
+collider gas) is therefore rejected unless the model is built with
+`abundance_jacobians=:frozen_cross_section`; see
+[Gas-abundance columns](../../jacobians.md#Gas-abundance-columns). Ordinary line absorption
+includes the pressure-dependent cross-section response as well as molecular
+column scaling. This is the derivative with only the final grid's bottom
+pressure interface moving, at fixed layer temperature, humidity and VMR;
+it does not differentiate profile reduction or observer-interface insertion.
+Native ABSCO uses the active pressure-interval slope (right-sided at interior
+knots, zero at/outside clamped endpoints); legacy LUTs differentiate their
+interpolant. Line-by-line derivatives retain the active wing windows, whose
+hard boundaries are discontinuous. See the [Jacobian guide](../../jacobians.md).
+
+```yaml
+cia_files:
+  - path: "/data/HITRAN_CIA/O2-O2_2024.cia"
+    reference_codes: ["54"]
+    negative_policy: error
+  - "/data/HITRAN_CIA/O2-N2_2024.cia"
+```
+
+## ABSCO LUT files
+
+`LUTfiles` is an array of file arrays, one per spectral band. Each inner array must contain the
+non-H₂O absorbers in the same order as `fixed_molecules[band]` followed by
+`variable_molecules[band]`. An optional H₂O file can occur anywhere in the inner array; it is
+recognized from its ABSCO molecule ID and is driven by `atmospheric_profile.q`.
+
+Three formats are accepted by extension:
+
+- `.hdf`, `.h5`, `.hdf5`: original ABSCO tables, read by AtmosphericAbsorption. vSmartMOM infers
+  O₂/WCO₂/SCO₂ from `spec_bands`, reads only that continuous slab, retains all H₂O foreign-broadener
+  nodes, and places the Float32 cube on the configured CPU/GPU architecture.
+- `.absco`: a portable table produced by `AtmosphericAbsorption.save_absco_lut`; it is restored on
+  the configured architecture.
+- all other extensions: the legacy vSmartMOM `InterpolationModel`/JLD2 loader.
+
+For a three-band Float32 CUDA run, the relevant TOML fragment is:
+
+```toml
+[radiative_transfer]
+spec_bands = ["12950:0.01:13200", "6170:0.01:6270", "4800:0.01:4900"]
+float_type = "Float32"
+architecture = "GPU()"
+# ...the other radiative_transfer fields...
+
+[absorption]
+fixed_molecules = [["O2"], ["CO2"], ["CO2"]]
+variable_molecules = [[], [], []]
+LUTfiles = [
+  ["${ENV:ABSCO_ROOT}/o2_v52.hdf",  "${ENV:ABSCO_ROOT}/h2o_v52.hdf"],
+  ["${ENV:ABSCO_ROOT}/co2_v52.hdf", "${ENV:ABSCO_ROOT}/h2o_v52.hdf"],
+  ["${ENV:ABSCO_ROOT}/co2_v52.hdf", "${ENV:ABSCO_ROOT}/h2o_v52.hdf"],
+]
+vmr = { O2 = 0.2095, CO2 = 0.00042 }
+broadening = "Voigt()" # retained for HITRAN fallback; ABSCO interpolation is linear
+CEF = "HumlicekWeidemann32SDErrorFunction()"
+wing_cutoff = 25
+```
+
+Set `ENV["ABSCO_ROOT"]` before reading the file. The O₂/CO₂ absorber abundance still multiplies
+optical depth separately. The broadener axis of the O₂/CO₂ tables receives the H₂O ratio
+`r = profile.vmr_h2o`; the H₂O table receives the moist mole fraction `r/(1+r)`, and its optical
+depth is additionally multiplied by `r`.
+The q-driven H₂O Jacobians include this broadener response; see
+[Gas-abundance columns](../../jacobians.md#Gas-abundance-columns).
 
 ## HITRAN edition
 
-Set the HITRAN edition once per session via:
+The default edition, `"artifact"`, is HITRAN2016 distributed as Julia
+artifacts. To use data downloaded from hitran.org instead, set an edition
+label once per session:
 
 ```julia
 using vSmartMOM
-vSmartMOM.set_hitran_edition!(2020)   # default; or 2016
+vSmartMOM.set_hitran_edition!("HITRAN2024")   # downloads on first use
+vSmartMOM.set_hitran_edition!("artifact")     # back to the HITRAN2016 default
 ```
 
-This is a per-session preference, not a YAML field. The Artifacts
-infrastructure caches HITRAN snapshots in `~/.julia/scratchspaces/`
-and downloads on-demand from hitran.org if needed. See the
+This is a per-session preference, not a YAML field. hitran.org serves only
+its current edition; the edition string labels the local cache in
+`~/.julia/scratchspaces/` and does not select a historical edition. Please
+cite the HITRAN edition you used (see [References](../../vSmartMOM/References.md)). See the
 [HITRAN Data Management](../../Absorption/HITRAN_Data.md) page for the
 dispatch flow and edition-selection workflow.
 
@@ -60,12 +167,10 @@ dispatch flow and edition-selection workflow.
 absorption:
   vmr:
     O2: 0.21
-    N2: 0.78
-    Ar: 0.009
   variable_molecules:
     - ["O2"]                # one inner list per spec_band
   fixed_molecules:
-    - ["N2", "Ar"]
+    - []                    # nothing else in this band
   broadening: "Voigt()"
   CEF: "HumlicekWeidemann32SDErrorFunction()"
   wing_cutoff: 25
@@ -78,7 +183,7 @@ atmospheric_profile:
   T: [220.0, 250.0, 280.0]
   p: [0.1, 100.0, 500.0, 1013.25]
   q: [1e-6, 1e-3, 5e-3]      # H₂O auto-included as variable
-  profile_reduction: nothing
+  profile_reduction: null
 
 absorption:
   vmr:
@@ -100,5 +205,5 @@ absorption:
 
 - [`Schema/atmospheric_profile.md`](atmospheric_profile.md) — `T`, `p`,
   `q` profile that VMRs bind to
-- `Schema/spec_bands.md` *(forthcoming)* — spectral grid the absorption
+- [`Schema/spec_bands.md`](spec_bands.md) — spectral grid the absorption
   cross-sections are evaluated on

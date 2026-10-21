@@ -10,7 +10,9 @@ Flexible aerosol framework supporting multiple schemes:
 - Two-Moment: Bulk aerosol properties (AOD + effective radius)
 - Future: MAAM, custom schemes, etc.
 
-Includes wavelength-dependent refractive index database and optical property calculations.
+Includes a wavelength-dependent refractive-index database and data readers.
+Scheme-to-optics conversion is not implemented; `compute_optical_properties`
+throws an explicit error. Production Mie optics live in `Scattering`.
 """
 module Aerosols
 

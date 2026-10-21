@@ -16,6 +16,54 @@ This clean separation makes it straightforward to add new physical parameters
 without touching the RT propagation code.
 =#
 
+function _attach_aerosol_phase(inv::LinAerosolInvariant,
+        Z⁺⁺, Z⁻⁺, Ż⁺⁺, Ż⁻⁺, Z₀⁺, Z₀⁻, Ż₀⁺, Ż₀⁻, arr_type,
+        columns::Union{Nothing,AbstractVector{<:Integer}}=nothing)
+    n = length(inv.τ)
+    active_columns = columns === nothing ? collect(1:7) : collect(columns)
+    # Chain-rule boundary, S2014 (C.25)–(C.26): the four Mie phase tangents
+    # (nᵣ,nᵢ,rₘ,σᵣ) occupy aerosol columns 2:5. Loading and vertical-profile
+    # parameters change τ/ϖ and mixing weights, not this species' normalized
+    # phase matrix. Their direct dZ entries are therefore zero here; mixing
+    # later supplies their contribution to the effective layer phase matrix.
+    function lift_phase_dot(Z, nrow, ncol)
+        FT = Z === nothing ? eltype(inv.τ) : eltype(Z)
+        if Z === nothing || ndims(Z) == 3
+            out = fill!(similar(inv.τ, FT, nrow, ncol, length(active_columns)), zero(FT))
+            if Z !== nothing
+                if columns === nothing
+                    # Full-Jacobian path: keep the single vectorized assign
+                    # (one launch) instead of per-column copies.
+                    out[:,:,2:5] .= permutedims(Z, (2, 3, 1))
+                else
+                    for (iout, column) in enumerate(active_columns)
+                        2 <= column <= 5 || continue
+                        out[:,:,iout] .= @view Z[column - 1, :, :]
+                    end
+                end
+            end
+        else
+            out = fill!(similar(inv.τ, FT, nrow, ncol, n, length(active_columns)), zero(FT))
+            if columns === nothing
+                out[:,:,:,2:5] .= permutedims(Z, (2, 3, 4, 1))
+            else
+                for (iout, column) in enumerate(active_columns)
+                    2 <= column <= 5 || continue
+                    out[:,:,:,iout] .= @view Z[column - 1, :, :, :]
+                end
+            end
+        end
+        return out
+    end
+    Ż7⁺⁺ = lift_phase_dot(Ż⁺⁺, size(Z⁺⁺,1), size(Z⁺⁺,2))
+    Ż7⁻⁺ = lift_phase_dot(Ż⁻⁺, size(Z⁻⁺,1), size(Z⁻⁺,2))
+    Ż7₀⁺ = Z₀⁺ === nothing ? nothing : lift_phase_dot(Ż₀⁺, size(Z₀⁺,1), size(Z₀⁺,2))
+    Ż7₀⁻ = Z₀⁻ === nothing ? nothing : lift_phase_dot(Ż₀⁻, size(Z₀⁻,1), size(Z₀⁻,2))
+    return CoreScatteringOpticalProperties(inv.τ, inv.ϖ, Z⁺⁺, Z⁻⁺, Z₀⁺, Z₀⁻),
+        CoreScatteringOpticalPropertiesLin(inv.τ̇, inv.ϖ̇,
+                                            Ż7⁺⁺, Ż7⁻⁺, Ż7₀⁺, Ż7₀⁻)
+end
+
 """
     constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model)
 
@@ -32,7 +80,8 @@ For each atmospheric layer, this function:
    the mixing formulas for combined ϖ and Z.
 4. Adds gas absorption via `UmbrellaCoreAbsorptionOpticalProperties`, updating ϖ and τ.
 
-The output derivative dimension has `Nparams = 7×NAer + NGas` entries per layer
+The output derivative dimension has `Nparams = 1 + 7×NAer + NGasLayer` entries per layer,
+where `NGasLayer = NGasSpecies×Nz`.
 (surface parameters are handled separately in the interaction step).
 
 # Returns
@@ -40,109 +89,136 @@ The output derivative dimension has `Nparams = 7×NAer + NGas` entries per layer
 - `layer_opt_lin`: Array of `CoreScatteringOpticalPropertiesLin` (derivatives, one per layer).
 - `fscat_opt`: Rayleigh scattering fraction per layer (for inelastic scattering weight).
 """
-function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #where {FT<:Real}
-    if InelasticScattering.has_inelastic(RS_type)
-        throw(ArgumentError(
-            "Linearized Raman-active optical properties are intentionally unsupported. " *
-            "Use forward Raman RT only."))
-    end
+function constructCoreOpticalProperties(rs, band, m, model, lin_model)
+    cache = build_m_invariant_cache_lin(band, model, lin_model)
+    return constructCoreOpticalProperties(rs, band, m, model, lin_model, cache)
+end
 
-    (; τ_rayl, τ_aer, τ_abs, aerosol_optics, 
-            greek_rayleigh) = model
-    (; τ̇_aer, τ̇_abs, lin_aerosol_optics) = lin_model
-    @assert all(iBand .≤ length(τ_rayl)) "iBand exceeded number of bands"
-    FT = eltype(τ_rayl[1])
-    
+"Cache-aware linearized construction: only phase blocks and phase mixing vary with m."
+function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model,
+                                        cache::LinMInvariantCache)
+    bands = iBand isa Integer ? (iBand,) : iBand
+    InelasticScattering.has_inelastic(RS_type) && throw(ArgumentError(
+        "Linearized Raman-active optical properties are intentionally unsupported."))
+    (; τ_rayl, τ_aer, aerosol_optics, greek_rayleigh) = model
+    (; lin_aerosol_optics, τ̇_rayl_psurf, τ̇_aer_psurf,
+       τ̇_abs_psurf) = lin_model
     arr_type = CoreRT.array_type(model)
+    nAero = size(τ_aer[first(bands)], 1)
+    nZ = size(τ_rayl[1], 2)
+    FT = eltype(τ_rayl[1])
+    selected_rayleigh = [greek_rayleigh[iB] for iB in bands]
+    shared_rayleigh = length(selected_rayleigh) > 1 &&
+                      all(g -> _same_greek(g, selected_rayleigh[1]), selected_rayleigh)
+    shared_blocks = shared_rayleigh ?
+        _compute_phase_blocks(model, selected_rayleigh[1], m, arr_type) : nothing
 
-    pol_type = CoreRT.polarization_type(model)
-    # Do this in CPU space only first:
-    
-    # Quadrature points:
-    μ = collect(model.quad_points.qp_μ )
-    # Number of Aerosols:
-    nAero = size(τ_aer[iBand[1]],1)
-    nZ    = size(τ_rayl[1],2)
-    # Rayleigh Z matrix. Linearized RT is pure-elastic only; Raman-active
-    # Cabannes/RRS modes are rejected above.
-    
-    band_layer_props     = [];
-    band_layer_props_lin = [];
-    band_fScattRayleigh  = [];
-    for iB in iBand
-        # Linearized RT is pure-elastic only — Raman/Cabannes types are rejected
-        # at the lin entry points — so both noRS and noRS_plus use the full
-        # Rayleigh phase matrix. greek_cabannes is intentionally NOT destructured
-        # for this path; a Cabannes branch here would be dead code (and an
-        # UndefVarError for noRS_plus). See project_raman_not_linearized.
-        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ,
-                                                        greek_rayleigh[iB], m,
-                                                        arr_type = arr_type)
-
-        rayl = [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), 1.0,
-                (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺)) for i=1:nZ]
-        # Initiate combined properties with rayleigh
-        combrella = [UmbrellaCoreScatteringOpticalProperties(rayl[i],nothing) for i=1:nZ]
-        # Loop over all aerosol types:
-        for iaer=1:nAero
-            # Precomute Z matrices per type (constant per layer)
-            AerZ⁺⁺, AerZ⁻⁺, AerŻ⁺⁺, AerŻ⁻⁺ = Scattering.compute_Z_moments(
-                                pol_type, μ, 
-                                aerosol_optics[iB][iaer].greek_coefs, 
-                                lin_aerosol_optics[iB][iaer].lin_greek_coefs, 
-                                m, arr_type=arr_type)
-            # Generate Core optical properties for Aerosols iaer
-            aer = []
-            lin_aer = []
-            for iz=1:nZ
-                t_aer, t_lin_aer =  createAero(
-                            arr_type(τ_aer[iB][iaer,:,iz]), 
-                            aerosol_optics[iB][iaer], 
-                            arr_type(AerZ⁺⁺), arr_type(AerZ⁻⁺), 
-                            arr_type(τ̇_aer[iB][iaer,:,:,iz]), 
-                            lin_aerosol_optics[iB][iaer], 
-                            arr_type(AerŻ⁺⁺), arr_type(AerŻ⁻⁺), 
-                            arr_type) 
-                push!(aer, t_aer)
-                push!(lin_aer, t_lin_aer)
-            end 
-            aer_combrella = [UmbrellaCoreScatteringOpticalProperties(aer[i],lin_aer[i]) for i=1:nZ]
-            # Mix with previous Core Optical Properties
-            combrella = [combrella[i]+aer_combrella[i] for i=1:nZ]
+    band_layer_props = Any[]
+    band_layer_props_lin = Any[]
+    band_fScattRayleigh = Any[]
+    for (iBi, iB) in enumerate(bands)
+        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, RaylZ₀⁺, RaylZ₀⁻ = shared_blocks === nothing ?
+            _compute_phase_blocks(model, greek_rayleigh[iB], m, arr_type) : shared_blocks
+        # Rayleigh is conservative in the model's precision. A Float64 1.0
+        # silently promotes every mixed ϖ and Z in an otherwise Float32 solve.
+        rayl = [CoreScatteringOpticalProperties(cache.rayl_τ_dev[iBi][iz], one(FT),
+            Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, RaylZ₀⁺, RaylZ₀⁻) for iz in 1:nZ]
+        combrella = [UmbrellaCoreScatteringOpticalProperties(rayl[iz], nothing)
+                     for iz in 1:nZ]
+        aer_ps_components = [Tuple[] for _ in 1:nZ]
+        for iaer in 1:nAero
+            aerosol_columns = cache.selection === nothing ? nothing :
+                              cache.selection.aerosol_columns[iaer]
+            needs_mie_phase = aerosol_columns === nothing ||
+                              any(column -> 2 <= column <= 5, aerosol_columns)
+            if needs_mie_phase
+                AerZ⁺⁺, AerZ⁻⁺, AerŻ⁺⁺, AerŻ⁻⁺,
+                AerZ₀⁺, AerZ₀⁻, AerŻ₀⁺, AerŻ₀⁻ =
+                    _compute_aerosol_phase_blocks_lin(
+                        model, aerosol_optics[iB][iaer], lin_aerosol_optics[iB][iaer],
+                        get_spec_bands(model)[iB], m, arr_type)
+            else
+                AerZ⁺⁺, AerZ⁻⁺, AerZ₀⁺, AerZ₀⁻ =
+                    _compute_aerosol_phase_blocks(
+                        model, aerosol_optics[iB][iaer],
+                        get_spec_bands(model)[iB], m, arr_type)
+                AerŻ⁺⁺ = AerŻ⁻⁺ = AerŻ₀⁺ = AerŻ₀⁻ = nothing
+            end
+            aer = Any[]
+            lin_aer = Any[]
+            for iz in 1:nZ
+                afwd, alin = _attach_aerosol_phase(cache.aerosol[iBi][iaer][iz],
+                    AerZ⁺⁺, AerZ⁻⁺, AerŻ⁺⁺, AerŻ⁻⁺,
+                    AerZ₀⁺, AerZ₀⁻, AerŻ₀⁺, AerŻ₀⁻, arr_type,
+                    aerosol_columns)
+                push!(aer, afwd); push!(lin_aer, alin)
+                push!(aer_ps_components[iz],
+                      (afwd, _to_device(arr_type, τ̇_aer_psurf[iB][iaer,:,iz])))
+            end
+            combrella = [combrella[iz] +
+                UmbrellaCoreScatteringOpticalProperties(aer[iz], lin_aer[iz])
+                for iz in 1:nZ]
         end
+        combrella = [combrella[iz] + UmbrellaCoreAbsorptionOpticalProperties(
+            cache.gas[iBi][iz], cache.lin_gas[iBi][iz]) for iz in 1:nZ]
+        fScattRayleigh = [_rayleigh_fraction_of_total_extinction(
+            rayl[iz], combrella[iz].fwd) for iz in 1:nZ]
+        combo = [combrella[iz].fwd for iz in 1:nZ]
+        combo_lin = Any[combrella[iz].lin for iz in 1:nZ]
 
-
-        # Create Core Optical Properties merged with trace gas absorptions:
-        gas = [CoreAbsorptionOpticalProperties(arr_type(τ_abs[iB][:,iz])) for iz=1:nZ]
-        lin_gas = [CoreAbsorptionOpticalPropertiesLin(arr_type(collect(τ̇_abs[iB][:,:,iz]'))) for iz=1:nZ] 
-        gas_combrella = [UmbrellaCoreAbsorptionOpticalProperties(gas[iz],lin_gas[iz]) for iz=1:nZ]   
-        tmp = combrella .+ gas_combrella            
-        combrella = tmp
-        fScattRayleigh =
-            [_rayleigh_fraction_of_total_extinction(rayl[iz], combrella[iz].fwd)
-             for iz=1:nZ]
-        #for i=1:nZ
-        #end
-        #combo_lin = [include_rayl!(combo[iz], combo_lin[iz], rayl[iz], rayl_lin[iz]) for iz=1:nZ]
-        #for iaer=1:nAero
-        #    aer_lin =  [createAeroLin(arr_type(τ̇_aer[iB][iaer,1:7,:,iz]), 
-        #                aerosol_optics_lin[iB][iaer], 
-        #                AerŻ⁺⁺, AerŻ⁻⁺, arr_type) for iz=1:nZ]
-        #    combo_lin = [include_aer!(iaer, combo[iz], combo_lin[iz], aer[iz], aer_lin[iz]) for i=1:nZ]
-        #end
-        # Use the following two lines for every gas to be included in the state vector
-        #igas=1
-        #combo2_lin = [include_gas(nAero, igas[iz], combo[iz], combo_lin[iz], gas_lin[iz]) for i=1:nZ]
-        combo =     [combrella[iz].fwd for iz=1:nZ]
-        combo_lin = [combrella[iz].lin for iz=1:nZ]
-
-        push!(band_layer_props, combo)
-        push!(band_layer_props_lin, combo_lin)
+        # Prepend the shared surface-pressure column when selected. Its phase
+        # numerators are m-dependent; τ/ϖ component tangents are cached above.
+        include_pressure = cache.selection === nothing ||
+                           cache.selection.include_pressure
+        for iz in (include_pressure ? (1:nZ) : (1:0))
+            fwd = combo[iz]; nSpec = length(fwd.τ)
+            raydot = _to_device(arr_type, τ̇_rayl_psurf[iB][:,iz])
+            absdot = _to_device(arr_type, τ̇_abs_psurf[iB][:,iz])
+            τdot = raydot .+ absdot
+            Wdot = copy(raydot)
+            Ndot⁺⁺ = reshape(raydot,1,1,nSpec) .* Rayl𝐙⁺⁺
+            Ndot⁻⁺ = reshape(raydot,1,1,nSpec) .* Rayl𝐙⁻⁺
+            Ndot₀⁺ = fwd.Z₀⁺ === nothing ? nothing :
+                reshape(raydot,1,1,nSpec) .* _ensure_3d(RaylZ₀⁺)
+            Ndot₀⁻ = fwd.Z₀⁻ === nothing ? nothing :
+                reshape(raydot,1,1,nSpec) .* _ensure_3d(RaylZ₀⁻)
+            for (iaer, (aer_fwd, rawdot)) in enumerate(aer_ps_components[iz])
+                optics = aerosol_optics[iB][iaer]
+                raw_factor = one(FT) .- optics.fᵗ .* optics.ω̃
+                trunc_factor = raw_factor isa AbstractArray ?
+                    _to_device(arr_type, raw_factor) : raw_factor
+                moddot = trunc_factor .* rawdot
+                τdot .+= moddot
+                scatterdot = moddot .* aer_fwd.ϖ
+                Wdot .+= scatterdot
+                Ndot⁺⁺ .+= reshape(scatterdot,1,1,nSpec) .* aer_fwd.Z⁺⁺
+                Ndot⁻⁺ .+= reshape(scatterdot,1,1,nSpec) .* aer_fwd.Z⁻⁺
+                if Ndot₀⁺ !== nothing
+                    Ndot₀⁺ .+= reshape(scatterdot,1,1,nSpec) .* aer_fwd.Z₀⁺
+                    Ndot₀⁻ .+= reshape(scatterdot,1,1,nSpec) .* aer_fwd.Z₀⁻
+                end
+            end
+            W = fwd.τ .* fwd.ϖ
+            ϖdot = (Wdot .- fwd.ϖ .* τdot) ./ fwd.τ
+            zdot(Ndot, Z) = (Ndot .- reshape(Wdot,1,1,nSpec) .* Z) ./
+                             reshape(W,1,1,nSpec)
+            Zdot⁺⁺, Zdot⁻⁺ = zdot(Ndot⁺⁺, fwd.Z⁺⁺), zdot(Ndot⁻⁺, fwd.Z⁻⁺)
+            Zdot₀⁺ = Ndot₀⁺ === nothing ? nothing : zdot(Ndot₀⁺, fwd.Z₀⁺)
+            Zdot₀⁻ = Ndot₀⁻ === nothing ? nothing : zdot(Ndot₀⁻, fwd.Z₀⁻)
+            old = combo_lin[iz]
+            combo_lin[iz] = CoreScatteringOpticalPropertiesLin(
+                hcat(τdot,old.τ̇), hcat(ϖdot,old.ϖ̇),
+                cat(reshape(Zdot⁺⁺,size(Zdot⁺⁺)...,1),old.Ż⁺⁺;dims=4),
+                cat(reshape(Zdot⁻⁺,size(Zdot⁻⁺)...,1),old.Ż⁻⁺;dims=4),
+                Zdot₀⁺ === nothing ? nothing : cat(reshape(Zdot₀⁺,size(Zdot₀⁺)...,1),old.Ż₀⁺;dims=4),
+                Zdot₀⁻ === nothing ? nothing : cat(reshape(Zdot₀⁻,size(Zdot₀⁻)...,1),old.Ż₀⁻;dims=4))
+        end
+        push!(band_layer_props,combo); push!(band_layer_props_lin,combo_lin)
         push!(band_fScattRayleigh,fScattRayleigh)
     end
-    layer_opt     = [prod([band_layer_props[i][iz] for i=1:length(iBand)]) for iz=1:nZ]
-    layer_opt_lin = [prod([band_layer_props_lin[i][iz] for i=1:length(iBand)]) for iz=1:nZ]
-    fscat_opt     = [[band_fScattRayleigh[i][iz] for i=1:length(iBand)] for iz=1:nZ]
+    layer_opt = [prod([band_layer_props[i][iz] for i in eachindex(bands)]) for iz in 1:nZ]
+    layer_opt_lin = [prod([band_layer_props_lin[i][iz] for i in eachindex(bands)]) for iz in 1:nZ]
+    fscat_opt = [[band_fScattRayleigh[i][iz] for i in eachindex(bands)] for iz in 1:nZ]
     return layer_opt, layer_opt_lin, fscat_opt
 end
  
@@ -237,6 +313,7 @@ _pad4_cols(M::AbstractMatrix, T) = (out = zeros(T, size(M, 1), 4); out[:, 1:size
 
 function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺, 
                     τ̇Aer, lin_aerosol_optics, AerŻ⁺⁺, AerŻ⁻⁺,
+                    AerZ₀⁺, AerZ₀⁻, AerŻ₀⁺, AerŻ₀⁻,
                     arr_type)
 
     (; fᵗ, ω̃) = aerosol_optics
@@ -249,17 +326,40 @@ function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺,
     #ḟᵗ = arr_type(ḟᵗ)
     #ω̃̇  = arr_type(ω̃̇)
 
-    sz = size(AerŻ⁺⁺)
     tmpŻ⁺⁺ = AerŻ⁺⁺
     tmpŻ⁻⁺ = AerŻ⁻⁺
-    AerŻ⁺⁺ = arr_type(zeros(size(AerZ⁺⁺,1), size(AerZ⁺⁺,2), 7))#, n)
-    AerŻ⁻⁺ = arr_type(zeros(size(AerZ⁻⁺,1), size(AerZ⁻⁺,2), 7))#, n)
-    AerŻ⁺⁺[:,:,2:5] .= permutedims(tmpŻ⁺⁺, (2, 3, 1))
-    AerŻ⁻⁺[:,:,2:5] .= permutedims(tmpŻ⁻⁺, (2, 3, 1))
+    if ndims(tmpŻ⁺⁺) == 3
+        AerŻ⁺⁺ = arr_type(zeros(size(AerZ⁺⁺,1), size(AerZ⁺⁺,2), 7))
+        AerŻ⁻⁺ = arr_type(zeros(size(AerZ⁻⁺,1), size(AerZ⁻⁺,2), 7))
+        AerŻ⁺⁺[:,:,2:5] .= permutedims(tmpŻ⁺⁺, (2, 3, 1))
+        AerŻ⁻⁺[:,:,2:5] .= permutedims(tmpŻ⁻⁺, (2, 3, 1))
+    elseif ndims(tmpŻ⁺⁺) == 4
+        AerŻ⁺⁺ = arr_type(zeros(size(AerZ⁺⁺,1), size(AerZ⁺⁺,2), n, 7))
+        AerŻ⁻⁺ = arr_type(zeros(size(AerZ⁻⁺,1), size(AerZ⁻⁺,2), n, 7))
+        AerŻ⁺⁺[:,:,:,2:5] .= permutedims(tmpŻ⁺⁺, (2, 3, 4, 1))
+        AerŻ⁻⁺[:,:,:,2:5] .= permutedims(tmpŻ⁻⁺, (2, 3, 4, 1))
+    else
+        error("createAero: expected phase derivatives (nParam,nμ,nμ) or (nParam,nμ,nμ,nSpec), got $(size(tmpŻ⁺⁺))")
+    end
+    if AerZ₀⁺ === nothing
+        AerŻ₀⁺ = AerŻ₀⁻ = nothing
+    elseif ndims(AerŻ₀⁺) == 3
+        tmp⁺, tmp⁻ = AerŻ₀⁺, AerŻ₀⁻
+        AerŻ₀⁺ = arr_type(zeros(size(AerZ₀⁺,1), size(AerZ₀⁺,2), 7))
+        AerŻ₀⁻ = arr_type(zeros(size(AerZ₀⁻,1), size(AerZ₀⁻,2), 7))
+        AerŻ₀⁺[:,:,2:5] .= permutedims(tmp⁺, (2, 3, 1))
+        AerŻ₀⁻[:,:,2:5] .= permutedims(tmp⁻, (2, 3, 1))
+    else
+        tmp⁺, tmp⁻ = AerŻ₀⁺, AerŻ₀⁻
+        AerŻ₀⁺ = arr_type(zeros(size(AerZ₀⁺,1), size(AerZ₀⁺,2), n, 7))
+        AerŻ₀⁻ = arr_type(zeros(size(AerZ₀⁻,1), size(AerZ₀⁻,2), n, 7))
+        AerŻ₀⁺[:,:,:,2:5] .= permutedims(tmp⁺, (2, 3, 4, 1))
+        AerŻ₀⁻[:,:,:,2:5] .= permutedims(tmp⁻, (2, 3, 4, 1))
+    end
 
     # Ensure arrays are in the right memory space (CPU or GPU)
     ω̃  = (ω̃ isa Number) ? arr_type(fill(ω̃,n)) : arr_type(ω̃)
-    #fᵗ  = (fᵗ isa Number) ? arr_type(fill(fᵗ,n)) : arr_type(fᵗ)
+    fᵗ  = (fᵗ isa Number) ? arr_type(fill(fᵗ,n)) : arr_type(fᵗ)
     
     ω̃̇ = arr_type(ω̃̇)
     ḟᵗ = arr_type(ḟᵗ)
@@ -282,27 +382,30 @@ function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺,
     ḟᵗ = arr_type(zeros(n, 7));  ḟᵗ[:, 2:5] .= ḟᵗ_block
 
     # Forward modified properties
-    τ_mod = (1 .- fᵗ * ω̃) .* τAer
-    ϖ_mod = (1 .- fᵗ) .* ω̃ ./ (1 .- fᵗ * ω̃)
+    fω = fᵗ .* ω̃
+    τ_mod = (1 .- fω) .* τAer
+    ϖ_mod = (1 .- fᵗ) .* ω̃ ./ (1 .- fω)
 
     # Allocate linearized outputs
     τ̇_mod = arr_type(zeros(n,7)) #similar(τ̇Aer)
     ϖ̇_mod = arr_type(zeros(n,7)) #similar(ω̃̇)
 
     # Bug 18 fix: derivatives w.r.t. 7 aerosol sub-params [τ_ref, nᵣ, nᵢ, rₘ, σᵣ, p₀, σp]
-    τ̇_mod[:,1] .= (1 .- fᵗ * ω̃) .* τ̇Aer[:,1]
+    τ̇_mod[:,1] .= (1 .- fω) .* τ̇Aer[:,1]
     ϖ̇_mod[:,1] .= 0.0
     # Vectorized form over iparam dimension
     # Dimensions: iparam × spectral
     tmp = fᵗ .* ω̃̇[:,2:5] .+ ω̃ .* ḟᵗ[:,2:5]  # (nSpec, iparam)
-    τ̇_mod[:,2:5] .= (1 .- fᵗ * ω̃) .* τ̇Aer[:,2:5] .- tmp .* τAer  # (nSpec, iparam)
-    ϖ̇_mod[:,2:5] .= (ω̃̇[:,2:5] .* (1 - fᵗ) .- ḟᵗ[:,2:5] .* (ω̃ .* (1 .- ω̃))) ./ (1 .- fᵗ * ω̃).^2
+    τ̇_mod[:,2:5] .= (1 .- fω) .* τ̇Aer[:,2:5] .- tmp .* τAer  # (nSpec, iparam)
+    ϖ̇_mod[:,2:5] .= (ω̃̇[:,2:5] .* (1 .- fᵗ) .- ḟᵗ[:,2:5] .* (ω̃ .* (1 .- ω̃))) ./ (1 .- fω).^2
 
-    τ̇_mod[:,6:7] .= (1 .- fᵗ * ω̃) .* τ̇Aer[:,6:7]
+    τ̇_mod[:,6:7] .= (1 .- fω) .* τ̇Aer[:,6:7]
     ϖ̇_mod[:,6:7] .= 0.0
     
-    return CoreScatteringOpticalProperties(τ_mod, ϖ_mod, AerZ⁺⁺, AerZ⁻⁺), 
-        CoreScatteringOpticalPropertiesLin(τ̇_mod, ϖ̇_mod, AerŻ⁺⁺, AerŻ⁻⁺)
+    return CoreScatteringOpticalProperties(τ_mod, ϖ_mod, AerZ⁺⁺, AerZ⁻⁺,
+                                           AerZ₀⁺, AerZ₀⁻),
+        CoreScatteringOpticalPropertiesLin(τ̇_mod, ϖ̇_mod, AerŻ⁺⁺, AerŻ⁻⁺,
+                                           AerŻ₀⁺, AerŻ₀⁻)
 end
 
 
@@ -342,9 +445,8 @@ function extractEffectiveProps(
         scattering_interface = get_scattering_interface(scattering_interface, scatter, iz)
         push!(scattering_interfaces_all, scattering_interface)
         @views τ_sum_all[:,iz+1] = τ_sum_all[:,iz] + lods[iz].τ 
-        for ip=1:nParams
-            τ̇_sum_all[:,ip,iz+1] = τ̇_sum_all[:,ip,iz] + lods_lin[iz].τ̇[:,ip] 
-        end
+        # Every retrieval column shares the same prefix-sum operation.
+        @views τ̇_sum_all[:,:,iz+1] .= τ̇_sum_all[:,:,iz] .+ lods_lin[iz].τ̇
     end
     return scattering_interfaces_all, τ_sum_all, τ̇_sum_all
 end
@@ -364,8 +466,14 @@ function expandOpticalProperties(in::CoreScatteringOpticalProperties,
                                   in_lin::CoreScatteringOpticalPropertiesLin,
                                   arr_type;
                                   expand_Z::Bool = false)
-    (; τ, ϖ, Z⁺⁺, Z⁻⁺) = in 
-    (; τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺) = in_lin 
+    (; τ, ϖ, Z⁺⁺, Z⁻⁺, Z₀⁺, Z₀⁻) = in
+    (; τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺, Ż₀⁺, Ż₀⁻) = in_lin
+    solar_plus = Z₀⁺ === nothing ? nothing : _to_device(arr_type, _ensure_3d(Z₀⁺))
+    solar_minus = Z₀⁻ === nothing ? nothing : _to_device(arr_type, _ensure_3d(Z₀⁻))
+    solar_dot_plus = Ż₀⁺ === nothing ? nothing : _to_device(arr_type,
+        ndims(Ż₀⁺) == 3 ? reshape(Ż₀⁺, size(Ż₀⁺,1), size(Ż₀⁺,2), 1, size(Ż₀⁺,3)) : Ż₀⁺)
+    solar_dot_minus = Ż₀⁻ === nothing ? nothing : _to_device(arr_type,
+        ndims(Ż₀⁻) == 3 ? reshape(Ż₀⁻, size(Ż₀⁻,1), size(Ż₀⁻,2), 1, size(Ż₀⁻,3)) : Ż₀⁻)
     @assert length(τ) == length(ϖ) "τ and ϖ sizes need to match"
     @assert length(τ̇) == length(ϖ̇) "τ̇ and ϖ̇ sizes need to match"
 
@@ -377,10 +485,12 @@ function expandOpticalProperties(in::CoreScatteringOpticalProperties,
             Ż⁻⁺ = _repeat(reshape(Ż⁻⁺, size(Ż⁻⁺,1), size(Ż⁻⁺,2), 1, size(Ż⁻⁺,3)), 1, 1, length(τ), 1)
             return CoreScatteringOpticalProperties(
                         _to_device(arr_type, τ), _to_device(arr_type, ϖ),
-                        _to_device(arr_type, Z⁺⁺), _to_device(arr_type, Z⁻⁺)),
+                        _to_device(arr_type, Z⁺⁺), _to_device(arr_type, Z⁻⁺),
+                        solar_plus, solar_minus),
                    CoreScatteringOpticalPropertiesLin(
                         _to_device(arr_type, τ̇), _to_device(arr_type, ϖ̇),
-                        _to_device(arr_type, Ż⁺⁺), _to_device(arr_type, Ż⁻⁺))
+                        _to_device(arr_type, Ż⁺⁺), _to_device(arr_type, Ż⁻⁺),
+                        solar_dot_plus, solar_dot_minus)
         else
             # Fast path: fused linearized kernels branch on size(Z,3) and
             # size(Ż,3), using n2=1 / n2_lin=1 for singleton spectral dim.
@@ -390,17 +500,21 @@ function expandOpticalProperties(in::CoreScatteringOpticalProperties,
             Ż4⁺⁺ = _to_device(arr_type, ndims(Ż⁺⁺) == 3 ? reshape(Ż⁺⁺, size(Ż⁺⁺,1), size(Ż⁺⁺,2), 1, size(Ż⁺⁺,3)) : Ż⁺⁺)
             Ż4⁻⁺ = _to_device(arr_type, ndims(Ż⁻⁺) == 3 ? reshape(Ż⁻⁺, size(Ż⁻⁺,1), size(Ż⁻⁺,2), 1, size(Ż⁻⁺,3)) : Ż⁻⁺)
             return CoreScatteringOpticalProperties(
-                        _to_device(arr_type, τ), _to_device(arr_type, ϖ), Z3⁺⁺, Z3⁻⁺),
+                        _to_device(arr_type, τ), _to_device(arr_type, ϖ), Z3⁺⁺, Z3⁻⁺,
+                        solar_plus, solar_minus),
                    CoreScatteringOpticalPropertiesLin(
-                        _to_device(arr_type, τ̇), _to_device(arr_type, ϖ̇), Ż4⁺⁺, Ż4⁻⁺)
+                        _to_device(arr_type, τ̇), _to_device(arr_type, ϖ̇), Ż4⁺⁺, Ż4⁻⁺,
+                        solar_dot_plus, solar_dot_minus)
         end
     else
         @assert size(Z⁺⁺, 3) == length(τ) "Z and τ dimensions need to match"
         return CoreScatteringOpticalProperties(
                     _to_device(arr_type, τ), _to_device(arr_type, ϖ),
-                    _to_device(arr_type, Z⁺⁺), _to_device(arr_type, Z⁻⁺)),
+                    _to_device(arr_type, Z⁺⁺), _to_device(arr_type, Z⁻⁺),
+                    solar_plus, solar_minus),
                CoreScatteringOpticalPropertiesLin(
                     _to_device(arr_type, τ̇), _to_device(arr_type, ϖ̇),
-                    _to_device(arr_type, Ż⁺⁺), _to_device(arr_type, Ż⁻⁺))
+                    _to_device(arr_type, Ż⁺⁺), _to_device(arr_type, Ż⁻⁺),
+                    solar_dot_plus, solar_dot_minus)
     end
 end

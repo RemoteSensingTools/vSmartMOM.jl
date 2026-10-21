@@ -78,7 +78,7 @@ function _precompute_surface_brdf(::Val{1}, surface::CoxMunkSSSurface,
         μᵥ = convert(FT, geometry.μv[iv])
         Δϕ = convert(FT, geometry.Δϕ[iv])
         n_water = _coxmunk_n_water(surface, ispec, n_spec, FT)
-        M = coxmunk_brdf_mueller(core_surface, 1, μᵥ, μ₀, Δϕ;
+        M = coxmunk_brdf_mueller(core_surface, 1, μ₀, μᵥ, Δϕ;
                                   n_water)
         ρ[iv, ispec] = M[1, 1]
     end
@@ -96,7 +96,7 @@ function _precompute_surface_brdf(::Val{N}, surface::CoxMunkSSSurface,
         μᵥ = convert(FT, geometry.μv[iv])
         Δϕ = convert(FT, geometry.Δϕ[iv])
         n_water = _coxmunk_n_water(surface, ispec, n_spec, FT)
-        M = coxmunk_brdf_mueller(core_surface, N, μᵥ, μ₀, Δϕ;
+        M = coxmunk_brdf_mueller(core_surface, N, μ₀, μᵥ, Δϕ;
                                   n_water)
         for istokes in 1:N
             ρ[iv, istokes, ispec] = M[istokes, 1]
@@ -177,7 +177,7 @@ function _precompute_surface_brdf_wind_jacobian(
         Δϕ = convert(FT, geometry.Δϕ[iv])
         n_water = _coxmunk_n_water(surface, ispec, n_spec, FT)
         _, dM = coxmunk_brdf_mueller_and_deriv(
-            core_surface, 1, μᵥ, μ₀, Δϕ; n_water)
+            core_surface, 1, μ₀, μᵥ, Δϕ; n_water)
         dρ[iv, ispec, 1] = dM[1, 1]
     end
     return dρ
@@ -199,7 +199,7 @@ function _precompute_surface_brdf_wind_jacobian(
         Δϕ = convert(FT, geometry.Δϕ[iv])
         n_water = _coxmunk_n_water(surface, ispec, n_spec, FT)
         _, dM = coxmunk_brdf_mueller_and_deriv(
-            core_surface, N, μᵥ, μ₀, Δϕ; n_water)
+            core_surface, N, μ₀, μᵥ, Δϕ; n_water)
         for istokes in 1:N
             dρ[iv, istokes, ispec, 1] = dM[istokes, 1]
         end

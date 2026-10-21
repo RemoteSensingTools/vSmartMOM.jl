@@ -1,0 +1,9 @@
+CORE_LOCAL nSpec=5 layers=20 pol=3 nparams=8 local_directions=3 combined=(median = 0.311879384, samples = [0.329869415, 0.308274868, 0.311879384]) ratio=4.01129141922518 speedup=1.7251620196864312
+CORE_MEASURE nSpec=5 pol=3 nparams=8 forward=(median = 0.077750368, samples = [0.079276087, 0.077750368, 0.0745383]) combined=(median = 0.538042468, samples = [0.547007311, 0.538042468, 0.537056454]) ratio=6.920127606341362
+CORE_FD_PASS nparams=8 all_columns=true endpoints=R,T azimuth=[0.0, 0.0]
+CORE_LOCAL nSpec=5 layers=20 pol=3 nparams=20 local_directions=3 combined=(median = 0.445218674, samples = [0.445218674, 0.404290633, 0.458395035]) ratio=7.2705535824019485 speedup=2.7274898312104496
+CORE_MEASURE nSpec=5 pol=3 nparams=20 forward=(median = 0.06123587, samples = [0.083186836, 0.06123587, 0.060982544]) combined=(median = 1.214329406, samples = [1.199802356, 1.214329406, 1.233332331]) ratio=19.830360963272017
+CORE_FD_PASS nparams=20 all_columns=true endpoints=R,T azimuth=[0.0, 0.0]
+CORE_LOCAL nSpec=5 layers=20 pol=3 nparams=60 local_directions=3 combined=(median = 0.80879415, samples = [0.819977615, 0.798587893, 0.80879415]) ratio=12.521421104877879 speedup=4.453752170437929
+CORE_MEASURE nSpec=5 pol=3 nparams=60 forward=(median = 0.06459284, samples = [0.065959771, 0.06459284, 0.062718788]) combined=(median = 3.602168701, samples = [3.518973309, 3.602168701, 3.633932653]) ratio=55.76730642281714
+CORE_FD_PASS nparams=60 all_columns=true endpoints=R,T azimuth=[0.0, 0.0]

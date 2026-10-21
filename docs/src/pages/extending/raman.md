@@ -6,7 +6,9 @@
 
 Raman support is selected by dispatch on `AbstractRamanType`. Adding a new mode should mean adding methods for that mode, not adding new `isa` branches inside the main RT loop.
 
-This guide covers Raman/Cabannes extension points only. Solar-induced fluorescence remains a product/data-policy decision and should not get a public extension guide until its fixtures and supported workflows are settled.
+This guide covers Raman/Cabannes extension points. Surface fluorescence uses
+the separate [source interface](sources.md); external SIF data helpers retain
+their experimental product/data status.
 
 ## Current Dispatch Layers
 
@@ -55,7 +57,7 @@ If the mode has redistribution weights that require normalization, add a specifi
 
 ## Fill Mode State
 
-Add a `getRamanSSProp!` method that populates all arrays consumed by the RT kernels. Existing `RRS`, `VS_0to1`, `VS_1to0`, and `_plus` methods are the reference.
+Add a `getRamanSSProp!` method that populates all arrays consumed by the RT kernels. Existing `RRS` and `_plus` methods are the reference.
 
 The method usually computes:
 

@@ -1,0 +1,3 @@
+RESPONSE_METHOD source
+RESPONSE_TIME nSpec=10000 layers=20 nparams=1 combined=(median = 3.934341234, samples = [3.931775474, 3.943088618, 3.934341234]) forward=(median = 0.789296927, samples = [0.796685038, 0.78650119, 0.789296927]) ratio=4.984614914128508 dense_comparison=false
+RESPONSE_TIME nSpec=10000 layers=20 nparams=60 combined=(median = 4.017056003, samples = [4.017056003, 4.016215623, 4.044634078]) forward=(median = 0.832577119, samples = [0.831537996, 0.832577119, 0.84803582]) ratio=4.82484554442818 dense_comparison=false

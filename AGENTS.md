@@ -5,6 +5,8 @@ work on vSmartMOM.jl. The goal is a 3-minute orientation: what the package is,
 the narrative thread it's organized around, where to find each concept, and the
 conventions that keep the codebase coherent.
 
+**Current session handoff:** [Resume v2.2 integration and Jacobian work](docs/dev_notes/SESSION_HANDOFF.md) — checkout, accepted decisions, validation limits, and next steps (saved 2026-09-08).
+
 **Sister files:**
 - [CLAUDE.md](CLAUDE.md) — project conventions, build/test commands, file structure.
 - **⚠ [docs/src/pages/conventions.md](docs/src/pages/conventions.md)** — Hovenier-style γ sign, Stokes Q/U/V signs, azimuth (Δφ) definition, and the sign-flip checklist for VLIDORT cross-validation. **Read this before any cross-code comparison or data import.**
@@ -35,9 +37,18 @@ DISCRETIZE   Fourier in azimuth (m=0..m_max_bands[iBand]; v0.7: per-component
              trait dispatch — Rayleigh→2, Lambertian→0, Cox-Munk→user_l_cap),
              Gauss/Radau quadrature in μ. User knob is `nstreams` (weighted
              streams per hemisphere); public contract `stream_l_cap = 2·N-1`.
+             Aerosol support is two-stage: maximum size parameter sets the
+             Mie-series ceiling, then optional `greek_beta_cutoff` retains
+             through the last |β_l| above threshold at any band wavelength.
+             Only β is tested; the maximum across aerosol species contributes
+             before the user/stream caps are applied.
+             Optional external-solar SFI keeps scalar μ₀ outside the diffuse
+             operator and evaluates its exact phase-source column separately;
+             enable with model_from_parameters(...; external_solar=true).
+             Embedded μ₀ remains the default; this is not a YAML setting.
              Schema: docs/src/pages/IO/Schema/.
-             Per Fourier moment m, each layer reduces to FOUR ARRAYS of
-             shape (NquadN, NquadN, nSpec):
+             Per Fourier moment m, each layer reduces to FOUR VARIABLES
+             (phase arrays share the diffuse shape in embedded-μ₀ mode):
                τ      — optical depth          ϖ      — single-scatter albedo
                Z⁺⁺   — forward phase matrix    Z⁻⁺   — backscatter phase matrix
                 │
@@ -54,7 +65,7 @@ OPTICS       │ Gas opacity  │    │ Scattering (Rayleigh+aerosol)│
                   CoreScatteringOpticalProperties)
                 • δ-M truncation (forward-peak removal)
                 • Add gas absorption to total τ
-                • Vertical concatenation of layers   (operator *)
+                • Concatenation of spectral bands   (operator *)
                 → Vector{CoreScatteringOpticalProperties}, one per layer
                 │
                 ▼
@@ -79,7 +90,7 @@ LINEARIZE    Each operator (elemental/doubling/interaction) has an EXACT
              ParameterLayout names the Jacobian columns.
                 │
                 ▼
-EVERYWHERE   ONE source tree, three GPU backends. Kernels written once with
+EVERYWHERE   ONE source tree, three execution backends (CPU, CUDA, Metal). Kernels written once with
 ON ANY       KernelAbstractions @kernel. CUDA / Metal injected via Julia 1.9+
 HARDWARE     package extensions. ALL WAVELENGTHS PROCESSED IN PARALLEL: the
              third array dim is spectral; batched_mul broadcasts over it.
@@ -100,14 +111,16 @@ with these:
    the linear approximation.** S2014 Eqs (19)–(20) are written in the
    `δ → 0` limit (linear in δ; equivalent to `1−exp(−x) ≈ x`). Many MOM codes
    stop there and need very thin elemental layers (large `N_doubl`) for that
-   approximation to hold. vSmartMOM's `elemental.jl:207–252` instead uses
+   approximation to hold. vSmartMOM's `elemental.jl::get_elem_rt!` instead uses
    `1 − exp(−δτ(1/μᵢ+1/μⱼ))` and `exp(−δτ/μᵢ) − exp(−δτ/μⱼ)` written via
-   `-expm1(-x)` and `expdiff_neg(a,b)` for numerical stability. Result:
+   `-expm1(-x)` and, for the `μⱼ/(μᵢ−μⱼ)`-weighted difference, the divided
+   difference `elem_trans_factor` (`expdiff_ratio`, accurate however close
+   μᵢ and μⱼ are) for numerical stability. Result:
    thicker elemental layer at the same single-scatter accuracy → smaller
    `N_doubl` → less doubling round-off, stable in `Float32`.
 
 2. **The elemental layer is sized by SCATTERING optical depth, not total
-   optical depth.** `get_dtau_ndoubl` (`rt_kernel.jl:245–253`) picks
+   optical depth.** `get_dtau_ndoubl` (`rt_kernel.jl::get_dtau_ndoubl`) picks
    `N_doubl` from `τ_scat·ϖ`; absorption is layered in via
    `τ_λ = τ_abs + τ_scat`, `ϖ_λ = τ_scat·ϖ / τ_λ`. The transmission factors
    inside the elemental kernel use the per-wavelength `dτ_λ`. Consequence:
@@ -125,14 +138,14 @@ bandwidth.
 Not marketing — each claim has a `file:line`. Mirror this list in user-facing
 material when explaining the package:
 
-1. **Operator-level analytic linearization.** RT kernel itself is hand-differentiated; AD is upstream-only. **Combined forward + linearized run costs less than 2× a forward-only run** — the closed-form chain rule on adding-doubling reuses the already-computed batched matrix inverses, so the dominant LU work is paid once. ForwardDiff would pay `(1+N_params)×`; finite differences `(1+N_state)×`. — `src/CoreRT/CoreKernel/elemental_lin.jl` (`get_elem_rt_fused!:456–591`, `get_elem_rt_SFI_fused!:602–815`), `{elemental,doubling,interaction}_lin.jl`. See `docs/src/pages/concepts/06_linearization.md` § "Why this is fast". *Status: production codebase implements the kernel-level fast path; a cleaner AD-upstream → analytic-downstream boundary (more idiomatic handoff struct, less manual chain-rule expansion in upstream code) is in active development.*
+1. **Operator-level analytic linearization.** The RT kernel is hand-differentiated; AD is upstream-only. Forward inverses are reused for all requested Jacobian columns. A compact local optical basis is doubled independently of retrieval size; complete doubled tangents are contracted before adding. Default matrix adding still grows with active parameter count. Opt-in `jacobian_adding=:source` carries only source vectors through solar/Lambertian endpoint adding; it retains local layer tangents for a backward illumination pass. Cost depends on operator size, spectral batch and backend. The development target of <2× forward concerns the full solve from supplied core optics, excluding upstream Mie/mixing; benchmark the tangent basis explicitly and do not present the target as a measured guarantee. Small GPU operators batch product rules over wavelength × parameter, and doubling/general interaction reuse scratch. — `src/CoreRT/CoreKernel/{elemental,doubling,interaction}_lin.jl`, `src/CoreRT/CoreKernel/jacobian_batched.jl`. See `docs/src/pages/concepts/06_linearization.md` § "Why this is fast".
 2. **One `@kernel` source compiles for CPU, CUDA, and Metal.** — `src/Architectures.jl:33–96`, `ext/vSmartMOMCUDAExt.jl:21–27`, `ext/vSmartMOMMetalExt.jl:19–22`.
-3. **Hybrid AD across the GPU boundary.** `ForwardDiff.Dual` flows through `NNlib.batched_mul` on `CuArray`. — `ext/gpu_batched_cuda.jl:141–177`.
-4. **Polarization is a type, not a runtime branch.** `Stokes_I/IQ/IQU/IQUV` specialize the kernels at compile time. — `src/Scattering/types.jl:92–143`.
-5. **Optical properties as algebra.** `+` mixes scatterers; `*` stacks layers. — `src/CoreRT/types.jl:1063–1101`.
-6. **Weak GPU dependency** (Julia 1.9+ package extensions). CPU-only installs first-class. — `ext/vSmartMOMCUDAExt.jl`.
-7. **Three `(τ, ϖ, Z)` core variables per layer.** RT kernel differentiates against these directly. — `src/CoreRT/types_lin.jl:119–149`.
-8. **Exact finite-δ elemental** (point #1 above). — `src/CoreRT/CoreKernel/elemental.jl:207–252`.
+3. **Hybrid AD across the GPU boundary.** `ForwardDiff.Dual` flows through the package-owned `CoreRT.batched_mul` on `CuArray`. — `ext/gpu_batched_cuda.jl` (`batched_mul`/`batch_inv!` methods for `CuArray{<:ForwardDiff.Dual}`).
+4. **Polarization is a type, not a runtime branch.** `Stokes_I/IQ/IQU/IQUV` specialize the kernels at compile time. — `src/Scattering/types.jl` (`AbstractPolarizationType` and its four subtypes).
+5. **Optical properties as algebra.** `+` mixes scatterers; `*` concatenates spectral bands. — `src/CoreRT/types.jl` (`Base.:+`/`Base.:*` on `CoreScatteringOpticalProperties`).
+6. **GPU package extensions.** CPU execution works without a CUDA device; CUDA is currently a direct dependency and Metal is optional. — `ext/vSmartMOMCUDAExt.jl`.
+7. **Three `(τ, ϖ, Z)` core variables per layer.** RT kernel differentiates against these directly. — `src/CoreRT/types_lin.jl::CoreScatteringOpticalPropertiesLin`.
+8. **Exact finite-δ elemental** (point #1 above). — `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt!`.
 
 ## Where everything is
 
@@ -164,36 +177,52 @@ material when explaining the package:
 | `RTModel.sources::AbstractSource` field | `src/CoreRT/types.jl::RTModel` |
 | `contribute!` / `source_tangent!` dispatch (replaces legacy `if SFI` in elastic lin path) | [`src/CoreRT/Sources/solar_beam.jl`](src/CoreRT/Sources/solar_beam.jl), `elemental_lin.jl`, `doubling_lin.jl`, `interaction_lin.jl` |
 | `surface_source_contribute!` double-dispatch on (source-type × surface-type) | [`src/CoreRT/Sources/surface_sif.jl`](src/CoreRT/Sources/surface_sif.jl) |
-| Top-level RT loop (bands × m × layers) | `src/CoreRT/rt_run.jl:53–329` |
-| Per-layer kernel dispatch | `src/CoreRT/CoreKernel/rt_kernel.jl:48–229` |
-| Build per-layer (τ, ϖ, Z) | `src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl:11–65` |
-| τϖ-weighted scatterer mixing (`+`) | `src/CoreRT/types.jl:1063–1093` |
-| Vertical layer stacking (`*`) | `src/CoreRT/types.jl:1096+` |
-| δ-M truncation | `src/CoreRT/LayerOpticalProperties/delta_m_truncation.jl:44–48` |
-| Mie / Greek (NAI-2 vs PCW) | `src/Scattering/compute_NAI2.jl:44`, `compute_PCW.jl:28` |
+| Top-level RT loop (bands × m × layers) | `src/CoreRT/rt_run.jl::_rt_run_column` (reached from `rt_run`) |
+| Per-layer kernel dispatch | `src/CoreRT/CoreKernel/rt_kernel.jl::rt_kernel!` |
+| Build per-layer (τ, ϖ, Z) | `src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl::constructCoreOpticalProperties` |
+| τϖ-weighted scatterer mixing (`+`) | `src/CoreRT/types.jl` (`Base.:+` on `CoreScatteringOpticalProperties`) |
+| Vertical layer stacking (`*`) | `src/CoreRT/types.jl` (`Base.:*` on `CoreScatteringOpticalProperties`) |
+| δ-M truncation | `src/CoreRT/LayerOpticalProperties/delta_m_truncation.jl::delta_m_forward` |
+| Mie / Greek (NAI-2 vs PCW) | `compute_aerosol_optical_properties` in `src/Scattering/compute_NAI2.jl` and `compute_PCW.jl` |
+| Native Mie tangents (quadrature preparation → specialized integration) | `src/Scattering/compute_NAI2_lin.jl::_nai2_bulk_optics_lin` |
 | Phase matrix Z from Greek + μ | `src/Scattering/compute_Z_matrices.jl::compute_Z_moments` |
-| HITRAN absorption | `src/Absorption/compute_absorption_cross_section.jl:32–280` |
-| Elemental (r, t, j) | `src/CoreRT/CoreKernel/elemental.jl:207–252` |
-| Doubling (geom series + D-symmetry) | `src/CoreRT/CoreKernel/doubling.jl + rt_helpers.jl:88–122` |
-| Interaction (4 cases) | `src/CoreRT/CoreKernel/interaction.jl:14–136` |
+| HITRAN absorption | `src/Absorption/compute_absorption_cross_section.jl::compute_absorption_cross_section` |
+| Pressure-dependent line/LUT cross sections (fixed final-grid bottom-interface coordinate) | `src/CoreRT/tools/absorption_pressure.jl`; `docs/dev_notes/pressure_source_followup_2026-09-08.md` |
+| Surface-pressure vertical-grid conventions (`FixedPressureGrid` default: only the bottom interface moves; `FixedAltitudeGrid`: all interfaces fixed in altitude, pressures scale with p_surf) | `src/CoreRT/tools/vertical_grid.jl`, `psurf_profile_tangents` in `src/CoreRT/tools/atmo_prof_lin.jl`; `model_from_parameters(LinMode(), params; vertical_grid=...)` |
+| Shared source/geometry/surface validation | `src/CoreRT/Sources/validation.jl` |
+| Shared parsed HITRAN cache (forward, linearized, BatchContext) | `src/CoreRT/tools/hitran_cache.jl`; `clear_spectroscopy_cache!` releases cached ownership; see `docs/dev_notes/jacobian_batched/construction_cost.md` |
+| Independent trial parameters with opt-in read-only absorption LUT sharing | `src/CoreRT/tools/copy_parameters.jl::copy_parameters` |
+| Elemental (r, t, j) | `src/CoreRT/CoreKernel/elemental.jl::{elemental!,get_elem_rt!}` |
+| Doubling (geom series + D-symmetry) | `src/CoreRT/CoreKernel/doubling.jl::{doubling_helper!,apply_D_matrix!}` |
+| Interaction (4 cases) | `src/CoreRT/CoreKernel/interaction.jl::interaction_helper!` (`ScatteringInterface_{00,01,10,11}`) |
 | Surface BRDFs | `src/CoreRT/Surfaces/` (10 files) |
 | Surface coupling | `src/CoreRT/CoreKernel/interaction_hdrf.jl:1–42` |
-| Postprocessing (azimuth, VZA) | `src/CoreRT/tools/postprocessing_vza*.jl:23–99` |
-| Quadrature (Gauss / Radau) | `src/CoreRT/tools/rt_set_streams.jl:24–110` |
+| Postprocessing (azimuth, VZA) | `src/CoreRT/tools/postprocessing_vza*.jl` (`postprocessing_vza!` family) |
+| Quadrature (Gauss / Radau) | `src/CoreRT/tools/rt_set_streams.jl::rt_set_streams` |
+| External direct-solar phase coupling | `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt_SFI!` |
+| External-solar TOA-only entry point | `src/CoreRT/rt_run.jl::rt_run_toa` |
+| Batched supplied-tangent propagation | `src/CoreRT/CoreKernel/jacobian_batched.jl` |
+| CUDA tangent products for 33–64 operators | `ext/gpu_jacobian_cuda.jl`; portable fallback in `src/CoreRT/CoreKernel/jacobian_blocked.jl` |
 | Linearization kernels | `src/CoreRT/CoreKernel/{elemental,doubling,interaction}_lin.jl` |
-| Chain-rule expansion (fused) | `src/CoreRT/CoreKernel/elemental_lin.jl:456–591` (`get_elem_rt_fused!`), `602–815` (`get_elem_rt_SFI_fused!`) |
-| Jacobian column layout | `src/CoreRT/parameter_layout.jl:1–67` |
-| Architecture types | `src/Architectures.jl:1–98` |
-| `@kernel` apply_D! (D-matrix) | `src/CoreRT/CoreKernel/doubling.jl:85–110` |
-| `@kernel` line shape | `src/Absorption/compute_absorption_cross_section.jl:229–280` |
-| `@kernel` Mie coefficients | `src/Scattering/gpu_mie_kernels.jl:30–100` |
-| `@kernel` portable LU (Metal) | `src/CoreRT/tools/ka_batched_kernels.jl:100–178` |
-| Batched matmul CPU | `src/CoreRT/tools/cpu_batched.jl:24–73` |
-| Batched matmul CUDA | `ext/gpu_batched_cuda.jl:122–139` |
-| Batched matmul Metal | `ext/vSmartMOMMetalExt.jl:29–54` |
-| ForwardDiff.Dual through GPU | `ext/gpu_batched_cuda.jl:141–177` |
-| CUDA extension init | `ext/vSmartMOMCUDAExt.jl:21–66` |
-| Metal extension init | `ext/vSmartMOMMetalExt.jl:19–101` |
+| Chain-rule expansion (fused) | `src/CoreRT/CoreKernel/elemental_fused_lin.jl::{get_elem_rt_fused!,get_elem_rt_SFI_fused!}` |
+| Tabulated phase Jacobians (shared angular tables) | `src/Scattering/compute_Z_matrices_lin.jl` |
+| Retrieval-selected local optical basis (`2 + Naer + selected microphysics`) and Fourier-independent coefficients | `src/CoreRT/LayerOpticalProperties/local_jacobian{,_cache}.jl` |
+| Equivalent-source adding (opt-in; SolarBeam + prescribed/retrievable SurfaceSIF, scalar/Legendre Lambertian endpoints) | `src/CoreRT/CoreKernel/source_adding_lin.jl`, `docs/dev_notes/jacobian_batched/source_adding.md` |
+| Local doubling → retrieval contraction → adding | `src/CoreRT/CoreKernel/local_jacobian.jl`, `rt_kernel_lin.jl` |
+| Backend-native phase-node interpolation | `src/CoreRT/LayerOpticalProperties/phase_interpolation.jl` |
+| Jacobian column layout | `src/CoreRT/parameter_layout.jl::{ParameterLayout,ActiveParameterLayout}` |
+| Retrieval-selected Jacobian plans (`OCO_RRS_synth`) | `src/CoreRT/parameter_layout.jl`, `src/CoreRT/tools/jacobian_plans.jl` |
+| Architecture types | `src/Architectures.jl` (`CPU`, `GPU`, `MetalGPU`) |
+| `@kernel` apply_D! (D-matrix) | `src/CoreRT/CoreKernel/doubling.jl::apply_D!` |
+| `@kernel` line shape | `src/Absorption/compute_absorption_cross_section.jl::line_shape_batch!` |
+| `@kernel` Mie coefficients | `src/Scattering/gpu_mie_kernels.jl::mie_coefficients_kernel_*!` |
+| `@kernel` portable LU (Metal) | `src/CoreRT/tools/ka_batched_kernels.jl::{ka_batch_inv_lu!,_batched_inv_lu_par_kernel!}` |
+| Batched matmul CPU | `src/CoreRT/tools/cpu_batched.jl::{batched_mul,batch_solve!,batch_inv!}` |
+| Batched matmul CUDA | `ext/gpu_batched_cuda.jl::{batched_mul,batch_solve!,batch_inv!}` |
+| Batched matmul Metal | `ext/vSmartMOMMetalExt.jl::{batched_mul,batch_solve!,batch_inv!}` |
+| ForwardDiff.Dual through GPU | `ext/gpu_batched_cuda.jl` (`batched_mul`/`batch_inv!` for `CuArray{<:ForwardDiff.Dual}`) |
+| CUDA extension init | `ext/vSmartMOMCUDAExt.jl` (backend methods, `__init__`) |
+| Metal extension init | `ext/vSmartMOMMetalExt.jl` (backend methods, `__init__`) |
 
 ## Conventions you must follow
 
@@ -204,8 +233,19 @@ material when explaining the package:
 - **Unicode in identifiers** is used directly: `τ`, `ϖ`, `μ`, `μ₀`, `Z⁺⁺`, `Z⁻⁺`, `R⁻⁺`, `T⁺⁺`, `r⁻⁺`, `t⁺⁺`. Don't romanize.
 - **Sign convention:** `+` = incoming/downward, `−` = outgoing/upward.
 - **Layer naming:** `CompositeLayer` fields are uppercase (`R, T, J`); `AddedLayer` fields are lowercase (`r, t, j`).
-- **3D RT array layout:** `(NquadN, NquadN, nSpec)` where `NquadN = Nquad * n_stokes`. The third dim is **spectral** — that's what enables batched-matmul over wavelengths.
+- **3D RT array layout:** diffuse operators use `(NquadN, NquadN, nSpec)`
+  where `NquadN = Nquad * n_stokes`. The third dim is **spectral** — that's
+  what enables batched-matmul over wavelengths. External-solar SFI uses
+  rectangular `Z₀ → R₀/T₀` columns outside the diffuse block.
+- **External-solar scope:** constructor keyword `external_solar=true` opts in and currently
+  supports elastic forward/linearized SFI and forward rotational Raman `RRS`
+  with Gauss quadrature and Lambertian surfaces. TOA-only entry points do not
+  allocate/postprocess BOA, HDR, or BHR. VRS, Raman Jacobians, `rt_run_ss`,
+  non-Lambertian, and interior-sensor paths retain embedded μ₀.
 - **Spectral units:** wavenumber (cm⁻¹) internally; wavelength (μm) for Mie.
+- **Observer heights:** `obs_alt` is geometric km above BOA. Scalar `0` means
+  BOA only; vector `[0]` means TOA + BOA. Strict-interior heights are exact
+  interfaces and are exposed through `ObserverRTResult.levels`.
 - **Profile direction:** TOA-to-BOA internally. GEOSChem data is BOA-to-TOA and gets flipped on read.
 - **No co-author attribution in commits.**
 - **Test discipline:** must `cd test/` before running tests — test files use relative paths (`test_profiles/`) that only resolve from `test/`.
@@ -229,8 +269,8 @@ julia --project=. -e '
   using vSmartMOM
   params = parameters_from_yaml("config/ocean_coxmunk.yaml")
   model, lin_model = model_from_parameters(LinMode(), params)
-  NAer = length(params.scattering_params.rt_aerosols)
-  NGas = size(lin_model.tau_dot_abs[1], 1)
+  NAer = params.scattering_params === nothing ? 0 : length(params.scattering_params.rt_aerosols)
+  NGas = size(lin_model.τ̇_abs[1], 1)
   R, T, dR, dT = rt_run(model, lin_model, NAer, NGas, 1)
 '
 
@@ -242,9 +282,11 @@ cd docs && julia --project=. make.jl
 
 1. **What is the package about?** → Read the spine above (top of this file).
 2. **What does this code do?** → Find it in the code-anchor table above; read the relevant Concepts page; cross-reference `theory_references.md` for the paper equation.
-3. **Why is the code shaped this way?** → Check the **design-choice passages** at the bottom of `theory_references.md`. They explain non-obvious trade-offs (no solar SFI in J, constant-`N_doubl`, Cabannes vs Rayleigh greek, Raman Rayleigh fraction, linear-in-inelastic, `rt_run_ss` raison d'être, δBGE-fit vs δ-m, exact finite-δ elemental).
+3. **Why is the code shaped this way?** → Check the **design-choice passages** at the bottom of `theory_references.md`. They explain non-obvious trade-offs (historical no-solar-SFI origin vs current embedded/external SFI representations, constant-`N_doubl`, Cabannes vs Rayleigh greek, Raman Rayleigh fraction, linear-in-inelastic, `rt_run_ss` raison d'être, δBGE-fit vs δ-m, exact finite-δ elemental, local optical basis/contraction order, regular elemental derivative limits).
 4. **Where does this paper equation map in the code?** → `theory_references.md` Sections A–J.
 5. **How should I write a new feature?** → Check `CLAUDE.md` for the "Common Workflows" patterns (adding a surface BRDF, adding a test, modifying YAML parsing).
+6. **How do retrieval-selective Jacobians work?** → Read `docs/dev_notes/selective_jacobian_plans.md` for the exact local/global layouts, early-selection allocation path, coordinate transforms, extension contract, and finite-difference record.
+7. **How should Jacobians extend to new physics or retrievals?** → Read `docs/dev_notes/jacobian_batched/extension_review.md` for the current boundaries, implementation gaps, and validation contract. Forward source support and an AD-mode declaration do not prove linearized support; selected columns must have enabled upstream derivatives.
 
 ## Maintenance contract for this file
 
@@ -252,7 +294,7 @@ When the docs evolve, this file evolves with them. Specifically:
 
 - If a new Concepts page is added or the arc reorders, update the Concepts arc table.
 - If a kernel's source location moves, update the code-anchor table.
-- If a new differentiator is added or a current claim no longer holds, update the differentiator list. Note: GPU Mie is now architecture-dispatched production reality for CUDA (`has_gpu_mie(::GPU) = true`; `make_mie_model(...; architecture=GPU())` runs on-GPU for CUDA). The differentiator list item "One `@kernel` source" already covers this; update item 6 ("Weak GPU dependency") if the Metal/CPU fallback path changes.
+- If a new differentiator is added or a current claim no longer holds, update the differentiator list. Note: GPU Mie is now architecture-dispatched production reality for CUDA (`has_gpu_mie(::GPU) = true`; `make_mie_model(...; architecture=GPU())` runs on-GPU for CUDA). The differentiator list item "One `@kernel` source" already covers this; update item 6 ("GPU dependency status") if the Metal/CPU fallback path changes.
 - If a new design-choice passage is added to `theory_references.md`, add it to "When in doubt" §3.
 
 This file is for agents who don't have time to read the whole codebase. If it's stale, it's actively misleading. Keep it honest.

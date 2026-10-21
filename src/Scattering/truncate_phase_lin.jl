@@ -3,6 +3,16 @@
 This file specifies how to truncate the AerosolOptics struct, given the truncation type
  
 =#
+# A tangent that switches on an element which is identically zero (e.g. a
+# polarization direction about an unpolarized Henyey–Greenstein phase matrix)
+# has no derivative under the 1/f² weighting of the δBGE fit.
+function _require_zero_tangent(ḟ, name)
+    all(iszero, ḟ) || throw(ArgumentError(
+        "δBGE truncation tangent is undefined for a nonzero $(name) tangent " *
+        "about an identically zero $(name) (its fit weights are 1/$(name)²)"))
+    return nothing
+end
+
 """
     $(FUNCTIONNAME)(mod::δBGE, aero::AerosolOptics, lin_aero::linAerosolOptics; reportFit=false)
 
@@ -12,8 +22,12 @@ Performs the same least-squares fit as [`truncate_phase`](@ref)(mod::δBGE, aero
 then propagates derivatives through the truncation to obtain truncated Greek-coefficient
 Jacobians. Reference: Sanghavi & Stephens (2015).
 
+All six truncated families carry the `1/c₀` renormalisation of SS2015 Eq. 8
+(`c₀ = 1 - fᵗ`), so each derivative picks up the matching
+`-xᵗ·ċ₀` chain-rule term with `ċ₀ = ẋβ[:,1]`.
+
 # Arguments
-- `mod`: [`δBGE`](@ref) with `l_max` and `Δ_angle`
+- `mod`: [`δBGE`](@ref) with `l_max`
 - `aero`: [`AerosolOptics`](@ref) to truncate
 - `lin_aero`: [`linAerosolOptics`](@ref) with derivatives w.r.t. state (e.g. nᵣ, nᵢ, r)
 - `reportFit`: if `true`, print RMS fit errors
@@ -26,7 +40,7 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAeroso
     (; α, β, γ, δ, ϵ, ζ) = greek_coefs
     (; lin_greek_coefs, ω̃̇, k̇) = lin_aero
     (; α̇, β̇, γ̇, δ̇, ϵ̇, ζ̇) = lin_greek_coefs
-    (; l_max, Δ_angle) = mod
+    (; l_max) = mod
 
     l_tr = l_max
     # Obtain Gauss-Legendre quadrature points and weights for phase function:
@@ -37,8 +51,6 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAeroso
 
     (; f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄) = scattering_matrix
     (; ḟ₁₁, ḟ₁₂, ḟ₂₂, ḟ₃₃, ḟ₃₄, ḟ₄₄) = lin_scattering_matrix
-    # Find elements that exclude the peak (if wanted!)
-    iμ = findall(x -> x < cosd(Δ_angle), μ)
 
     # Prefactor for P2:
     fac = zeros(FT,l_tr);
@@ -46,10 +58,13 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAeroso
         fac[l + 1] = sqrt(FT(1) / ( ( l - FT(1)) * l * (l + FT(1)) * (l + FT(2)) ));
     end
 
-    # Create subsets (for Ax=y weighted least-squares fits):
-    y₁₁ = view(f₁₁, iμ)
-    y₁₂ = view(f₁₂, iμ)
-    y₃₄ = view(f₃₄, iμ)
+    # The fits and their tangents run over the FULL angular domain — the
+    # same domain the forward `truncate_phase` uses now that the
+    # forward-peak exclusion cone (δBGE.Δ_angle) is retired, so these
+    # tangents differentiate exactly the production fit.
+    y₁₁ = f₁₁
+    y₁₂ = f₁₂
+    y₃₄ = f₃₄
     
     #= for β
        Ax=b, where
@@ -109,11 +124,23 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAeroso
             A[j,i] = A[i,j]
         end
     end
-    γᵗ = similar(cl); γᵗ[1:2] .=0
-    γᵗ[3:end] = A[3:end,3:end] \ b[3:end]   # G in δ-BGE (γ)
+    # Unnormalised δ-BGE fit of b₁(μ): reproduces the *untruncated* f₁₂. The
+    # 1/c₀ renormalisation (and its derivative chain) is applied further down,
+    # once c₀ = cl[1] is available — the derivative formula
+    # ẋ = A⁻¹(ḃ − Ȧx) below needs the unnormalised fit x.
+    γᵗ_fit = similar(cl); γᵗ_fit[1:2] .= 0
+    # As in truncate_phase: an identically zero f₁₂ truncates to zero (the
+    # 1/f₁₂² weights are undefined there), and so does a zero tangent.
+    γ_zero = all(iszero, y₁₂)
+    γᵗ_fit[3:end] = γ_zero ? zero(γᵗ_fit[3:end]) :
+                    A[3:end,3:end] \ b[3:end]   # G in δ-BGE (γ)
 
-    γ̇ᵗ = zeros(4,l_tr)
+    γ̇ᵗ_fit = zeros(4,l_tr)
     for ctr=1:4
+        if γ_zero
+            _require_zero_tangent(view(ḟ₁₂, ctr, :), "f₁₂")
+            continue
+        end
         Ȧ = zeros(l_tr, l_tr)
         ḃ = zeros(l_tr)
         for i = 3:l_tr
@@ -124,13 +151,16 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAeroso
                 Ȧ[j,i] = Ȧ[i,j]
             end
         end
-        γ̇ᵗ[ctr,3:end] = A[3:end,3:end] \ (ḃ[3:end] - Ȧ[3:end,3:end] * γᵗ[3:end])
+        γ̇ᵗ_fit[ctr,3:end] = A[3:end,3:end] \ (ḃ[3:end] - Ȧ[3:end,3:end] * γᵗ_fit[3:end])
     end
     
 
     if reportFit
         println("Errors in δ-BGE fits:")
-        mod_γ = convert.(FT, B * γᵗ[3:end])
+        # Evaluate the fitted expansion on the outside-cone sample points
+        # (same domain as y₁₂) — mirrors B_sub in truncate_phase.jl.
+        B_sub = fac[3:end]' .* view(P², :, 3:l_tr)
+        mod_γ = convert.(FT, B_sub * γᵗ_fit[3:end])
         @show StatsBase.rmsd(mod_γ, y₁₂; normalize=true)
     end
     
@@ -152,11 +182,19 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAeroso
         end
     end
     
-    ϵᵗ = similar(cl); ϵᵗ[1:2] .=0
-    ϵᵗ[3:end] = A[3:end,3:end] \ b[3:end]   # E in δ-BGE (ϵ)
+    # Unnormalised δ-BGE fit of b₂(μ) — see the γ block above; the 1/c₀
+    # renormalisation and its derivative chain are applied below.
+    ϵᵗ_fit = similar(cl); ϵᵗ_fit[1:2] .=0
+    ϵ_zero = all(iszero, y₃₄)
+    ϵᵗ_fit[3:end] = ϵ_zero ? zero(ϵᵗ_fit[3:end]) :
+                    A[3:end,3:end] \ b[3:end]   # E in δ-BGE (ϵ)
     
-    ϵ̇ᵗ = zeros(4,l_tr)
+    ϵ̇ᵗ_fit = zeros(4,l_tr)
     for ctr=1:4
+        if ϵ_zero
+            _require_zero_tangent(view(ḟ₃₄, ctr, :), "f₃₄")
+            continue
+        end
         Ȧ = zeros(l_tr, l_tr)
         ḃ = zeros(l_tr)
         for i = 3:l_tr
@@ -167,12 +205,13 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAeroso
                 Ȧ[j,i] = Ȧ[i,j]
             end
         end
-        ϵ̇ᵗ[ctr,3:end] = A[3:end,3:end] \ (ḃ[3:end] - Ȧ[3:end,3:end] * ϵᵗ[3:end])
+        ϵ̇ᵗ_fit[ctr,3:end] = A[3:end,3:end] \ (ḃ[3:end] - Ȧ[3:end,3:end] * ϵᵗ_fit[3:end])
     end
     
     if reportFit
         println("Errors in δ-BGE fits:")
-        mod_ϵ = convert.(FT, B * ϵᵗ[3:end])
+        B_sub = fac[3:end]' .* view(P², :, 3:l_tr)
+        mod_ϵ = convert.(FT, B_sub * ϵᵗ_fit[3:end])
         @show StatsBase.rmsd(mod_ϵ, y₃₄; normalize=true)
     end
 
@@ -184,16 +223,30 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAeroso
     δᵗ = (δ[1:l_tr] .- (β[1:l_tr] .- cl)) / c₀    # Eq. 38b, derived from β
     αᵗ = (α[1:l_tr] .- (β[1:l_tr] .- cl)) / c₀    # Eq. 38c, derived from β
     ζᵗ = (ζ[1:l_tr] .- (β[1:l_tr] .- cl)) / c₀    # Eq. 38d, derived from β
+    # γᵗ / ϵᵗ: the δ-BGE fits above reproduce the *untruncated* b₁(μ), b₂(μ).
+    # The δBGE phase matrix is Zᵗ = (Z − fᵗ·δ(cosΘ−1)·E)/(1−fᵗ) (SS2015 Eq. 8),
+    # so **all six** Greek families carry the same 1/c₀ renormalisation. Unlike
+    # α/β/δ/ζ there is no forward-peak subtraction here, because the Dirac spike
+    # is diagonal: γ_l^δ = ϵ_l^δ = 0 (S2014 Eqs. A.5–A.10; cf. SS2015 Eqs. 27c,d
+    # for the δ-m analogue γⁿ_l = γ_l/(1−f_tr), ϵⁿ_l = ϵ_l/(1−f_tr)).
+    γᵗ = γᵗ_fit / c₀
+    ϵᵗ = ϵᵗ_fit / c₀
 
     β̇ᵗ = zeros(4,l_tr)
     δ̇ᵗ = zeros(4,l_tr)
     α̇ᵗ = zeros(4,l_tr)
     ζ̇ᵗ = zeros(4,l_tr)
+    γ̇ᵗ = zeros(4,l_tr)
+    ϵ̇ᵗ = zeros(4,l_tr)
     for ctr=1:4
         β̇ᵗ[ctr,:] = (ẋβ[ctr,:] - βᵗ*ẋβ[ctr,1]) / c₀
         δ̇ᵗ[ctr,:] = (δ̇[ctr,1:l_tr] - (β̇[ctr,1:l_tr] - ẋβ[ctr,:]) - δᵗ*ẋβ[ctr,1]) / c₀
         α̇ᵗ[ctr,:] = (α̇[ctr,1:l_tr] - (β̇[ctr,1:l_tr] - ẋβ[ctr,:]) - αᵗ*ẋβ[ctr,1]) / c₀
         ζ̇ᵗ[ctr,:] = (ζ̇[ctr,1:l_tr] - (β̇[ctr,1:l_tr] - ẋβ[ctr,:]) - ζᵗ*ẋβ[ctr,1]) / c₀
+        # Same chain rule as β̇ᵗ, with ċ₀ = ẋβ[ctr,1] and no peak-subtraction
+        # term: d(x_fit/c₀) = (ẋ_fit − (x_fit/c₀)·ċ₀)/c₀.
+        γ̇ᵗ[ctr,:] = (γ̇ᵗ_fit[ctr,:] - γᵗ*ẋβ[ctr,1]) / c₀
+        ϵ̇ᵗ[ctr,:] = (ϵ̇ᵗ_fit[ctr,:] - ϵᵗ*ẋβ[ctr,1]) / c₀
     end
     # Adjust scattering and extinction cross section!
     # δ-BGE fits are solved in Float64 (accuracy); cast the truncated Greek

@@ -13,12 +13,19 @@ optical-property derivation see Sanghavi 2022 (Part I).
 
 vSmartMOM supports rotational Raman (RRS) and vibrational Raman (VRS,
 RVRS) inelastic scattering as a **parallel kernel path** next to the
-elastic one. Selection is via the `RS_type` configured in YAML: `noRS`
-(default; pure elastic), `RRS`, `VS_0to1`, `VS_1to0`, plus `_plus`
-variants for multi-band runs that share spectral structure. The bulk of
-retrievals (NIR shortwave for greenhouse gases, polarized aerosol over
-ocean) use `noRS` — the inelastic correction is small there. UV/Vis
+elastic one. Pass the configured mode object as `rt_run(RS_type, model, iBand)`: `noRS`
+(default; pure elastic), `RRS`, or the vibrational `VS_0to1_plus` /
+`VS_1to0_plus` for runs over an incident wavelength and its Raman target
+bands. The bulk of retrievals (NIR shortwave for greenhouse gases, polarized
+aerosol over ocean) use `noRS` — the inelastic correction is small there. UV/Vis
 retrievals (Ring effect, O₂ A-band line shapes, ozone DOAS) need RRS.
+Vibrational Raman runs use the `_plus` variants, whose state and model are
+built by `model_from_parameters(rs, λ₀, params)` for one incident wavelength
+`λ₀` (same depolarization rule as the standard builder: with `depol: -1` the
+Rayleigh and Cabannes depolarizations come from the molecular constants, the
+Rayleigh one with `rayleigh_anisotropy`; `params` is not modified); `VS_0to1` and
+`VS_1to0` are kept as types only (they have no state builder and do not run
+in `rt_run`).
 
 ## When to enable it
 
@@ -26,7 +33,7 @@ retrievals (Ring effect, O₂ A-band line shapes, ozone DOAS) need RRS.
 |---|---|
 | Ring effect (hyperspectral UV/Vis trace gases) | `RRS` |
 | O₂ A-band line-shape correction at high precision | `RRS` (single-scatter approximation often suffices via `rt_run_ss`) |
-| Fraunhofer-line ghosting due to N₂/O₂ vibrational Raman | `VS_0to1` and/or `VS_1to0` |
+| Fraunhofer-line ghosting due to N₂/O₂ vibrational Raman | `VS_0to1_plus` and/or `VS_1to0_plus` |
 | NIR-only retrievals (XCO₂, XCH₄ from OCO-2/3, GOSAT) | `noRS` (default) |
 
 ## How it's wired
@@ -48,8 +55,16 @@ Architecturally:
 - **Parallel kernel files** at [`src/CoreRT/CoreKernel/elemental_inelastic.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental_inelastic.jl),
   `doubling_inelastic.jl`, `interaction_inelastic.jl`. `rt_kernel!`
   dispatches on `RS_type` to choose which set runs (see
-  [`src/CoreRT/CoreKernel/rt_kernel.jl:48–229`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_kernel.jl#L48-L229)). The elastic kernel
+  the `RRS`/`VS_*` methods in [`src/CoreRT/CoreKernel/rt_kernel.jl:399–442`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_kernel.jl#L399-L442)). The elastic kernel
   *also* runs alongside — Raman is additive on top.
+- **Diffuse redistribution and direct-solar excitation use different angular
+  shapes.** Raman diffuse operators remain square
+  `(NquadN,NquadN,nSpec,nRaman)` because they redistribute an arbitrary
+  diffuse incident field. With external-solar SFI, separate
+  ``ieR_0^{-+},ieR_0^{+-},ieT_0^{++},ieT_0^{--}`` arrays have shape
+  `(NquadN,nStokes,nSpec,nRaman)`. They couple only the fixed ``\mu_0`` beam
+  to diffuse streams and are contracted with ``F_0(:,\lambda_0)`` before the
+  ordinary Raman source-vector doubling recurrence.
 - **`fScattRayleigh` means Rayleigh over total extinction**, not Rayleigh
   over scattering extinction:
   ``f_\mathrm{Rayl}(\lambda,z)=\tau_\mathrm{Rayl}(\lambda,z)/
@@ -58,13 +73,46 @@ Architecturally:
   then isolates the Rayleigh-active part of that extinction for the Raman
   source. Computing it before gas absorption would over-weight Raman source
   terms inside absorption lines.
-- **`rt_run_ss`** ([`src/CoreRT/rt_run.jl:364–524`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/rt_run.jl#L364-L524)) is the single-scattering
+- **`rt_run_ss`** ([`src/CoreRT/rt_run.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/rt_run.jl)) is the single-scattering
   approximation that exists alongside `rt_run` for SF2023-II Eq. (32) —
   the inelastic correction `I₁ ≈ I₀ + (I'₁ − I'₀)` that makes the
   linear-in-inelastic approximation usable in absorbing bands. Not a
   debug helper; it's the *production* tool for fast O₂ A-band Raman
-  corrections.
-- **Linearized Raman is currently elastic-only**. The `_lin.jl` files
+  corrections. Its hemispheric outputs `hem_R`/`hem_T` are diffuse fluxes:
+  `hem_T` excludes the unscattered direct beam for every quadrature scheme
+  (add ``\mu_0 F_0 e^{-\tau/\mu_0}`` for the total downwelling flux).
+- **An `RRS` band must hold rotational lines.** `getRamanSSProp!(rs, λ, ν)`
+  measures the line shifts from the band grid point nearest `λ` (normally
+  the band centre) and keeps only the lines inside the band; `rt_run` then
+  scales them so that together they carry the whole Raman fraction
+  ``1-\varpi_\mathrm{Cab}`` (≈ 3 %) of the Rayleigh scattering. A band whose
+  half-width is below the smallest shifts (±11.9 cm⁻¹ for N₂, ±14.3 cm⁻¹ for
+  O₂) holds no line, and `getRamanSSProp!` throws an `ArgumentError`: widen the
+  band or use `noRS`. A band that holds only some lines conserves the Raman
+  energy but concentrates it on those lines. All lines lie within ±234 cm⁻¹
+  (N₂, J ≤ 28), so a complete RRS band needs a shoulder of that width around
+  every output point.
+- **Raman lines fall between grid points.** Each line is shared between
+  its two neighbouring grid points by linear interpolation, which keeps the
+  line's strength and position. Because the shifts are measured from a grid
+  point, the result does not depend on whether `λ` falls on a grid point
+  (the mean of an even-length band does not). The vibrational Raman lines of
+  the VS modes are put on their target grids by the same interpolation.
+- **Vibrational Raman (`_plus`) runs take the Raman light from band 1.**
+  Band 1 holds the incident wavelength; its elastic single-scattering albedo
+  is reduced by the whole vibrational Raman fraction
+  ``(\sigma_\mathrm{VRS}+\sigma_\mathrm{RVRS})/\sigma_\mathrm{Rayl}`` of both
+  directions (≈ 9 × 10⁻⁴ at 395 nm), and the target bands keep the full
+  elastic albedo. A `VS_0to1_plus` run puts the Stokes (0→1) part, nearly all
+  of it, into its target bands; a `VS_1to0_plus` run only the anti-Stokes part
+  (at most a few 10⁻⁴ of it at atmospheric temperatures), so the energy
+  closes when both directions are combined. Rotational Raman is not
+  redistributed in these runs: its energy stays in the elastic part.
+- **The vibrational Q branch (ΔJ = 0) has a Rayleigh-type phase matrix**
+  whose depolarization follows from the population-weighted Placzek–Teller
+  coefficient ⟨b_JJ⟩ of its per-J lines (ρ ≈ 0.046 for N₂ and 0.100 for O₂);
+  the O and S branches use the rotational Raman phase matrix.
+- **Raman Jacobians are unsupported**. The `_lin.jl` files
   cover the elastic path only; ``\partial \mathbf{R}/\partial \mathbf{x}`` derivatives
   through inelastic scattering are not yet implemented.
 
@@ -78,7 +126,7 @@ Architecturally:
 | Inelastic doubling | [`src/CoreRT/CoreKernel/doubling_inelastic.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/doubling_inelastic.jl) |
 | Inelastic interaction | [`src/CoreRT/CoreKernel/interaction_inelastic.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/interaction_inelastic.jl) |
 | `_plus` variants (multi-band) | [`src/CoreRT/CoreKernel/elemental_inelastic_plus.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental_inelastic_plus.jl) |
-| Single-scatter inelastic correction | `src/CoreRT/rt_run.jl::rt_run_ss:364–524` |
+| Single-scatter inelastic correction | `src/CoreRT/rt_run.jl::rt_run_ss` |
 | Cabannes vs full Rayleigh selector | [`src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl:8–9`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl#L8-L9) |
 | Raman Rayleigh extinction fraction | `src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl::_rayleigh_fraction_of_total_extinction` |
 

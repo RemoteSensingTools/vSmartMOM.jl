@@ -1,0 +1,16 @@
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:33[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:21[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:09[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:05[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:21[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:14[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:06[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:04[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:03[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:07[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:04[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:03[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:05[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:03[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Test Summary:                     | Pass  Total     Time
+Equivalent-source adding with SIF |  284    284  5m49.4s
+Test Summary:            | Pass  Total   Time
+Equivalent-source adding |   92     92  15.5s

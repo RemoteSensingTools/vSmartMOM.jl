@@ -58,7 +58,7 @@ function no_absorption_params()
             "sza" => sza_deg,
             "vza" => vza,
             "vaz" => vaz,
-            "obs_alt" => 1000.0,
+            "obs_alt" => [0.0],
         ),
         "atmospheric_profile" => Dict{String,Any}(
             "T" => [285.0],

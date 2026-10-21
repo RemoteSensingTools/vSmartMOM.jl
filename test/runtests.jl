@@ -16,10 +16,29 @@ using JLD2
 const _VSMARTMOM_TEST_ORIGINAL_CWD = pwd()
 cd(@__DIR__)
 try
+@testset "vSmartMOM" begin
 
 # Core module tests
 @testset "Absorption" begin include("test_Absorption.jl") end
+@testset "HITRAN cache" begin include("test_hitran_cache.jl") end
+@testset "Parameter copies" begin include("test_copy_parameters.jl") end
+@testset "Idiomatic Julia interfaces" begin include("test_julia_interfaces.jl") end
+@testset "Absorption column integration" begin include("test_absorption_column_integration.jl") end
+@testset "Absorption pressure derivatives" begin include("test_absorption_pressure.jl") end
+@testset "Vertical-grid surface-pressure Jacobians" begin include("test_vertical_grid_psurf.jl") end
+@testset "H2O self broadening" begin include("test_h2o_self_broadening.jl") end
 @testset "Scattering" begin include("test_Scattering.jl") end
+@testset "Molecular Rayleigh" begin include("test_molecular_rayleigh.jl") end
+@testset "Rayleigh tensor dispersion (depol: -1)" begin include("test_rayleigh_anisotropy.jl") end
+
+# Caller-defined-node bulk Mie API (Sol plan phase 1) -- caller-node
+# compute_aerosol_optical_properties_nodes/_gpu; delegation refactor of the
+# log-normal NAI2 path via the shared _nai2_bulk_optics core.
+@testset "Mie caller-node API" begin include("test_mie_nodes.jl") end
+
+# Batched caller-node Mie seam (docs/dev_notes/proposals/batched_mie_nodes_seam.md v2) --
+# exact-nmax grouped GPU batching + reusable single-owner workspace.
+@testset "Mie caller-node batched API" begin include("test_mie_nodes_batched.jl") end
 @testset "CoreRT" begin include("test_CoreRT.jl") end
 @testset "Batched Kernels" begin include("test_batched_kernels.jl") end
 @testset "SolarModel" begin include("test_SolarModel.jl") end
@@ -27,11 +46,36 @@ try
 # Forward model tests (these require YAML parameter files + data)
 @testset "Forward noRS" begin include("test_forward_noRS.jl") end
 
+# Restored scalar/vector observer-height convention and exact interior levels.
+@testset "Multi-sensor heights" begin include("test_multisensor_heights.jl") end
+
 # Molecular Rayleigh/Cabannes/RRS optical-property identities.
 @testset "Rayleigh/Cabannes Raman" begin include("test_ray_cab_raman.jl") end
+@testset "Raman Placzek–Teller sum rule" begin include("test_raman_placzek_teller.jl") end
+@testset "Raman RRS line weights" begin include("test_raman_rrs_lines.jl") end
 
 # Jacobian unit tests
 @testset "Jacobian Unit" begin include("test_jacobians_unit.jl") end
+@testset "Batched Jacobians" begin include("test_jacobian_batched.jl") end
+@testset "Elemental boundary Jacobians" begin include("test_elemental_boundary_jacobians.jl") end
+# Elemental t⁺⁺/J₀⁺ factors near coincident ordinates (limit form, decision 14e).
+@testset "Elemental limit form" begin include("test_elemental_limit_form.jl") end
+@testset "CUDA Jacobian plans" begin include("test_jacobian_vendor.jl") end
+if get(ENV,"VSMARTMOM_JACOBIAN_GPU_TEST","false") == "true"
+    @testset "CUDA Jacobian tiles" begin include("test_jacobian_tiled.jl") end
+end
+@testset "Blocked Jacobians" begin include("test_jacobian_blocked.jl") end
+@testset "Phase interpolation" begin include("test_phase_interpolation.jl") end
+@testset "Aerosol reference" begin include("test_aerosol_reference.jl") end
+@testset "NAI2 fixed radius grid" begin include("test_nai2_fixed_radius_grid.jl") end
+@testset "Local optical Jacobians" begin include("test_local_jacobian.jl") end
+@testset "Source adding Jacobians" begin include("test_source_adding.jl") end
+@testset "Source adding SIF Jacobians" begin include("test_source_adding_sif.jl") end
+@testset "Tabulated phase Jacobians" begin include("test_z_jacobian_tables.jl") end
+@testset "Batched Lambertian Jacobians" begin include("test_lambertian_jacobian_batched.jl") end
+@testset "Selective Jacobians" begin include("test_selective_jacobians.jl") end
+@testset "Jacobian upstream contract" begin include("test_jacobian_upstream_contract.jl") end
+@testset "Gas-abundance Jacobian contract" begin include("test_abundance_jacobian_contract.jl") end
 
 # Type stability tests (no external data)
 @testset "Type Stability" begin include("test_type_stability.jl") end
@@ -60,11 +104,23 @@ try
 # Phase A — `Nstreams` field on `QuadPoints` (count of nonzero weights;
 # distinct from augmented `Nquad`). See docs/src/pages/conventions.md §6.
 @testset "QuadPoints streams" begin include("test_quadpoints_streams.jl") end
+# Radau with the sun at zenith: halved single-interval weights, mapped-node
+# solar test, and continuity with a slightly oblique sun.
+@testset "Radau overhead sun" begin include("test_radau_overhead_sun.jl") end
+
+# Direct SFI keeps the collimated solar direction external to the diffuse
+# operator. Five weighted streams + one VZA therefore means 18×18 for IQU.
+@testset "External solar SFI" begin include("test_external_solar_sfi.jl") end
 
 # Phase B — forward and lin paths must derive the same per-band Fourier
 # loop bound. Regression for the previous lin-only precedence bug at
 # even `l_max`; both paths now flow through `_derive_m_max_bands`.
 @testset "Forward/lin m_max parity" begin include("test_lin_forward_loop_parity.jl") end
+
+# Optional VLIDORT-style early exit. The package default remains the complete
+# Fourier sum; configured nadir workflows require two passing I moments so the
+# polarized m=2 term cannot be omitted after an m=1 intensity zero.
+@testset "Fourier convergence" begin include("test_fourier_convergence.jl") end
 
 # Phase C — `component_m_max(c, ctx)` trait dispatch + flag-gated
 # aggregator. **Default flag is `true`** in v2.1: Cox-Munk / RossLi /
@@ -85,6 +141,8 @@ try
 # VS Raman path smoke tests — guards the previously-broken VS_0to1/VS_1to0
 # call chain (undefined compute_optical_Rayl!/compute_ϖ_Cabannes! calls).
 @testset "Inelastic VS smoke" begin include("test_inelastic_vs_smoke.jl") end
+# VS_0to1_plus / VS_1to0_plus forward runs over concatenated bands. ~3 min.
+@testset "Raman VS plus" begin include("test_raman_vs_plus.jl") end
 
 # ForwardDiff hybrid-AD path — guards the Dual-safe Dₙ recursion in
 # compute_mie_ab! (Float64-stabilized for plain floats, native for Duals)
@@ -93,11 +151,62 @@ try
 
 # Cox-Munk ocean surface tests
 @testset "Cox-Munk Surface" begin include("test_coxmunk.jl") end
+@testset "Cox-Munk RT contract" begin include("test_coxmunk_rt_contract.jl") end
+@testset "Cox-Munk polarization" begin include("test_coxmunk_polarization.jl") end
+@testset "Cox-Munk spectral water index" begin include("test_coxmunk_spectral.jl") end
+@testset "Ross-Li zenith cap" begin include("test_rossli_zenith_cap.jl") end
+
+# Linearized RT solves one band per call.
+@testset "Linearized band selection" begin include("test_lin_band_selection.jl") end
 
 # Lambertian surface scaffold — cross-flavor consistency (Scalar/Legendre/
 # Spline/Spectrum share one create_surface_layer!), m>0 conventions, and the
 # LambertianSurfaceSpectrum end-to-end regression.
 @testset "Lambertian surfaces" begin include("test_lambertian_surfaces.jl") end
+
+# Atmosphere/surface split — rt_run_atmosphere / rt_run_surface /
+# rt_run_multi_surface. Bit-exactness regression against monolithic rt_run
+# (same kernels, same inputs); see docs/dev_notes/proposals/surface_split_albedo_sweep.md.
+@testset "Surface split" begin include("test_surface_split.jl") end
+
+# Analytic Lambertian-albedo closure (O(1) per albedo) over a cached
+# atmosphere, + the :slim AtmosphereRTCache mode; see
+# docs/dev_notes/proposals/surface_split_albedo_sweep.md §3-4.
+@testset "Lambertian closure" begin include("test_lambertian_closure.jl") end
+
+# SZA × view-pair × BRDF scenario sweeps: `remake_geometry`'s bit-exactness
+# vs a full `model_from_parameters` rebuild, plus `run_sweep`'s output
+# against a monolithic `rt_run` reference; see
+# docs/dev_notes/proposals/surface_split_albedo_sweep.md §6-7 (PR 3).
+@testset "Scenario sweep" begin include("test_scenario_sweep.jl") end
+
+# Performance-path regressions (perf/fused-adding-kernels). Each file's GPU
+# arm self-skips when CUDA is unavailable; the CPU arms (bitwise contracts,
+# gates, kill-switch defaults) always run.
+# Phase 0 — in-place _bmm! rewiring of doubling/interaction (bit-identical).
+@testset "Phase 0 in-place" begin include("test_phase0_inplace.jl") end
+# Phase 1 — fused KA doubling kernels vs the _bmm! ladder (tolerance contract).
+@testset "Fused doubling" begin include("test_fused_doubling.jl") end
+# Phase 2 — fused KA interaction kernels, incl. the gate assertion that the
+# production interaction_helper! actually dispatches to the fused branch.
+@testset "Fused interaction" begin include("test_fused_interaction.jl") end
+# Sparse (layer-resolved) aerosol combine vs dense — bitwise A/B in both the
+# dense and the one-mode-per-layer regimes.
+@testset "Sparse aerosol combine" begin include("test_sparse_combine.jl") end
+# Z-moment tables — bitwise contract, Π auto-build (silent-zero regression),
+# μ-mismatch rejection, kill-switch default.
+@testset "Z-moment tables" begin include("test_z_tables.jl") end
+# m-invariant max(τ·ϖ) cache — one per-layer device reduction on m=0 instead
+# of 3 blocking round trips per (layer, m); bitwise rt_run A/B.
+@testset "m-invariant dτ cache" begin include("test_m_invariant_dtau.jl") end
+# VLIDORT-style Fourier convergence (AbstractFourierConvergence strategies):
+# default bitwise, unreachable-tolerance bitwise, early-exit within tolerance,
+# YAML wiring, FOURIER_SAVED diagnostic.
+
+# TMS single-scattering correction: strategy types, f=0 no-op at machine
+# precision, parity-policy rejections, exact-SS reference, truncation-order
+# convergence (see docs/dev_notes/TMS_DISCOVERY.md).
+@testset "TMS SS correction" begin include("test_tms.jl") end
 
 # NOTE: GPU/Metal tests live in test/local/gpu/ and run via
 # `julia --project=test test/local/runtests.jl` (the local-only suite); they are
@@ -108,6 +217,7 @@ try
 # Skipped by default on CPU-only machines (run takes ~3 min); set
 # PHASE1B_CPU=1 or have CUDA available to actually run.
 @testset "Phase 1b RRS regression" begin include("test_forward_raman_phase1b.jl") end
+@testset "External-solar RRS columns" begin include("test_external_solar_raman.jl") end
 
 # Phase 1c single-scatter driver smoke test.
 @testset "Phase 1c SS driver" begin include("test_forward_ss.jl") end
@@ -134,17 +244,30 @@ try
 # Validates bit-equality of optical depths and radiances across scene updates,
 # round-trip consistency, and guard rails.
 @testset "BatchContext update_model!" begin include("test_update_model.jl") end
+@testset "BatchContext failure-state integrity" begin include("test_update_model_transaction.jl") end
 
 # v0.6 source-term refactor — AbstractSource vocabulary, SolarBeam, BlackbodySource,
 # SurfaceSIF, surface_source_contribute! double-dispatch, prepared_sources flow.
 # Includes the full Phase 1 → 5b regression assertions and end-to-end bit-equality
 # checks via small CPU rt_run scenarios on PureRayleighParameters.
 @testset "Sources (v0.6)" begin include("test_sources.jl") end
+@testset "Source request validation" begin include("test_source_validation.jl") end
+
+# Solve-boundary guards: reused RS objects do not keep a driver-written F₀,
+# and a sources= call does not overwrite a preset F₀ (decision 14a);
+# HDR/BHR/hem_T count the direct beam once at weighted μ₀ nodes; TMS with
+# stream exports / combined bands; multisensor Cox-Munk TOA; U/V incident
+# beams; ThermalEmission paths and layer count; linearized surface support.
+@testset "RT entry guards" begin include("test_rt_entry_guards.jl") end
 
 # v0.7 Phase A — ThermalEmission per-layer Planck volume source.
 # Pins the corrected TIR weight rule (overrides REFACTOR_SPEC_v6 §2.11):
 # isotropic source fires only at m=0 with 2π factor to undo downstream 0.5/π.
 @testset "ThermalEmission (v0.7 Phase A)" begin include("test_thermal_emission.jl") end
+
+# Non-scattering layers (τ·ϖ ≤ 2eps): no stale sources, surface added as a
+# reflecting layer, thermal emission kept — column, multisensor and lin paths.
+@testset "Non-scattering layers" begin include("test_nonscattering_layers.jl") end
 
 # VLIDORT 2.8.3 baseline validation suite — Siewert 2000 PROBLEM_IIA Stokes-I,
 # solar_tester scalar (Task 1), solar_tester vector (Task 1, IQU). Reference
@@ -153,6 +276,7 @@ try
 # `@testset "VLIDORT baseline"`, so we don't double-nest.
 include("vlidort_baseline/runtests.jl")
 
+end # complete suite: collect all testset failures before returning
 finally
     cd(_VSMARTMOM_TEST_ORIGINAL_CWD)
 end

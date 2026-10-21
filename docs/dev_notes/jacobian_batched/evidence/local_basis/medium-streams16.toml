@@ -1,0 +1,44 @@
+backend = "cuda"
+chunk_size = 512
+spectral_points = 512
+
+[[measurements]]
+device_allocated_bytes = [8394353059843, 8394353059843, 8394353059843]
+mode = "reference"
+chunk = 1
+seconds = [94.378215186, 94.381832933, 94.326835015]
+max_parity_error = 0.0
+host_bytes = [2472742816, 2474252600, 2472623896]
+[[measurements]]
+device_allocated_bytes = [352286658947, 352286658947, 352286658947]
+mode = "physical"
+chunk = 1
+seconds = [48.912093924, 49.031349967, 49.121202361]
+max_parity_error = 3.885780586188048e-16
+host_bytes = [651375712, 651254400, 651278808]
+[[measurements]]
+device_allocated_bytes = [53612970371, 53612970371, 53612970371]
+mode = "local"
+chunk = 1
+seconds = [30.49183492, 30.544343899, 30.514478336]
+max_parity_error = 3.885780586188048e-16
+host_bytes = [624420248, 624404568, 624492640]
+[[measurements]]
+device_allocated_bytes = [5630719563, 5630719563, 5630719563]
+mode = "forward"
+chunk = 1
+seconds = [5.907738874, 5.965154275, 5.836991074]
+max_parity_error = 5.204170427930421e-18
+host_bytes = [897027032, 890476672, 890256144]
+
+[totals_seconds]
+local = [30.49183492, 30.544343899, 30.514478336]
+forward = [5.907738874, 5.965154275, 5.836991074]
+reference = [94.378215186, 94.381832933, 94.326835015]
+physical = [48.912093924, 49.031349967, 49.121202361]
+
+[medians_seconds]
+local = 30.514478336
+forward = 5.907738874
+reference = 94.378215186
+physical = 49.031349967

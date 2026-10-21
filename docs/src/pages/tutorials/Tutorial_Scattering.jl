@@ -13,6 +13,7 @@
 #
 # ### Load packages
 
+using vSmartMOM
 using vSmartMOM.Scattering
 using Distributions
 using FastGaussQuadrature
@@ -40,8 +41,7 @@ aero = Aerosol(size_distribution, nᵣ, nᵢ)
 λ = 0.55                               # wavelength [μm]
 polarization_type = Stokes_IQUV()
 l_max = 20
-Δ_angle = 2.0
-truncation_type = δBGE(l_max, Δ_angle)
+truncation_type = δBGE(l_max)
 
 model_NAI2 = make_mie_model(
     NAI2(),
@@ -62,6 +62,14 @@ aerosol_optics_NAI2 = compute_aerosol_optical_properties(model_NAI2)
 println("ω̃ = ", aerosol_optics_NAI2.ω̃)
 println("k  = ", aerosol_optics_NAI2.k)
 println("fᵗ = ", aerosol_optics_NAI2.fᵗ)
+
+# These are the untruncated Mie optics: the Greek coefficients run to the full
+# Mie order and `fᵗ` is a placeholder (`1`) until a truncation is applied. The
+# RT model builder applies the δBGE fit itself; to inspect it directly, call
+# `truncate_phase` with the same truncation type:
+
+aerosol_optics_trunc = truncate_phase(truncation_type, aerosol_optics_NAI2)
+println("fᵗ after δBGE(", l_max, ") truncation = ", aerosol_optics_trunc.fᵗ)
 
 # ---
 #
@@ -140,14 +148,14 @@ fig
 
 # ---
 #
-# ### AD mode
+# ### Analytic Mie Jacobians
 #
-# `autodiff=true` returns one `AerosolOptics` object.
-# The Jacobian is stored in `derivs` with columns corresponding to:
-# `[rₘ, σ, nᵣ, nᵢ]`.
+# `LinMode()` returns forward and linearized optics. The native columns are
+# `[nᵣ, nᵢ, μ_logr, σ_logr]`; the historical `autodiff=true` wrapper is retired.
 
-aerosol_optics_ad = compute_aerosol_optical_properties(model_NAI2; autodiff=true)
-println("AD derivs size: ", size(aerosol_optics_ad.derivs))
+aerosol_optics, aerosol_optics_lin = compute_aerosol_optical_properties(
+    vSmartMOM.LinMode(), model_NAI2, Float64)
+println("SSA derivative shape: ", size(aerosol_optics_lin.ω̃̇))
 
 # ---
 #

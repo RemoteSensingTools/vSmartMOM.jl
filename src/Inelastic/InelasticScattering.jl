@@ -17,6 +17,7 @@ module InelasticScattering
     include("src/raman_constants.jl")
     include("src/molecular_constructors.jl")
     include("src/inelastic_cross_section.jl")
+    include("molecular_rayleigh_poltensor.jl") # UsingPolTen backend for Scattering.molecular_rayleigh_properties
     include("src/apply_lineshape.jl")
     include("types.jl")
     include("inelastic_helper.jl")

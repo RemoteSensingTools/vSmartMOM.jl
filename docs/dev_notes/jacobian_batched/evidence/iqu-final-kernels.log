@@ -1,0 +1,16 @@
+Precompiling packages...
+  25808.7 ms  ✓ vSmartMOM
+  11759.5 ms  ✓ vSmartMOM → vSmartMOMCUDAExt
+  2 dependencies successfully precompiled in 39 seconds. 274 already precompiled.
+Test Summary:                    | Pass  Total   Time
+Batched Jacobian propagation CPU |  416    416  44.0s
+Test Summary:                     | Pass  Total     Time
+Batched Jacobian propagation CUDA |  416    416  1m01.6s
+Test Summary:                    | Pass  Total  Time
+Tangent zeros stay on the device |    8      8  5.7s
+Test Summary:                   | Pass  Total   Time
+Shared-memory Jacobian products |   36     36  17.5s
+Test Summary:                 | Pass  Total   Time
+Tabulated phase Jacobians CPU |  656    656  41.3s
+Test Summary:                         | Pass  Total   Time
+Tabulated phase Jacobians CUDA output |  656    656  17.5s

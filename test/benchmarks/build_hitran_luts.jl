@@ -2,7 +2,7 @@
 # build_hitran_luts.jl — Rebuild the HITRAN absorption LUTs
 #
 # Produces one JLD2 per species under `~/data/HITRAN_LUTs/` (override via
-# `HITRAN_LUT_DIR`). Spec per plans/HANDOFF_LUT_REBUILD_2026-04-23.md:
+# `HITRAN_LUT_DIR`). Spec per docs/dev_notes/plans/HANDOFF_LUT_REBUILD_2026-04-23.md:
 #
 #   Δν         = 0.01 cm⁻¹  (pilot confirmed Δν≤0.01 caps ⟨ΔT⟩ ≤ 3.3e-5)
 #   ν range    = 2857.14–35714.29 cm⁻¹ (280–3500 nm)

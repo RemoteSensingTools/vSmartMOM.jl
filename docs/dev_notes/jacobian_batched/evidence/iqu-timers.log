@@ -1,0 +1,51 @@
+BENCH_BEGIN cuda-n10000-t4
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:35[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:24[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+───────────────────────────────────────────────────────────────────────────────────
+                                          Time                    Allocations
+                                 ───────────────────────   ────────────────────────
+        Tot / % measured:             17.2s /  95.5%           24.1GiB /  98.5%
+
+Section                  ncalls     time    %tot     avg     alloc    %tot      avg
+───────────────────────────────────────────────────────────────────────────────────
+OpticalProps                 30    6.27s   38.1%   209ms   17.0GiB   71.5%   580MiB
+doubling                     25    5.93s   36.1%   237ms   13.9MiB    0.1%   570KiB
+  getri_strided             165   6.02ms    0.0%  36.5μs    481KiB    0.0%  2.91KiB
+  getrf_strided             165   4.44ms    0.0%  26.9μs    251KiB    0.0%  1.52KiB
+Creating layers               3    2.17s   13.2%   724ms   6.74GiB   28.4%  2.25GiB
+interaction                  25    1.86s   11.3%  74.2ms   2.65MiB    0.0%   108KiB
+  getri_strided              50   1.78ms    0.0%  35.6μs    113KiB    0.0%  2.26KiB
+  getrf_strided              50   1.74ms    0.0%  34.8μs   74.2KiB    0.0%  1.48KiB
+elemental                    25    202ms    1.2%  8.06ms   1.28MiB    0.0%  52.3KiB
+OpticalProps invariant        1   8.40ms    0.1%  8.40ms   18.8MiB    0.1%  18.8MiB
+Creating arrays               1    400μs    0.0%   400μs   4.39KiB    0.0%  4.39KiB
+───────────────────────────────────────────────────────────────────────────────────
+TIMER_DONE cuda-n10000-t4

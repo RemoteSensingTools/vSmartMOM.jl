@@ -72,43 +72,46 @@ Every claim below has a `file.jl:LINE` next to it. No marketing.
    atmospheric profile, surface BRDF parameters — never through the
    adding-doubling kernels. That separation keeps the hot loop pure-`FT`
    and lets the analytic chain rule run on GPU.
-   *Evidence:* [`src/CoreRT/CoreKernel/elemental_lin.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental_lin.jl) (fused chain-rule kernels `get_elem_rt_fused!` / `get_elem_rt_SFI_fused!`),
+   *Evidence:* [`src/CoreRT/CoreKernel/elemental_lin.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental_lin.jl) (drives the fused chain-rule kernels `get_elem_rt_fused!` / `get_elem_rt_SFI_fused!` of `elemental_fused_lin.jl`),
    `src/CoreRT/CoreKernel/{elemental,doubling,interaction}_lin.jl`.
 
 2. **One `@kernel` source compiles for CPU, CUDA, and Metal.** Backend
    dispatch is a one-line method override per extension; the kernel
    bodies are unchanged. Metal works because `KernelAbstractions.@kernel`
    is the abstraction layer, not vendor BLAS.
-   *Evidence:* [`src/Architectures.jl:33–96`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Architectures.jl#L33-L96), [`ext/vSmartMOMCUDAExt.jl:21–27`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMCUDAExt.jl#L21-L27),
-   [`ext/vSmartMOMMetalExt.jl:19–22`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMMetalExt.jl#L19-L22).
+   *Evidence:* [`src/Architectures.jl:33–187`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Architectures.jl#L33-L187), [`ext/vSmartMOMCUDAExt.jl:22–28`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMCUDAExt.jl#L22-L28),
+   [`ext/vSmartMOMMetalExt.jl:20–23`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMMetalExt.jl#L20-L23).
 
 3. **Hybrid AD across the GPU boundary.** `ForwardDiff.Dual` numbers flow
-   through `NNlib.batched_mul` on `CuArray` — values and partials carried
-   through CUBLAS together, no host-device round trips.
-   *Evidence:* [`ext/gpu_batched_cuda.jl:141–177`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/gpu_batched_cuda.jl#L141-L177).
+   through the package-owned `CoreRT.batched_mul` on `CuArray` — values and
+   partials are split and multiplied with batched CUBLAS calls, no host-device
+   round trips.
+   *Evidence:* [`ext/gpu_batched_cuda.jl:255–291`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/gpu_batched_cuda.jl#L255-L291).
 
 4. **Polarization is a type, not a runtime branch.** `Stokes_I` (``n=1``),
    `Stokes_IQ` (``n=2``), `Stokes_IQU` (``n=3``), `Stokes_IQUV` (``n=4``)
    each subtype `AbstractPolarizationType`. The kernels specialize at
    compile time on the type — there's no `if pol_type.n == 4` branch
    inside the inner loops.
-   *Evidence:* [`src/Scattering/types.jl:92–143`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types.jl#L92-L143).
+   *Evidence:* [`src/Scattering/types.jl:142–215`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types.jl#L142-L215).
 
 5. **Optical properties as algebra.** ``+`` mixes scatterers in a layer
    (τϖ-weighted ``Z`` averaging); ``*`` stacks layers vertically. Users
    compose layer optics like operands.
-   *Evidence:* [`src/CoreRT/types.jl:1063–1101`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/types.jl#L1063-L1101).
+   *Evidence:* [`src/CoreRT/types.jl:1743–1795`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/types.jl#L1743-L1795).
 
-6. **Weak GPU dependency** via Julia 1.9 package extensions. CPU-only
-   installs are first-class; CUDA and Metal load at runtime if available
-   and otherwise stay out of your dependency graph.
+6. **GPU backends as package extensions** (Julia ≥ 1.9). CPU-only runs are
+   first-class; the CUDA and Metal backend code loads only when `CUDA` or
+   `Metal` is loaded in the session. Metal is a weak dependency; CUDA is
+   currently a direct dependency (it is resolved on install, but no CUDA
+   device is needed for CPU runs).
    *Evidence:* [`ext/vSmartMOMCUDAExt.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMCUDAExt.jl).
 
 7. **Three core variables ``(\tau, \varpi_0, \mathbf{Z})`` per layer.** The
    RT kernel differentiates against these directly, not a black-box scalar
    optical depth, which is why the chain rule is tractable end-to-end.
-   *Evidence:* [`src/CoreRT/types_lin.jl:119–149`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/types_lin.jl#L119-L149),
-   `src/CoreRT/types.jl:1032+`.
+   *Evidence:* [`src/CoreRT/types_lin.jl:330–355`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/types_lin.jl#L330-L355),
+   `src/CoreRT/types.jl:1706+`.
 
 8. **Exact finite-δ elemental, not the linear limit.** Sanghavi 2014
    Eqs. (19)–(20) are written in the ``\delta \to 0`` limit (linear in
@@ -116,12 +119,14 @@ Every claim below has a `file.jl:LINE` next to it. No marketing.
    layers (large ``N_\mathrm{doubl}``) for that approximation to hold.
    vSmartMOM's elemental kernel uses the exact finite-``\delta`` single-scatter
    formulas (Fell 1997 Eqs 1.52–1.56, restated as SF2023-II Eqs 10–11),
-   coded with `-expm1(-x)` and `expdiff_neg(a, b)` for numerical stability
-   in `Float32` on GPU. The elemental layer can be thicker at the same
-   single-scatter accuracy → smaller ``N_\mathrm{doubl}`` → less round-off
-   accumulating through doubling. See [Concepts/04 § Elemental](04_mom_solver.md#elemental-layer)
+   coded with `-expm1(-x)` and, for the ``\mu_j/(\mu_i-\mu_j)`` term, a
+   divided difference of ``e^{-x}`` that never divides by ``\mu_i-\mu_j``
+   (`elem_trans_factor`), for numerical stability in `Float32` on GPU. The
+   elemental layer can be thicker at the same single-scatter accuracy →
+   smaller ``N_\mathrm{doubl}`` → less round-off accumulating through
+   doubling. See [Concepts/04 § Elemental](04_mom_solver.md#Elemental-layer)
    for the side-by-side equation comparison.
-   *Evidence:* [`src/CoreRT/CoreKernel/elemental.jl:207–252`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental.jl#L207-L252).
+   *Evidence:* [`src/CoreRT/CoreKernel/elemental.jl:290–333`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental.jl#L290-L333).
 
 ## The narrative thread
 
@@ -158,7 +163,7 @@ SURFACE      BRDF as the bottom-most AddedLayer (RT basics 5).
                 v
 LINEARIZE    Operator-level chain rule on adding-doubling.
              ParameterLayout names the Jacobian columns.
-             Forward + linearized < 2× forward-only (RT basics 6).
+             Reuse forward inverses; batch active Jacobian columns (RT basics 6).
                 |
                 v
 EVERYWHERE   One @kernel source compiles for CPU + CUDA + Metal.

@@ -1,0 +1,329 @@
+{
+  "candidate": "093719657c3db82678564aaf3cc5fa7c8d69dc2d",
+  "branches": [
+    {
+      "ref": "GPU-library-update",
+      "sha": "e385c0eb742bd6723a2a3a950915a2a068e7ab0a",
+      "candidate_only": 509,
+      "ref_only": 0
+    },
+    {
+      "ref": "NewTag",
+      "sha": "973190b8bce29559c11a6644e54481e1740e7d4a",
+      "candidate_only": 508,
+      "ref_only": 0
+    },
+    {
+      "ref": "RamanLuT",
+      "sha": "4c8d1a2e616d6ead92e06240f0861c4915d4fbac",
+      "candidate_only": 139,
+      "ref_only": 0
+    },
+    {
+      "ref": "SS-exact",
+      "sha": "1680085d1c3017fc8d0cf37a360e2af529b597e4",
+      "candidate_only": 225,
+      "ref_only": 0
+    },
+    {
+      "ref": "TOMAS-aerosols",
+      "sha": "50c82ba27de86cdf117f78acbf37b65181234ed7",
+      "candidate_only": 478,
+      "ref_only": 0
+    },
+    {
+      "ref": "cfranken/refactor-low-risk-cleanup",
+      "sha": "68c09467807529875a5b9ba53aa4daf3ce04c12c",
+      "candidate_only": 324,
+      "ref_only": 0
+    },
+    {
+      "ref": "develop",
+      "sha": "95009df482f8aed8ff0386b33fd7d68bb45836ce",
+      "candidate_only": 673,
+      "ref_only": 0
+    },
+    {
+      "ref": "externalAbsorption",
+      "sha": "1c82f65571b22d41aa403081cd62ae3282b49612",
+      "candidate_only": 172,
+      "ref_only": 0
+    },
+    {
+      "ref": "feat/surface-split",
+      "sha": "51be2b133a5b1491112e7c340f8ea0010e1e4b53",
+      "candidate_only": 85,
+      "ref_only": 40
+    },
+    {
+      "ref": "fix-docs-missing-docstrings",
+      "sha": "9598c6731b2809598e2bc11974e77332ff07e438",
+      "candidate_only": 209,
+      "ref_only": 1
+    },
+    {
+      "ref": "gchp-io",
+      "sha": "c2c88a831c5799b8d9939309704afd94fc224210",
+      "candidate_only": 211,
+      "ref_only": 4
+    },
+    {
+      "ref": "geoschem",
+      "sha": "a4efd0882a6f731a13449f442e065c382153606f",
+      "candidate_only": 494,
+      "ref_only": 0
+    },
+    {
+      "ref": "integration/release-candidate",
+      "sha": "093719657c3db82678564aaf3cc5fa7c8d69dc2d",
+      "candidate_only": 0,
+      "ref_only": 0
+    },
+    {
+      "ref": "io-update",
+      "sha": "b41faff326584302f54b1cf6a1f52fa64627f1c8",
+      "candidate_only": 486,
+      "ref_only": 0
+    },
+    {
+      "ref": "linMom",
+      "sha": "58e1ce11c33b95f90801cabeed6a500a945c4327",
+      "candidate_only": 550,
+      "ref_only": 13
+    },
+    {
+      "ref": "main",
+      "sha": "8afe0aec7b8f006781aa219a299f30a77a1d128f",
+      "candidate_only": 138,
+      "ref_only": 0
+    },
+    {
+      "ref": "perf/cuda-graph-capture",
+      "sha": "6b71c10e3c028abbe0de7b0c7cba963b3cf115f3",
+      "candidate_only": 112,
+      "ref_only": 2
+    },
+    {
+      "ref": "perf/elastic-profiling",
+      "sha": "4c8d1a2e616d6ead92e06240f0861c4915d4fbac",
+      "candidate_only": 139,
+      "ref_only": 0
+    },
+    {
+      "ref": "perf/fused-adding-kernels",
+      "sha": "93de93e1aa4c5d92b84fdad4cf7dba300f8a269c",
+      "candidate_only": 91,
+      "ref_only": 0
+    },
+    {
+      "ref": "perf/jacobian-batched-propagation",
+      "sha": "0540d37a8fda40acd6f2cd1d1cfee48ab769c2c9",
+      "candidate_only": 38,
+      "ref_only": 23
+    },
+    {
+      "ref": "pr222",
+      "sha": "a0f510c6c377d297e4829356dd5713159e66507b",
+      "candidate_only": 210,
+      "ref_only": 1
+    },
+    {
+      "ref": "pr223",
+      "sha": "9598c6731b2809598e2bc11974e77332ff07e438",
+      "candidate_only": 209,
+      "ref_only": 1
+    },
+    {
+      "ref": "rami",
+      "sha": "bc877324477b4728eb303a565588b9be078e0ed0",
+      "candidate_only": 551,
+      "ref_only": 0
+    },
+    {
+      "ref": "review-base-premerge",
+      "sha": "93de93e1aa4c5d92b84fdad4cf7dba300f8a269c",
+      "candidate_only": 91,
+      "ref_only": 0
+    },
+    {
+      "ref": "review/release-readiness",
+      "sha": "5cf1845bc9d9966fcd88618c78d2f7777d73f917",
+      "candidate_only": 43,
+      "ref_only": 1
+    },
+    {
+      "ref": "sanghavi-archive",
+      "sha": "b0de496a5d4614c735435739732206599f37a0da",
+      "candidate_only": 665,
+      "ref_only": 21
+    },
+    {
+      "ref": "sanghavi-unified",
+      "sha": "1b5db4d6f12131aef22dde6fdd5eff432fedd712",
+      "candidate_only": 219,
+      "ref_only": 0
+    },
+    {
+      "ref": "trial/merge-suniti-multisensor",
+      "sha": "9bca792e9ce0a1e483d7eef5abd58801e21091de",
+      "candidate_only": 85,
+      "ref_only": 25
+    },
+    {
+      "ref": "unified-vsmartmom",
+      "sha": "a4e41878223ebe2de454fd9e6fcf2ef625696f19",
+      "candidate_only": 415,
+      "ref_only": 0
+    },
+    {
+      "ref": "origin",
+      "sha": "8afe0aec7b8f006781aa219a299f30a77a1d128f",
+      "candidate_only": 138,
+      "ref_only": 0
+    },
+    {
+      "ref": "origin/compathelper/new_version/2026-06-01-15-02-59-426-01670303187",
+      "sha": "75ce08782c7fbedf01032408b9f6b0383a890c09",
+      "candidate_only": 209,
+      "ref_only": 1
+    },
+    {
+      "ref": "origin/compathelper/new_version/2026-06-08-14-23-58-422-00459118794",
+      "sha": "ef38f50e91d31a908d308f31f07bc2ad498eac30",
+      "candidate_only": 209,
+      "ref_only": 1
+    },
+    {
+      "ref": "origin/compathelper/new_version/2026-06-29-14-22-35-183-01709616764",
+      "sha": "c24dd76dcc91124162db1ef3b3f1de770b34e5be",
+      "candidate_only": 138,
+      "ref_only": 1
+    },
+    {
+      "ref": "origin/compathelper/new_version/2026-07-27-13-50-05-736-02546357241",
+      "sha": "6943bd732a55a18c69c0c063c07881f999618ccb",
+      "candidate_only": 138,
+      "ref_only": 1
+    },
+    {
+      "ref": "origin/compathelper/new_version/2026-08-31-13-06-27-435-01745137557",
+      "sha": "4b370657497a56ecb94b37ff7964b14ccbb60b1c",
+      "candidate_only": 138,
+      "ref_only": 1
+    },
+    {
+      "ref": "origin/dependabot/npm_and_yarn/docs/brace-expansion-5.0.9",
+      "sha": "8745bccc43713b3dfd39554e7c4b673448e24b0a",
+      "candidate_only": 138,
+      "ref_only": 1
+    },
+    {
+      "ref": "origin/dependabot/npm_and_yarn/docs/linkify-it-5.0.2",
+      "sha": "386f2b09540a4ea01621911870ee32fdb6bf1034",
+      "candidate_only": 138,
+      "ref_only": 1
+    },
+    {
+      "ref": "origin/dependabot/npm_and_yarn/docs/markdown-it-14.2.0",
+      "sha": "3dfb0e5170472ceacac45bd3833ab2188304559c",
+      "candidate_only": 138,
+      "ref_only": 1
+    },
+    {
+      "ref": "origin/dependabot/npm_and_yarn/docs/nanoid-3.3.18",
+      "sha": "083f14358acee815e88f5df34087463ff524ae17",
+      "candidate_only": 138,
+      "ref_only": 1
+    },
+    {
+      "ref": "origin/dependabot/npm_and_yarn/docs/postcss-8.5.25",
+      "sha": "9ccca96776e6c646e78cc9a3fca0f0148fb96e3d",
+      "candidate_only": 138,
+      "ref_only": 1
+    },
+    {
+      "ref": "origin/externalAbsorption",
+      "sha": "1c82f65571b22d41aa403081cd62ae3282b49612",
+      "candidate_only": 172,
+      "ref_only": 0
+    },
+    {
+      "ref": "origin/feat/mie-node-api",
+      "sha": "2cd693488a981eb53c0e4d74027a1167867e40df",
+      "candidate_only": 117,
+      "ref_only": 0
+    },
+    {
+      "ref": "origin/feat/surface-split",
+      "sha": "46b33640b13b60aa5355d0a2968d597cbce7e19d",
+      "candidate_only": 44,
+      "ref_only": 0
+    },
+    {
+      "ref": "origin/fix-docs-missing-docstrings",
+      "sha": "9598c6731b2809598e2bc11974e77332ff07e438",
+      "candidate_only": 209,
+      "ref_only": 1
+    },
+    {
+      "ref": "origin/gchp-io",
+      "sha": "c2c88a831c5799b8d9939309704afd94fc224210",
+      "candidate_only": 211,
+      "ref_only": 4
+    },
+    {
+      "ref": "origin/gh-pages",
+      "sha": "61fbb238853a3331951c8d6132aab6b2cc5a3ea4",
+      "candidate_only": 1256,
+      "ref_only": 75
+    },
+    {
+      "ref": "origin/integration/surface-split-multisensor",
+      "sha": "b524a0d85ae36ab0eecf8b23a939f4d6ce62c456",
+      "candidate_only": 43,
+      "ref_only": 0
+    },
+    {
+      "ref": "origin/joss",
+      "sha": "ae1758f15ef06d0c45d9c6fc2ff17a06788f8fb5",
+      "candidate_only": 669,
+      "ref_only": 46
+    },
+    {
+      "ref": "origin/main",
+      "sha": "8afe0aec7b8f006781aa219a299f30a77a1d128f",
+      "candidate_only": 138,
+      "ref_only": 0
+    },
+    {
+      "ref": "origin/perf/fused-adding-kernels",
+      "sha": "93de93e1aa4c5d92b84fdad4cf7dba300f8a269c",
+      "candidate_only": 91,
+      "ref_only": 0
+    },
+    {
+      "ref": "origin/raman-sanity-lut-bug",
+      "sha": "817d93cb212aacc245b9cd9639bb399e007c6503",
+      "candidate_only": 208,
+      "ref_only": 0
+    },
+    {
+      "ref": "origin/sanghavi",
+      "sha": "fc74e3f0685b6cdaac9db963278fa3ecfe10cb8d",
+      "candidate_only": 665,
+      "ref_only": 52
+    },
+    {
+      "ref": "origin/suniti_multi_sensor",
+      "sha": "630c9190e82632660636d87ce99afd8935084bd3",
+      "candidate_only": 126,
+      "ref_only": 13
+    },
+    {
+      "ref": "origin/trial/merge-suniti-multisensor",
+      "sha": "9f7f627fa30b84601b5c17efc4c4caa8fc126605",
+      "candidate_only": 67,
+      "ref_only": 0
+    }
+  ]
+}

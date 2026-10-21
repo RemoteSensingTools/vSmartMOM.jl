@@ -1,3 +1,9 @@
+> Historical development note. This file records prototype/design work and
+> is not the current API contract. The ingestion framework does not implement
+> scheme-to-optics conversion; placeholder optical calculations now raise errors.
+> See the [current aerosol documentation](../../../docs/src/pages/Aerosols/Overview.md) and the production
+> `Scattering` APIs for supported calculations.
+
 # Distributions.jl Integration Update
 
 **Date:** October 20, 2025  

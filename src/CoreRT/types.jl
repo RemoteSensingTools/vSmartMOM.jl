@@ -29,7 +29,7 @@ dry and wet vertical column densities, and volume mixing ratios for
 trace gases.  Constructed internally by [`model_from_parameters`](@ref)
 from the raw arrays in [`vSmartMOM_Parameters`](@ref).
 
-`p_full` has `N` levels; `p_half` has `N-1` layer-boundary pressures.
+`p_full` has `N` levels; `p_half` has `N+1` layer-boundary pressures.
 `T`, `q`, `vmr_h2o`, `vcd_dry`, `vcd_h2o`, and `Δz` are layer quantities
 of length `N`.
 
@@ -45,7 +45,7 @@ struct AtmosphericProfile{FT, VMR <: Union{Real, Vector}}
     q::Array{FT,1}
     "Pressure Levels"
     p_half::Array{FT,1}
-    "H2O Volume Mixing Ratio Profile"
+    "H2O/dry-air molar-ratio profile"
     vmr_h2o::Array{FT,1}
     "Vertical Column Density (Dry)"
     vcd_dry::Array{FT,1}
@@ -60,17 +60,142 @@ end
 "Types for describing atmospheric parameters"
 abstract type AbstractObsGeometry end
 
-"Observation Geometry (basics)" 
-Base.@kwdef struct ObsGeometry{FT} <: AbstractObsGeometry
+"Observation geometry, including the resolved vertical-output interfaces."
+Base.@kwdef mutable struct ObsGeometry{FT} <: AbstractObsGeometry
     "Solar Zenith Angle `[Degree]`"
     sza::FT
     "Viewing Zenith Angle(s) `[Degree]`" 
     vza::Array{FT,1}
     "Viewing Azimuth Angle(s) `[Degree]`" 
     vaz::Array{FT,1}
-    "Altitude of Observer `[Pa]`"
-    obs_alt::FT
+    "Requested observer altitude(s) `[km above BOA]`; scalar and vector forms have distinct semantics"
+    obs_alt::Union{FT, Vector{FT}}
+    "Strictly interior atmospheric interface indices (number of layers above each sensor)"
+    sensor_levels::Vector{Int} = Int[]
+    "Geometric altitudes corresponding to `sensor_levels` `[km above BOA]`"
+    sensor_altitudes::Vector{FT} = FT[]
+    "Whether the requested output includes TOA upwelling radiance"
+    include_toa::Bool = false
+    "Whether the requested output includes BOA downwelling radiance"
+    include_boa::Bool = false
+    "Resolved top-of-atmosphere altitude `[km above BOA]`"
+    toa_altitude::FT = zero(FT)
 end
+
+# Preserve the long-standing four-argument construction seam used by tests and
+# downstream callers.  Model construction replaces this unresolved geometry
+# with one carrying the sensor-interface metadata after the profile is framed.
+function ObsGeometry{FT}(sza, vza, vaz, obs_alt) where {FT}
+    alt = obs_alt isa Real ? FT(obs_alt) : convert(Vector{FT}, collect(obs_alt))
+    has_zero = alt isa AbstractVector ? any(iszero, alt) : iszero(alt)
+    include_boa = alt isa AbstractVector ? has_zero : iszero(alt)
+    include_toa = alt isa AbstractVector && has_zero
+    return ObsGeometry{FT}(FT(sza), convert(Vector{FT}, vza),
+                           convert(Vector{FT}, vaz), alt,
+                           Int[], FT[], include_toa, include_boa, zero(FT))
+end
+
+function ObsGeometry(sza::FT, vza, vaz, obs_alt) where {FT<:Real}
+    return ObsGeometry{FT}(sza, vza, vaz, obs_alt)
+end
+
+"""
+    LevelRadiance
+
+Radiances at one strict-interior atmospheric interface. `upwelling` and
+`downwelling` are the diffuse elastic fields solved by MOM.
+`unscattered_downwelling` is the separately reported attenuated collimated
+solar beam at the solar ordinate (zero for other viewing zenith angles).
+Use [`total_downwelling`](@ref) to add the diffuse and unscattered components.
+
+Over a `CoxMunkSurface`, `upwelling` carries the direct-solar glint as
+resolved by the Fourier series: the exact-glint correction
+(`apply_ss_correction!`) is applied to the TOA radiance only.
+"""
+struct LevelRadiance{FT,U,D,IU,ID}
+    "Geometric height in km above model BOA"
+    height_km::FT
+    "Interface index: number of atmospheric layers above this level"
+    boundary_index::Int
+    upwelling::U
+    downwelling::D
+    unscattered_downwelling::D
+    inelastic_upwelling::IU
+    inelastic_downwelling::ID
+end
+
+"Allocate a zero direct-beam component matching an existing downwelling field."
+_zero_unscattered_downwelling(::Nothing) = nothing
+function _zero_unscattered_downwelling(downwelling)
+    direct = similar(downwelling)
+    fill!(direct, zero(eltype(direct)))
+    return direct
+end
+
+# Preserve the original six-argument construction seam for downstream callers.
+function LevelRadiance(height_km, boundary_index, upwelling, downwelling,
+                       inelastic_upwelling, inelastic_downwelling)
+    return LevelRadiance(height_km, boundary_index, upwelling, downwelling,
+                         _zero_unscattered_downwelling(downwelling),
+                         inelastic_upwelling, inelastic_downwelling)
+end
+
+function LevelRadiance{FT,U,D,IU,ID}(height_km::FT, boundary_index::Int,
+                                     upwelling::U, downwelling::D,
+                                     inelastic_upwelling::IU,
+                                     inelastic_downwelling::ID) where {FT,U,D,IU,ID}
+    return LevelRadiance{FT,U,D,IU,ID}(
+        height_km, boundary_index, upwelling, downwelling,
+        _zero_unscattered_downwelling(downwelling),
+        inelastic_upwelling, inelastic_downwelling)
+end
+
+"""
+    total_downwelling(level::LevelRadiance)
+
+Return the total elastic downwelling radiance at an interior level: the MOM
+diffuse field plus the separately reported unscattered solar beam.
+"""
+function total_downwelling(level::LevelRadiance)
+    level.unscattered_downwelling === nothing && return level.downwelling
+    return level.downwelling .+ level.unscattered_downwelling
+end
+
+"""
+    ObserverRTResult
+
+Height-aware forward-RT result. `toa` is upwelling at TOA, `boa` is
+downwelling at BOA, and `levels` contains co-located diffuse up/down radiances
+plus a separate unscattered solar component at requested interior heights.
+Unrequested endpoints are `nothing`.
+
+The result remains iterable/indexable over the historical seven forward
+slots `(toa, boa, inelastic_toa, inelastic_boa, hdr, bhr_uw, bhr_dw)` so
+the default `obs_alt: [0]` preserves historical destructuring and indexing.
+"""
+struct ObserverRTResult{FT,TOA,BOA,IET,IEB,L,H,U,D}
+    toa::TOA
+    boa::BOA
+    inelastic_toa::IET
+    inelastic_boa::IEB
+    levels::Vector{L}
+    toa_altitude_km::FT
+    hdr::H
+    bhr_uw::U
+    bhr_dw::D
+end
+
+@inline _observer_legacy_tuple(r::ObserverRTResult) =
+    (r.toa, r.boa, r.inelastic_toa, r.inelastic_boa, r.hdr, r.bhr_uw, r.bhr_dw)
+Base.length(::ObserverRTResult) = 7
+Base.firstindex(::ObserverRTResult) = 1
+Base.lastindex(::ObserverRTResult) = 7
+Base.getindex(r::ObserverRTResult, indices...) = getindex(_observer_legacy_tuple(r), indices...)
+Base.iterate(r::ObserverRTResult, state...) = iterate(_observer_legacy_tuple(r), state...)
+Base.Tuple(r::ObserverRTResult) = _observer_legacy_tuple(r)
+# `keys` completes the indexable-collection protocol (`eachindex`, generic
+# element-wise comparison loops over the legacy tuple positions).
+Base.keys(r::ObserverRTResult) = keys(_observer_legacy_tuple(r))
 
 """
     RT_Aerosol{FT}
@@ -130,6 +255,29 @@ struct SFI <:AbstractSourceType end
 
 "Abstract Type for Layer R,T and J matrices"
 abstract type AbstractLayer end
+
+"""
+    SolarColumnOperators{FT}
+
+Rectangular layer operators coupling the fixed solar direction to every
+diffuse output stream.  Their array layout is
+`(NquadN, nStokes, nSpec)`: the second axis is the incident solar Stokes
+component, not an angular quadrature axis.
+"""
+Base.@kwdef struct SolarColumnOperators{FT}
+    R₀⁻⁺::AbstractArray{FT,3}
+    R₀⁺⁻::AbstractArray{FT,3}
+    T₀⁺⁺::AbstractArray{FT,3}
+    T₀⁻⁻::AbstractArray{FT,3}
+end
+
+"""Raman solar-column operators with layout `(NquadN,nStokes,nSpec,nRaman)`."""
+Base.@kwdef struct RamanSolarColumnOperators{FT}
+    ieR₀⁻⁺::AbstractArray{FT,4}
+    ieR₀⁺⁻::AbstractArray{FT,4}
+    ieT₀⁺⁺::AbstractArray{FT,4}
+    ieT₀⁻⁻::AbstractArray{FT,4}
+end
 
 """
     CompositeLayer{FT} <: AbstractLayer
@@ -218,6 +366,10 @@ Base.@kwdef struct AddedLayer{FT} <: AbstractLayer
     dbl_j₁⁺::Union{AbstractArray{FT,3}, Nothing} = nothing
     "Doubling workspace: source temp -"
     dbl_j₁⁻::Union{AbstractArray{FT,3}, Nothing} = nothing
+    "In-place ⊠ workspace: J-shaped scratch 1 (doubling + interaction; Phase-0 preallocation)"
+    dbl_v1::Union{AbstractArray{FT,3}, Nothing} = nothing
+    "In-place ⊠ workspace: J-shaped scratch 2 (doubling + interaction; Phase-0 preallocation)"
+    dbl_v2::Union{AbstractArray{FT,3}, Nothing} = nothing
     # v0.7 Phase A.2a — per-source j₀ slots. Each non-solar source contributes
     # its own [`SourceSlot`](@ref) (j₀⁺/j₀⁻ + per-source `expk` for doubling +
     # j₁ workspace). The doubling/interaction routines iterate this NT to
@@ -225,6 +377,8 @@ Base.@kwdef struct AddedLayer{FT} <: AbstractLayer
     # Empty NT in solar-only runs → bit-equal to pre-A.2a behaviour.
     "Per-source j₀ slots (v0.7 Phase A.2a, NamedTuple{(:thermal, …)} of SourceSlot)"
     j₀_by_src::NamedTuple = (;)
+    "Optional rectangular direct-solar elemental operators"
+    solar_columns::Union{SolarColumnOperators{FT},Nothing} = nothing
 end
 
 """
@@ -330,6 +484,10 @@ struct AddedLayerRS{FT} <: AbstractLayer
     ieJ₀⁺::AbstractArray{FT,4}
     "Added layer source matrix ieJ (in - direction)"
     ieJ₀⁻::AbstractArray{FT,4}
+    "Optional elastic direct-solar columns"
+    solar_columns::Union{SolarColumnOperators{FT},Nothing}
+    "Optional direct-solar Raman columns; diffuse redistribution remains square"
+    raman_solar_columns::Union{RamanSolarColumnOperators{FT},Nothing}
 end
 # Multisensor Composite layers 
 # Elastic
@@ -429,10 +587,164 @@ struct ScatteringInterface_01 <: AbstractScatteringInterface end
 struct ScatteringInterface_10 <: AbstractScatteringInterface end
 "Scattering in inhomogeneous composite layer; Scattering in homogeneous layer, added to bottom of the composite layer." 
 struct ScatteringInterface_11 <: AbstractScatteringInterface end
-"Scattering Interface between Surface and Composite Layer" 
+"Scattering Interface between Surface and Composite Layer"
 struct ScatteringInterface_AtmoSurf <: AbstractScatteringInterface end
 
-"Abstract Type for Surface Types" 
+"""
+    AtmosphereRTCache{FT, AT3, AT1, AT2, AT, PT, QT, ARCH, RS, PS, IS, SCI}
+
+Per-Fourier-moment snapshot of the atmosphere-only composite layer, plus the
+context needed to drive the surface phase of [`rt_run`](@ref). Built by
+[`rt_run_atmosphere`](@ref) and consumed by [`rt_run_surface`](@ref); the two
+together replace one full `rt_run` call when iterating BRDFs over the same
+atmosphere — the m-loop layer accumulation (elemental → doubling →
+interaction over `Nz` layers) runs once per scene, not once per surface.
+
+# Memory footprint
+`:full` mode (`cache_mode`): device-resident `(m_max+1)` copies of six
+`(NquadN, NquadN, nSpec)`-ish blocks (`R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻` are `(NquadN,
+NquadN, nSpec)`; `J₀⁺, J₀⁻` are `(NquadN, 1, nSpec)`, budgeted the same
+order for a rough estimate):
+
+`bytes ≈ (m_max+1) · sizeof(FT) · nSpec · NquadN · (4·NquadN + 2)`
+
+E.g. Float64, `NquadN=60`, `nSpec=10⁴`, `m_max=20`: ≈ 24 GB — fine for small
+`nSpec` / scalar sweeps, prohibitive for full spectral bands on GPU.
+
+`:slim` mode (proposal §4, Lambertian-family targets only): the four big
+`(NquadN, NquadN, nSpec)` blocks are retained only at `m=0` (needed by
+[`lambertian_closure`](@ref) and the `a=0` replay); at `m>0` a Lambertian
+surface layer is exactly zero (`_zero_surface_layer!`), so the final
+interaction is the identity on `J₀⁺/J₀⁻` and only those two `(NquadN, 1,
+nSpec)` blocks (+ per-source slots) are kept. Footprint drops to
+`4·NquadN²·nSpec + m_max·NquadN·nSpec` (Float64/NquadN=60/nSpec=10⁴/m_max=20:
+24 GB → ≈1.2 GB). `rt_run_atmosphere(...; cache_mode = :auto)` (the default)
+picks `:slim` iff every target BRDF has `component_m_max(b, ctx) == 0`
+(the Lambertian family), else `:full`. `rt_run_surface` throws
+`ArgumentError` if asked to replay a non-Lambertian-family BRDF against a
+`:slim` cache — rebuild with `cache_mode = :full`.
+
+# Type parameters
+- `FT` — working float type (Float64 / Float32).
+- `AT3` — concrete 3-D array type for R/T/J snapshots (`Array{FT,3}` on
+  CPU, `CuArray{FT,3}` on GPU).
+- `AT1` — concrete 1-D array type for `τ_sum_surf` (device-resident, same
+  as the `τ_sum_end_dev` array the monolithic surface step consumes, so
+  the replay preserves rt_run's host/device contract).
+- `AT2` — concrete 2-D array type for `surface_F₀` (`(pol_n, nSpec)`).
+- `AT` — the array-type constructor (`Array` / `CuArray`); applied as
+  `arr_type(x)` when replaying against a different architecture than the
+  one the cache was built on (not currently exercised — CPU→CPU / GPU→GPU
+  only).
+- `PT` — polarization type (e.g. `Stokes_IQU{FT}`).
+- `QT` — `QuadPoints{FT}` instance type.
+- `ARCH` — architecture (`CPU` / `GPU`).
+- `RS` — Raman type; always `noRS{FT}` for this cache (the only supported
+  type — see the module-level scope note in `rt_run_split.jl`).
+- `PS` — `prepared_sources` concrete type.
+- `IS` — `I_static` concrete type (`Diagonal{FT, AT1}`).
+- `SCI <: AbstractScatteringInterface` — concrete scattering-interface type
+  used at the surface step (uniform across `m` for a given scene).
+
+Every field is concrete so the hot replay loop in `rt_run_surface` stays
+type-stable end-to-end.
+"""
+struct AtmosphereRTCache{FT, AT3, AT1, AT2, AT, PT, QT, ARCH, RS, PS, IS,
+                         SCI <: AbstractScatteringInterface}
+    "Polarization type (Stokes_I / IQU / IQUV)"
+    pol_type::PT
+    "Quadrature points and weights"
+    quad_points::QT
+    "Index of the solar-zenith stream in the quadrature grid"
+    iμ₀::Int
+    "cos(SZA)"
+    μ₀::FT
+    "Viewing zenith angles [deg]"
+    vza::Vector{FT}
+    "Viewing azimuth angles [deg]"
+    vaz::Vector{FT}
+    "Number of spectral points"
+    nSpec::Int
+    "Cache Fourier loop bound (order): the replay in `rt_run_surface` runs
+    `m = 0:m_max`. May exceed the source model's own `m_max_bands[iBand]`
+    when `target_brdfs` (passed to `rt_run_atmosphere`) need a wider bound
+    (e.g. Cox-Munk/RPV/RossLi over an otherwise Lambertian-only model)."
+    m_max::Int
+    "The *model's* own Fourier-support cap (`model.solver.l_trunc` at
+    `rt_run_atmosphere` time — a proxy for the true per-band
+    `user_l_cap`, exact when no aerosols are present). Distinct from
+    `m_max`: used by `rt_run_surface`'s cache-width guard to determine the
+    Fourier order a candidate BRDF actually *needs*, independent of how
+    wide this particular cache happens to be. Using `m_max` there instead
+    would make the guard trivially pass for any surface whose
+    `component_m_max` trait is `ctx.user_l_cap` (Cox-Munk/RPV/RossLi/Canopy)."
+    user_l_cap::Int
+    "`Nquad · pol_type.n`"
+    NquadN::Int
+    "`:full` (all six blocks at every m) or `:slim` (six blocks at m=0 only;
+    `J₀⁺`/`J₀⁻`/per-source slots only at m>0 — valid only when every
+    replayed BRDF is Lambertian-family, see the memory-footprint note
+    above and `docs/dev_notes/proposals/surface_split_albedo_sweep.md` §4)."
+    cache_mode::Symbol
+    "Spectral band index this cache was built for (single-element; see the
+    module-level scope note in `rt_run_split.jl`)"
+    iBand::Vector{Int}
+    "Fourier azimuthal weight per moment (`0.5/π` at m=0, `1/π` otherwise)"
+    weight_per_m::Vector{FT}
+    "Array-type constructor (`Array`/`CuArray`) for the cache's architecture"
+    arr_type::Type{AT}
+    "Compute architecture (CPU/GPU) the cache was built on"
+    arch::ARCH
+    "Source-Function-Integration flag (always `true` — `rt_run` hardcodes it)"
+    SFI::Bool
+    "Raman type — always `noRS{FT}` for this cache"
+    RS_type::RS
+    "Prepared source set (solar beam + any additional sources)"
+    prepared_sources::PS
+    "Static identity matrix used by the interaction step"
+    I_static::IS
+    "Composite-layer `R⁻⁺` snapshot, one per Fourier moment"
+    R⁻⁺_per_m::Vector{AT3}
+    "Composite-layer `R⁺⁻` snapshot, one per Fourier moment"
+    R⁺⁻_per_m::Vector{AT3}
+    "Composite-layer `T⁺⁺` snapshot, one per Fourier moment"
+    T⁺⁺_per_m::Vector{AT3}
+    "Composite-layer `T⁻⁻` snapshot, one per Fourier moment"
+    T⁻⁻_per_m::Vector{AT3}
+    "Composite-layer `J₀⁺` snapshot, one per Fourier moment"
+    J₀⁺_per_m::Vector{AT3}
+    "Composite-layer `J₀⁻` snapshot, one per Fourier moment"
+    J₀⁻_per_m::Vector{AT3}
+    # Per-source J₀ slots stay loosely typed: the NamedTuple key set + slot
+    # type vary across configurations (solar-only, +thermal, +SIF), and the
+    # surface phase walks the NT once per m so the lookup cost is negligible.
+    "Per-source composite `J₀` slots, one NamedTuple per Fourier moment"
+    J₀_by_src_per_m::Vector{NamedTuple}
+    "Scattering-interface trait at the surface step, one per Fourier moment"
+    sci_surf_per_m::Vector{SCI}
+    "Cumulative optical depth to the surface (TOA→BOA), device-resident"
+    τ_sum_surf::AT1
+    "Device-resident surface-incident solar F₀ (`(pol_n, nSpec)`), consumed
+    by `create_surface_layer!`'s `F₀=` kwarg during replay"
+    surface_F₀::AT2
+    "TMS exact single-scattering term `(nvza, nStokes, nSpec)` — computed
+    once at cache-build time (it is SURFACE-INDEPENDENT: pure atmospheric
+    first order) and added to every replayed radiance and to the Lambertian
+    closure's `R_black`. `nothing` when the cache was built with
+    `NoSSCorrection` (then the truncated SS is still in the snapshots and
+    nothing extra is added — historical behavior)."
+    tms_ss::Union{Nothing, Array{FT, 3}}
+    "Wavenumbers (cm⁻¹) of the cached spectral points; resolves spectral
+    surface properties of a replayed BRDF (e.g. the Cox–Munk water index)"
+    spec_wn::Vector{FT}
+end
+
+Base.show(io::IO, c::AtmosphereRTCache{FT}) where {FT} = print(io,
+    "AtmosphereRTCache{", FT, "}(m_max=", c.m_max,
+    ", nSpec=", c.nSpec, ", NquadN=", c.NquadN,
+    ", cache_mode=", c.cache_mode, ")")
+
+"Abstract Type for Surface Types"
 abstract type AbstractSurfaceType end
 
 """
@@ -497,6 +809,14 @@ RossThick (volumetric canopy scattering), and LiSparse (geometric
 mutual shadowing).  Standard MODIS/RAMI parameterization.  Scalar only
 (Stokes-I); no built-in linearization.
 
+By default the incident and reflected zenith angles are capped at 80°
+before the kernels are evaluated (`zenith_cap_deg = 80`), a vSmartMOM
+regularization of grazing quadrature nodes, where the LiSparse kernel
+becomes large and negative. `zenith_cap_deg = nothing` evaluates the kernels
+at the true angles, as MODIS (MCD43) and VLIDORT do.
+
+    RossLiSurfaceScalar(fvol, fgeo, fiso; zenith_cap_deg = 80)
+
 # Fields
 $(DocStringExtensions.FIELDS)
 """
@@ -507,6 +827,22 @@ struct RossLiSurfaceScalar{FT} <: AbstractSurfaceType
     fgeo::FT
     "Isotropic reflectance fraction"
     fiso::FT
+    "Kernel zenith-angle cap [deg]; `nothing` = no cap (MODIS/VLIDORT definition)"
+    zenith_cap_deg::Union{Nothing, FT}
+end
+
+RossLiSurfaceScalar(fvol::FT, fgeo::FT, fiso::FT;
+                    zenith_cap_deg = 80) where {FT} =
+    RossLiSurfaceScalar{FT}(fvol, fgeo, fiso; zenith_cap_deg)
+
+RossLiSurfaceScalar{FT}(fvol, fgeo, fiso; zenith_cap_deg = 80) where {FT} =
+    RossLiSurfaceScalar{FT}(fvol, fgeo, fiso, _rossli_zenith_cap(FT, zenith_cap_deg))
+
+_rossli_zenith_cap(::Type{FT}, ::Nothing) where {FT} = nothing
+function _rossli_zenith_cap(::Type{FT}, cap::Real) where {FT}
+    !(cap isa Bool) && 0 < cap <= 90 || throw(ArgumentError(
+        "RossLiSurfaceScalar: zenith_cap_deg must lie in (0°, 90°] or be nothing; got $cap"))
+    return FT(cap)
 end
 
 """
@@ -515,7 +851,16 @@ end
 Cox-Munk (1954) ocean surface: Fresnel reflection from wind-roughened wave facets.
 Supports full polarization (Mueller matrix) and optional Lambertian whitecap contribution.
 
-Isotropic slope distribution: σ² = 0.003 + 0.00512·U.
+Isotropic Gaussian slope distribution with total mean-square slope
+⟨zx² + zy²⟩ = 0.003 + 0.00512·U (Cox & Munk 1954), i.e. per-axis variance
+σ² = ½(0.003 + 0.00512·U); see `CoreRT.wind_to_sigma2`.
+
+With `n_water = nothing` the solvers use the Segelstein (1981) index
+([`water_refractive_index`](@ref)) at the wavelength of every spectral
+point; a vector `n_water` is used element-wise and must have one entry per
+spectral point of the band. The exact direct-solar glint correction
+(`apply_ss_correction!`) is applied at TOA only; interior observer levels
+carry the Fourier-series glint.
 
 # Fields
 $(DocStringExtensions.FIELDS)
@@ -523,7 +868,7 @@ $(DocStringExtensions.FIELDS)
 Base.@kwdef struct CoxMunkSurface{FT} <: AbstractSurfaceType
     "10-m wind speed [m/s]"
     wind_speed::FT
-    "Complex refractive index of water; nothing → built-in Segelstein 1981 lookup"
+    "Complex refractive index n + ik of water: `nothing` → Segelstein (1981) at each spectral point's wavelength; a scalar for the whole band; or a vector with one entry per spectral point"
     n_water::Union{Nothing, Complex{FT}, Vector{Complex{FT}}} = nothing
     "Whitecap Lambertian albedo (Koepke 1984)"
     whitecap_albedo::FT = 0.22
@@ -552,6 +897,12 @@ Composite lower boundary: a vegetation canopy (one or more scattering layers)
 backed by a soil BRDF. When used as the surface in `rt_run`, the canopy
 sub-layers are processed internally via the adding-doubling method before
 interacting with the soil, producing an effective canopy+soil reflectance.
+
+The direct beam enters the effective layer only through its reflected source
+(`j₀⁺ = 0`), so `rt_run`'s BHR-down output `bhr_dw` is the diffuse
+downwelling flux for a canopy (no direct solar term), and the forward BOA
+radiance carries no collimated beam at a view on the solar ordinate. TOA
+radiances include the reflected direct beam.
 
 Requires `CanopyOptics.jl` for leaf-angle distribution and scattering models.
 """
@@ -652,7 +1003,10 @@ The species list per band is the union of `fixed_molecules` (no Jacobian) and
 `variable_molecules` (Jacobian computed). H₂O is handled separately: when
 `atmospheric_profile.q` is provided, line absorption is computed from
 `profile.vmr_h2o` using `h2o_lut` (if present) or HITRAN-on-the-fly otherwise,
-and is automatically treated as variable in the linearised path.
+and is automatically treated as variable in the linearised path. Native gas
+tangents hold cross sections, CIA and MT_CKD fixed (the q-driven H₂O tangent
+includes ABSCO H₂O-broadener axes); see
+[`AbundanceTangentContract`](@ref) for the requests this rejects.
 """
 mutable struct AbsorptionParameters{FM,VM,V,BF,CE,LT,HL}
     "Fixed-abundance molecules per band (no Jacobian computed). Must NOT include H2O."
@@ -669,12 +1023,32 @@ mutable struct AbsorptionParameters{FM,VM,V,BF,CE,LT,HL}
     wing_cutoff::Real
     "Lookup table per (band, position-in-fixed_molecules ∪ variable_molecules)"
     luts::LT
-    "Optional H₂O LUT (one per band). `nothing` means HITRAN-on-the-fly fallback."
+    "H₂O setting per band: LUT object, `nothing` for HITRAN fallback, or `:disabled`."
     h2o_lut::HL
     "Optional list of HITRAN CIA file paths (one per collision pair)"
     cia_files::Vector{String}
+    "Per-CIA-file HITRAN reference-code selection; `nothing` requires unambiguous coverage"
+    cia_reference_codes::Vector{Union{Nothing,Vector{String}}}
+    "Per-CIA-file handling of negative tabulated cross sections (`:error` or `:clamp_zero`)"
+    cia_negative_policies::Vector{Symbol}
     "Optional path to AER MT_CKD water-vapor continuum NetCDF (e.g. absco-ref_wv-mt-ckd.nc)"
     mtckd_file::String
+end
+
+# Preserve the pre-reference-selection positional constructor used by external
+# callers. Bare file paths remain valid, but `load_cia_table` now rejects them
+# if multiple HITRAN reference families overlap on the requested model grid.
+function AbsorptionParameters(fixed_molecules, variable_molecules, vmr,
+                              broadening_function, CEF, wing_cutoff, luts,
+                              h2o_lut, cia_files::Vector{String},
+                              mtckd_file::String)
+    reference_codes = Union{Nothing,Vector{String}}[
+        nothing for _ in cia_files]
+    negative_policies = fill(:error, length(cia_files))
+    return AbsorptionParameters(
+        fixed_molecules, variable_molecules, vmr, broadening_function, CEF,
+        wing_cutoff, luts, h2o_lut, cia_files, reference_codes,
+        negative_policies, mtckd_file)
 end
 
 """
@@ -695,7 +1069,156 @@ mutable struct ScatteringParameters{FT<:Real}
     n_ref::Complex{FT}
     "Algorithm to use for fourier decomposition (NAI2/PCW)"
     decomp_type::AbstractFourierDecompositionType
+    "Minimum aerosol particle radius for quadrature points/weights (µm); fixed, independent of the size distributions"
+    r_min::FT
 end
+
+# Six-argument form (before `r_min` existed): the radius quadrature starts at
+# `Scattering.DEFAULT_R_MIN`.
+ScatteringParameters(rt_aerosols::Vector{RT_Aerosol{FT}}, r_max::FT, nquad_radius::Integer,
+                     λ_ref::FT, n_ref::Complex{FT},
+                     decomp_type::AbstractFourierDecompositionType) where {FT} =
+    ScatteringParameters(rt_aerosols, r_max, nquad_radius, λ_ref, n_ref, decomp_type,
+                         FT(Scattering.DEFAULT_R_MIN))
+
+"""
+    AbstractFourierConvergence
+
+Termination strategy for the azimuthal Fourier loop. The static component
+traits first determine the highest order the scene can contribute; a runtime
+strategy may then stop below that ceiling after the accumulated directional
+radiances have converged. [`AllFourierMoments`](@ref) retains the complete
+trait-selected series, [`IntensityConvergence`](@ref) monitors Stokes I, and
+[`StokesConvergence`](@ref) monitors every propagated Stokes component.
+"""
+abstract type AbstractFourierConvergence end
+
+"""
+    AllFourierMoments()
+
+Evaluate every Fourier moment through the scene's resolved `m_max`. This is
+the package default and is bit-identical to the historical full loop.
+"""
+struct AllFourierMoments <: AbstractFourierConvergence end
+
+@doc raw"""
+    IntensityConvergence(tolerance; min_m=3, n_consecutive=2)
+
+Terminate after `n_consecutive` eligible Fourier moments satisfy
+
+```math
+|\Delta I_m| \leq \epsilon |I_{0:m}|
+```
+
+at every monitored view and wavelength. A failing moment resets the counter.
+The test is disabled through `min(min_m-1, m_max)`: the default `min_m=3`
+prevents a structural zero at `m=1` from hiding a nonzero `m=2` contribution,
+without manufacturing moments beyond a physically shorter precomputed series.
+The combined analytic-linearization path follows the same forward stopping
+moment and propagates all Jacobian contributions through it.
+"""
+struct IntensityConvergence{FT<:AbstractFloat} <: AbstractFourierConvergence
+    tolerance::FT
+    min_m::Int
+    n_consecutive::Int
+    function IntensityConvergence(tolerance::AbstractFloat;
+                                  min_m::Int=3,
+                                  n_consecutive::Int=2)
+        isfinite(tolerance) && tolerance > 0 || throw(ArgumentError(
+            "IntensityConvergence tolerance must be finite and positive"))
+        min_m >= 3 || throw(ArgumentError(
+            "IntensityConvergence min_m must be at least 3 so a structural " *
+            "m=1 zero cannot suppress a nonzero m=2 term"))
+        n_consecutive >= 1 || throw(ArgumentError(
+            "IntensityConvergence requires at least one passing moment"))
+        return new{typeof(tolerance)}(tolerance, min_m, n_consecutive)
+    end
+end
+
+@doc raw"""
+    StokesConvergence(tolerance; min_m=3, n_consecutive=2)
+
+Terminate after `n_consecutive` eligible Fourier moments satisfy
+
+```math
+|\Delta S_{k,m}| \leq \epsilon |S_{k,0:m}|
+```
+
+independently for every propagated Stokes component at every monitored view
+and wavelength. Thus an I/Q/U solve must converge in I, Q, and U. The same
+low-order guard and forward/linearized stopping contract as
+[`IntensityConvergence`](@ref) apply.
+"""
+struct StokesConvergence{FT<:AbstractFloat} <: AbstractFourierConvergence
+    tolerance::FT
+    min_m::Int
+    n_consecutive::Int
+    function StokesConvergence(tolerance::AbstractFloat;
+                               min_m::Int=3,
+                               n_consecutive::Int=2)
+        isfinite(tolerance) && tolerance > 0 || throw(ArgumentError(
+            "StokesConvergence tolerance must be finite and positive"))
+        min_m >= 3 || throw(ArgumentError(
+            "StokesConvergence min_m must be at least 3 so structural " *
+            "low-order zeros cannot suppress a nonzero m=2 term"))
+        n_consecutive >= 1 || throw(ArgumentError(
+            "StokesConvergence requires at least one passing moment"))
+        return new{typeof(tolerance)}(tolerance, min_m, n_consecutive)
+    end
+end
+
+"""
+    AbstractSingleScatteringCorrection
+
+Strategy for correcting the single-scattering (first-order) part of the
+radiance for phase-function truncation. δ-M/δ-BGE truncation removes the
+aerosol forward peak from the Fourier-expanded optics — harmless for the
+multiple-scattered field but visibly wrong for the first-order term at the
+view geometries (aureole, rainbow/glory structure). Concrete strategies:
+
+- [`NoSSCorrection`](@ref) — historical behavior, bit-identical to the
+  uncorrected solver (default).
+- [`TMSCorrection`](@ref) — Nakajima & Tanaka (1988) TMS: the truncated
+  direct-beam source is zeroed at the zero-weight view nodes in every
+  Fourier mode, and the exact (untruncated) single scattering is added in
+  real space after the Fourier sum, using the solver's own δ-scaled
+  transmittances.
+
+Selected via `RTNumericalParameters.ss_correction` (YAML:
+`numerics.ss_correction: none | tms`). The hierarchy is open for future
+variants (e.g. an IMS-augmented correction, canopy hot-spot or sun-glint
+corrections) — add a subtype, never a boolean flag.
+
+Forward/linearized parity policy: a strategy must either be implemented in
+BOTH the forward and linearized drivers or be explicitly rejected by the
+one that lacks it — silent divergence between the two is a bug by
+definition (see docs/dev_notes/forward_lin_parity_policy.md).
+"""
+abstract type AbstractSingleScatteringCorrection end
+
+"""
+    NoSSCorrection()
+
+No single-scattering correction — the truncated Fourier solution is
+returned as-is. Bit-identical to the historical solver. Default.
+"""
+struct NoSSCorrection <: AbstractSingleScatteringCorrection end
+
+"""
+    TMSCorrection()
+
+Nakajima–Tanaka TMS single-scattering correction ("never generate, then
+add"): zero the truncated beam source at zero-weight view nodes in every
+Fourier mode; add the exact single scattering post-Fourier-sum from the
+untruncated phase functions, with the N–T scaling `ω/(1−ωf)` paired with
+δ-scaled optical depths (implemented as `β_scat/Δτ′`, which is
+algebraically identical and reuses the solver's own scaled `τ_sum`).
+Requires an unpolarized solar source; currently forward-elastic (`noRS`)
+only — the linearized driver and Raman paths reject it explicitly, as do
+interior sensor heights and per-moment stream exports (`rt_run_streams`).
+Combined-band solves evaluate the correction per band.
+"""
+struct TMSCorrection <: AbstractSingleScatteringCorrection end
 
 """
     RTNumericalParameters{FT}
@@ -727,8 +1250,7 @@ Base.@kwdef struct RTNumericalParameters{FT<:AbstractFloat}
     dτ_min_floor::FT = FT(1024) * eps(FT)
 
     "BLAS thread cap applied at every `rt_run` invocation. `nothing`
-    means leave the BLAS thread setting alone (use whatever
-    `LinearAlgebra.BLAS.get_num_threads()` returned at session start).
+    means leave the current BLAS thread setting alone.
     Why cap: the batched-GEMM call sites in `cpu_batched.jl` and the
     elemental/doubling/interaction kernels operate on small matrices
     (NSTREAMS·n_stokes ≈ 12-48 per side) tiled across a wide spectral
@@ -737,8 +1259,11 @@ Base.@kwdef struct RTNumericalParameters{FT<:AbstractFloat}
     The VLIDORT baseline harness empirically picked 8 as the sweet spot
     on a 128-thread machine; `1` is the most defensive choice when a
     single process owns all spectral points and threading happens at
-    the batched outer level. Set via the `numerics.blas_threads` YAML
-    key, or programmatically with
+    the batched outer level. This is a process-wide, persistent setting,
+    despite being selected from a model: it is not restored after the run and
+    models with different values must not execute concurrently in one process.
+    Set it once for an application via the `numerics.blas_threads` YAML key,
+    or programmatically with
     `RTNumericalParameters{FT}(blas_threads = 8)`."
     blas_threads::Union{Nothing, Int} = nothing
 
@@ -751,6 +1276,19 @@ Base.@kwdef struct RTNumericalParameters{FT<:AbstractFloat}
     messages were demoted to `@debug` and are silent unless you set
     `ENV[\"JULIA_DEBUG\"] = \"vSmartMOM\"`."
     verbose::Bool = false
+
+    "Azimuthal Fourier-loop termination strategy. The package-wide default
+    runs all moments. Retrieval/truth workflows may explicitly select
+    `IntensityConvergence` or `StokesConvergence` after validating the omitted
+    tail for their viewing geometry."
+    fourier_convergence::AbstractFourierConvergence = AllFourierMoments()
+
+    "Single-scattering (first-order) truncation correction — see
+    [`AbstractSingleScatteringCorrection`](@ref). Default
+    [`NoSSCorrection`](@ref) (bit-identical historical behavior). Set
+    [`TMSCorrection`](@ref) for the Nakajima–Tanaka correction; YAML key
+    `numerics.ss_correction: tms`."
+    ss_correction::AbstractSingleScatteringCorrection = NoSSCorrection()
 end
 
 """
@@ -805,8 +1343,8 @@ mutable struct vSmartMOM_Parameters{FT<:Real}
     vza::AbstractArray{FT}
     "Viewing azimuthal angles [deg]"
     vaz::AbstractArray{FT}
-    "Altitude of observer [Pa]"
-    obs_alt::FT
+    "Observer altitude(s) [km above BOA]; scalar and vector forms have distinct output semantics"
+    obs_alt::Union{FT, Vector{FT}}
 
     # atmospheric_profile group
     "Temperature Profile [K]"
@@ -855,14 +1393,48 @@ mutable struct vSmartMOM_Parameters{FT<:Real}
     `stream_l_cap` from `nstreams` instead."
     legacy_l_cap_override::Union{Int, Nothing}
 
+    "Optional post-Mie Fourier-support cutoff based specifically on the
+    magnitude of the integrated aerosol Greek coefficient `β_l`. The largest
+    degree satisfying `abs(β_l) >= greek_beta_cutoff` is retained for each
+    aerosol; the per-band maximum enters the component trait aggregator.
+    This changes Fourier-loop support after Mie integration but does not resize
+    the previously selected quadrature. `nothing` disables the cutoff."
+    greek_beta_cutoff::Union{FT, Nothing}
+
+    "Wavelength dependence of the N₂/O₂ polarizability tensor used for the
+    automatic (`depol < 0`) Rayleigh depolarization of `greek_rayleigh` and
+    `τ_rayl`: `DispersiveAnisotropy()` (default) or `ConstantAnisotropy()`
+    (the Raman-module constants with a wavelength-independent anisotropy,
+    the v2.2 pre-release behaviour). The Cabannes fractions and
+    Raman cross sections always use the Raman-module constants. YAML key
+    `radiative_transfer.rayleigh_anisotropy`."
+    rayleigh_anisotropy::Scattering.AbstractPolarizabilityDispersion
+
+end
+
+# Positional constructor without `rayleigh_anisotropy` (the field list of the
+# v2.2 pre-releases), so those positional calls keep working; the default is the
+# dispersive anisotropy.
+function vSmartMOM_Parameters(args::Vararg{Any, N}) where {N}
+    N == fieldcount(vSmartMOM_Parameters) - 1 || throw(MethodError(
+        vSmartMOM_Parameters, args))
+    return vSmartMOM_Parameters(args..., Scattering.DispersiveAnisotropy())
+end
+
+function vSmartMOM_Parameters{FT}(args::Vararg{Any, N}) where {FT, N}
+    N == fieldcount(vSmartMOM_Parameters) - 1 || throw(MethodError(
+        vSmartMOM_Parameters{FT}, args))
+    return vSmartMOM_Parameters{FT}(args..., Scattering.DispersiveAnisotropy())
 end
 
 """
     QuadPoints{FT}
 
 Gauss or Gauss-Radau quadrature points and weights used for the angular
-discretisation of the radiative transfer equation.  Also stores the cosine
-of the solar zenith angle (`μ₀`) and its index within the quadrature grid.
+discretisation of the radiative transfer equation. Also stores the cosine
+of the solar zenith angle (`μ₀`). In the legacy representation `iμ₀` indexes
+that direction in the diffuse grid; external-solar models instead use a zero
+sentinel there and `iμ₀_phase` for the exact phase-source column.
 
 # Fields
 $(DocStringExtensions.FIELDS)
@@ -870,22 +1442,37 @@ $(DocStringExtensions.FIELDS)
 struct QuadPoints{FT}
     "μ₀, cos(SZA)"
     μ₀::FT
-    "Index in quadrature points with sun"
+    "Index of μ₀ in the diffuse grid, or zero when the solar direction is external"
     iμ₀::Int
-    "Index in quadrature points with sun (in qp_μN)"
+    "First Stokes index of μ₀ in qp_μN, or zero for external-solar models"
     iμ₀Nstart::Int
-    "Quadrature points"
+    "Diffuse-operator quadrature points"
     qp_μ::AbstractArray{FT,1}
-    "Weights of quadrature points"
+    "Weights of diffuse-operator quadrature points"
     wt_μ::AbstractArray{FT,1}
     "Quadrature points (repeated for polarizations)"
     qp_μN::AbstractArray{FT,1}
     "Weights of quadrature points (repeated for polarizations)"
     wt_μN::AbstractArray{FT,1}
-    "Total number of quadrature points (weighted streams + zero-weight SZA/VZA output nodes)"
+    "Total diffuse-grid nodes (weighted streams + zero-weight VZAs, and legacy SZA)"
     Nquad::Int
     "Number of weighted streams per hemisphere (count of nonzero weights). Public contract: stream_l_cap = 2·Nstreams - 1."
     Nstreams::Int
+    "Angular grid used to construct phase matrices; may additionally contain the external solar direction."
+    phase_qp_μ::AbstractArray{FT,1}
+    "Index of μ₀ in `phase_qp_μ`."
+    iμ₀_phase::Int
+    "First Stokes index of μ₀ in the polarization-expanded phase grid."
+    iμ₀Nstart_phase::Int
+    "Whether the direct solar direction is external to the diffuse-operator quadrature grid."
+    external_solar::Bool
+end
+
+"Backward-compatible constructor for the historical embedded-μ₀ layout."
+function QuadPoints(μ₀, iμ₀, iμ₀Nstart, qp_μ, wt_μ, qp_μN, wt_μN,
+                    Nquad, Nstreams)
+    return QuadPoints(μ₀, iμ₀, iμ₀Nstart, qp_μ, wt_μ, qp_μN, wt_μN,
+                      Nquad, Nstreams, qp_μ, iμ₀, iμ₀Nstart, false)
 end
 
 # ============================================================================
@@ -1074,12 +1661,75 @@ n_fourier_moments_bands(m::RTModel) = m.solver.n_fourier_moments_bands
 
 # ── RTModel accessors ─────────────────────────────────────────────────────
 get_surface(m::RTModel, iBand) = m.surfaces[iBand]
+
+"""
+    common_band_surface(m::RTModel, iBand)
+
+Lower boundary for a solve over the bands `iBand` together (combined-band
+Raman calls). Such a solve applies one surface to every band, so all selected
+bands must hold the same surface (`===`: the same object, or an identical
+plain-value surface such as two `LambertianSurfaceScalar(0.15)` entries).
+The shared surface must also describe the combined spectral grid: a spectral
+or spline albedo needs one value per spectral point of all selected bands;
+a Legendre albedo (a polynomial over one band's sample index) and a canopy
+(whose cache is built for one band's grid) are not supported across bands.
+Anything else raises an `ArgumentError` instead of silently using the first
+band's surface.
+"""
+function common_band_surface(m::RTModel, iBand)
+    surface = get_surface(m, first(iBand))
+    bands = unique(iBand)
+    length(bands) == 1 && return surface
+    for ib in bands
+        get_surface(m, ib) === surface || throw(ArgumentError(
+            "bands $bands are solved together with a single lower boundary, but " *
+            "band $ib holds a different surface ($(get_surface(m, ib))) from band " *
+            "$(first(bands)) ($surface); run these bands separately"))
+    end
+    n_spec = sum(ib -> length(get_spec_bands(m)[ib]), bands)
+    _check_combined_band_surface(surface, n_spec, bands)
+    return surface
+end
+
+_check_combined_band_surface(::AbstractSurfaceType, n_spec, bands) = nothing
+
+function _check_combined_band_surface(s::LambertianSurfaceSpectrum, n_spec, bands)
+    length(s.albedo) == n_spec || throw(ArgumentError(
+        "bands $bands are solved together on $n_spec spectral points, but the shared " *
+        "LambertianSurfaceSpectrum has $(length(s.albedo)) albedo values"))
+    return nothing
+end
+
+function _check_combined_band_surface(s::LambertianSurfaceSpline, n_spec, bands)
+    length(s.wlGrid) == n_spec || throw(ArgumentError(
+        "bands $bands are solved together on $n_spec spectral points, but the shared " *
+        "LambertianSurfaceSpline is evaluated on $(length(s.wlGrid)) grid points"))
+    return nothing
+end
+
+_check_combined_band_surface(::LambertianSurfaceLegendre, n_spec, bands) =
+    throw(ArgumentError(
+        "LambertianSurfaceLegendre is a polynomial over one band's spectral-point " *
+        "index and cannot span bands $bands solved together; run them separately"))
+
+_check_combined_band_surface(::CanopySurface, n_spec, bands) =
+    throw(ArgumentError(
+        "CanopySurface caches its optics for one band's spectral grid and is not " *
+        "supported for bands $bands solved together; run them separately"))
 get_surfaces(m::RTModel) = m.surfaces
 get_spec_bands(m::RTModel) = m.atmosphere.spec_bands
+
+"Wavenumber grid (cm⁻¹) of the spectral points of bands `iBand`, in solver order."
+_band_wavenumbers(m::RTModel, iBand) =
+    reduce(vcat, (collect(get_spec_bands(m)[ib]) for ib in iBand))
 
 # ── Convenience property forwarding ──────────────────────────────────────
 # Allows shorthand access (model.τ_abs, model.profile, model.obs_geom, etc.)
 # on RTModel, forwarding to the appropriate sub-struct field.
+
+const _RTMODEL_PROPERTY_ALIASES = (
+    :τ_abs, :τ_rayl, :τ_aer, :aerosol_optics, :greek_rayleigh,
+    :greek_cabannes, :ϖ_Cabannes, :obs_geom, :profile, :l_max)
 
 function Base.getproperty(m::RTModel, s::Symbol)
     s === :τ_abs && return m.optics.τ_abs
@@ -1095,6 +1745,9 @@ function Base.getproperty(m::RTModel, s::Symbol)
     return getfield(m, s)
 end
 
+Base.propertynames(m::RTModel, private::Bool=false) =
+    (fieldnames(typeof(m))..., _RTMODEL_PROPERTY_ALIASES...)
+
 # ── Linearized optics ────────────────────────────────────────────────────
 
 """
@@ -1108,7 +1761,7 @@ physical state vector.
 $(DocStringExtensions.FIELDS)
 """
 struct OpticsLin{A, B, C}
-    "∂τ_abs/∂x per band: Vector of arrays [NGas × nSpec × nLayers]"
+    "∂τ_abs/∂VMR(gas,z): [NGas*Nz × nSpec × Nz], species-major"
     τ̇_abs::A
     "∂τ_aer/∂x per band: Vector of arrays [NAer × 7 × nSpec × nLayers]"
     τ̇_aer::B
@@ -1134,7 +1787,7 @@ Rayleigh and aerosol) or `*` (vertical concatenation).
 - `Z⁺⁺::FT3`: forward-scattering Z matrix
 - `Z⁻⁺::FT3`: backward-scattering Z matrix
 """
-Base.@kwdef struct CoreScatteringOpticalProperties{FT,FT2,FT3} <:  AbstractOpticalProperties
+Base.@kwdef struct CoreScatteringOpticalProperties{FT,FT2,FT3,FT4} <:  AbstractOpticalProperties
     "Absorption optical depth (scalar or wavelength dependent)"
     τ::FT 
     "Single scattering albedo"
@@ -1143,7 +1796,14 @@ Base.@kwdef struct CoreScatteringOpticalProperties{FT,FT2,FT3} <:  AbstractOptic
     Z⁺⁺::FT3 
     "Z scattering matrix (backward)"
     Z⁻⁺::FT3
+    "Solar-direction forward phase block [NquadN × nStokes × nSpec], or nothing"
+    Z₀⁺::FT4 = nothing
+    "Solar-direction backward phase block [NquadN × nStokes × nSpec], or nothing"
+    Z₀⁻::FT4 = nothing
 end
+
+CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺) =
+    CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺, nothing, nothing)
 
 # Core optical Properties COP with directional cross section 
 Base.@kwdef struct CoreDirectionalScatteringOpticalProperties{FT,FT2,FT3,FT4} <:  AbstractOpticalProperties
@@ -1165,9 +1825,8 @@ Base.@kwdef struct CoreAbsorptionOpticalProperties{FT} <:  AbstractOpticalProper
 end
 
 # Adding Core Optical Properties, can have mixed dimensions!
-function Base.:+( x::CoreScatteringOpticalProperties{xFT, xFT2, xFT3}, 
-                  y::CoreScatteringOpticalProperties{yFT, yFT2, yFT3} 
-                ) where {xFT, xFT2, xFT3, yFT, yFT2, yFT3} 
+function Base.:+(x::CoreScatteringOpticalProperties,
+                 y::CoreScatteringOpticalProperties)
     # Predefine some arrays:            
     xZ⁺⁺ = x.Z⁺⁺
     xZ⁻⁺ = x.Z⁻⁺
@@ -1181,8 +1840,8 @@ function Base.:+( x::CoreScatteringOpticalProperties{xFT, xFT2, xFT3},
     ϖ  = w ./ ifelse.(τ .> zero.(τ), τ, one.(τ))
     
     #@show xFT, xFT2, xFT3
-    all(wx .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, y.Z⁺⁺, y.Z⁻⁺)) : nothing
-    all(wy .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)) : nothing
+    all(wx .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, y.Z⁺⁺, y.Z⁻⁺, y.Z₀⁺, y.Z₀⁻)) : nothing
+    all(wy .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺, x.Z₀⁺, x.Z₀⁻)) : nothing
 
     n = length(w);
     
@@ -1194,7 +1853,16 @@ function Base.:+( x::CoreScatteringOpticalProperties{xFT, xFT2, xFT3},
     Z⁺⁺ = (wx .* xZ⁺⁺ .+ wy .* yZ⁺⁺) 
     Z⁻⁺ = (wx .* xZ⁻⁺ .+ wy .* yZ⁻⁺)
 
-    CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺)  
+    (x.Z₀⁺ === nothing) == (y.Z₀⁺ === nothing) || throw(ArgumentError(
+        "cannot mix scattering optics with inconsistent solar phase columns"))
+    if x.Z₀⁺ === nothing
+        Z₀⁺ = Z₀⁻ = nothing
+    else
+        Z₀⁺ = wx .* x.Z₀⁺ .+ wy .* y.Z₀⁺
+        Z₀⁻ = wx .* x.Z₀⁻ .+ wy .* y.Z₀⁻
+    end
+
+    CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺, Z₀⁺, Z₀⁻)
 end
 
 # Concatenate Core Optical Properties, can have mixed dimensions!
@@ -1203,7 +1871,10 @@ function Base.:*( x::CoreScatteringOpticalProperties, y::CoreScatteringOpticalPr
     # expand_Z=true: cat along dim=3 requires both operands to have size(Z,3)==nSpec
     x = expandOpticalProperties(x, arr_type; expand_Z=true);
     y = expandOpticalProperties(y, arr_type; expand_Z=true);
-    CoreScatteringOpticalProperties([x.τ; y.τ],[x.ϖ; y.ϖ],cat(x.Z⁺⁺,y.Z⁺⁺, dims=3), cat(x.Z⁻⁺,y.Z⁻⁺, dims=3) )
+    Z₀⁺ = x.Z₀⁺ === nothing ? nothing : cat(x.Z₀⁺, y.Z₀⁺; dims=3)
+    Z₀⁻ = x.Z₀⁻ === nothing ? nothing : cat(x.Z₀⁻, y.Z₀⁻; dims=3)
+    CoreScatteringOpticalProperties([x.τ; y.τ], [x.ϖ; y.ϖ],
+        cat(x.Z⁺⁺, y.Z⁺⁺; dims=3), cat(x.Z⁻⁺, y.Z⁻⁺; dims=3), Z₀⁺, Z₀⁻)
 end
 
 function Base.:+( x::CoreScatteringOpticalProperties, y::CoreAbsorptionOpticalProperties ) 
@@ -1211,7 +1882,7 @@ function Base.:+( x::CoreScatteringOpticalProperties, y::CoreAbsorptionOpticalPr
     wx = x.τ .* x.ϖ 
     #@show size(wx), size(τ)
     ϖ  = wx ./ ifelse.(τ .> zero.(τ), τ, one.(τ))
-    CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)
+    CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺, x.Z₀⁺, x.Z₀⁻)
 end
 
 function Base.:+(  y::CoreAbsorptionOpticalProperties, x::CoreScatteringOpticalProperties ) 

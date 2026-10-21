@@ -117,22 +117,25 @@ end
 function _quickstart_plot()
     params = read_parameters(joinpath(pkgdir(vSmartMOM), "config", "quickstart.yaml"))
     params.architecture = vSmartMOM.Architectures.CPU()
-    R, T = _quietly() do
-        model = model_from_parameters(params)
-        rt_run(model)
+    # Exercise the opt-in external-solar SFI path and its lean TOA-only
+    # entry point (`external_solar=false`, the embedded-μ₀ full-column
+    # operator, is the default; `rt_run_toa` requires the opt-in).
+    R = _quietly() do
+        model = model_from_parameters(params; external_solar = true)
+        rt_run_toa(model)
     end
 
     data = [
         (;
             type = "bar",
-            x = ["TOA reflectance R", "BOA transmittance T"],
-            y = Float64[R[1, 1, 1], T[1, 1, 1]],
-            marker = (; color = ["#2563eb", "#16a34a"]),
+            x = ["TOA radiance R"],
+            y = Float64[R[1, 1, 1]],
+            marker = (; color = ["#2563eb"]),
             hovertemplate = "%{x}<br>Stokes I=%{y:.6f}<extra></extra>",
         ),
     ]
     layout = (;
-        title = (; text = "Quickstart RT Output", x = 0.02),
+        title = (; text = "Quickstart TOA RT Output", x = 0.02),
         margin = (; l = 56, r = 18, t = 72, b = 52),
         xaxis = (; title = ""),
         yaxis = (; title = "Stokes I", rangemode = "tozero"),
@@ -147,11 +150,9 @@ function _core_rt_vza_plot()
     params = read_parameters(joinpath(pkgdir(vSmartMOM),
                                       "test", "test_parameters", "PureRayleighParameters.yaml"))
     params.architecture = vSmartMOM.Architectures.CPU()
-    params.max_m = 2
-    params.l_trunc = 20
-    R, _ = _quietly() do
-        model = model_from_parameters(params)
-        rt_run(model)
+    R = _quietly() do
+        model = model_from_parameters(params; external_solar = true)
+        rt_run_toa(model)
     end
 
     signed_vza = ifelse.(Float64.(params.vaz) .≈ 180.0,
@@ -184,7 +185,7 @@ function _core_rt_vza_plot()
         title = (; text = "Pure-Rayleigh Reflectance by Viewing Angle", x = 0.02),
         margin = (; l = 60, r = 20, t = 78, b = 92),
         xaxis = (; title = "Signed viewing zenith angle (deg)"),
-        yaxis = (; title = "TOA reflectance", zeroline = true),
+        yaxis = (; title = "TOA radiance", zeroline = true),
         legend = _bottom_legend(),
         paper_bgcolor = "#ffffff",
         plot_bgcolor = "#ffffff",
@@ -202,7 +203,7 @@ function _mie_preview()
             aerosol,
             0.55,
             Stokes_IQUV(),
-            δBGE(30, 2.0),
+            δBGE(30),
             30.0,
             500,
         )
@@ -396,7 +397,7 @@ function _absorption_temperature_plot()
         ),
     ]
     layout = (;
-        title = (; text = "Temperature Redistribution Across a CO2 Band", x = 0.02),
+        title = (; text = "Illustrative Temperature Redistribution (synthetic lines)", x = 0.02),
         margin = (; l = 64, r = 20, t = 78, b = 96),
         xaxis = (; title = "Wavenumber (cm^-1)"),
         yaxis = (; title = "Normalized cross section", domain = [0.48, 1.0]),
@@ -476,7 +477,7 @@ function _jacobian_aod_plot()
         title = (; text = "Aerosol Optical Depth Jacobian", x = 0.02),
         margin = (; l = 72, r = 20, t = 78, b = 104),
         xaxis = (; title = "Spectral grid index"),
-        yaxis = (; title = "TOA reflectance", domain = [0.54, 1.0]),
+        yaxis = (; title = "TOA radiance", domain = [0.54, 1.0]),
         yaxis2 = (; title = "dR_I / dtau_ref", domain = [0.0, 0.34], zeroline = true),
         legend = _bottom_legend(),
         paper_bgcolor = "#ffffff",
@@ -499,7 +500,7 @@ function _surface_brdf_plot()
         (; type = "scatter", mode = "lines", name = "Cox-Munk glint", x = vza, y = coxmunk, line = (; color = "#f59e0b", width = 3)),
     ]
     layout = (;
-        title = (; text = "Surface BRDF Angular Slices", x = 0.02),
+        title = (; text = "Illustrative Surface Angular Shapes (synthetic)", x = 0.02),
         margin = (; l = 64, r = 20, t = 78, b = 96),
         xaxis = (; title = "Signed view zenith angle (deg)"),
         yaxis = (; title = "Relative BRDF / reflectance"),
@@ -520,11 +521,11 @@ function _canopy_spectral_plot()
     data = [
         (; type = "scatter", mode = "lines", name = "Leaf reflectance", x = λ, y = leaf_reflectance, line = (; color = "#16a34a", width = 3)),
         (; type = "scatter", mode = "lines", name = "Leaf transmittance", x = λ, y = leaf_transmittance, line = (; color = "#65a30d", width = 3, dash = "dash")),
-        (; type = "scatter", mode = "lines", name = "Canopy TOA response", x = λ, y = canopy_toa, line = (; color = "#2563eb", width = 3)),
+        (; type = "scatter", mode = "lines", name = "Illustrative canopy response", x = λ, y = canopy_toa, line = (; color = "#2563eb", width = 3)),
         (; type = "scatter", mode = "lines", name = "Bare soil", x = λ, y = bare_soil, line = (; color = "#92400e", width = 3)),
     ]
     layout = (;
-        title = (; text = "Canopy Red-Edge Response", x = 0.02),
+        title = (; text = "Illustrative Red Edge (synthetic curves)", x = 0.02),
         margin = (; l = 64, r = 20, t = 78, b = 96),
         xaxis = (; title = "Wavelength (nm)"),
         yaxis = (; title = "Reflectance / transmittance", range = [0, 0.55]),
@@ -596,11 +597,13 @@ function build()
         "User Guide"            => Any[
                                     "Quick Start (5 min)" => "pages/quickstart.md",
                                     "Conventions ⚠ (read first)" => "pages/conventions.md",
-                                    "Configure a Scene" => "pages/IO/Overview.md",
-                                    "Configuration Guide (step by step)" => "pages/IO/ConfigurationGuide.md",
+                                    "Configure a Scene (step by step)" => "pages/IO/ConfigurationGuide.md",
+                                    "IO API (read_parameters)" => "pages/IO/Overview.md",
                                     "Compute Jacobians" => "pages/jacobians.md",
+                                    "Fast Re-runs & Batch Processing" => "pages/batch_processing.md",
                                     "Run on GPU" => "pages/gpu.md",
                                    ],
+        "Tutorials"             => tutorials_md,
         "RT basics"             => Any[
                                     "1 · Problem & MOM Thesis" => "pages/concepts/01_overview.md",
                                     "2 · Vector RTE & Discretization" => "pages/concepts/02_rt_theory.md",
@@ -625,9 +628,8 @@ function build()
                                     "Sources & Emission" => "pages/extending/sources.md",
                                     "GEOS-Chem Integration" => "pages/geoschem_integration.md",
                                    ],
-        "Tutorials"             => tutorials_md,
         "Library"               => Any[
-                                    "Overview" => "pages/api_reference.md",
+                                    "Library Overview" => "pages/api_reference.md",
                                     "Top-Level API" => "pages/api/top_level.md",
                                     "CoreRT" => "pages/api/core_rt.md",
                                     "IO" => "pages/api/io.md",
@@ -642,7 +644,18 @@ function build()
                                     "Function Index" => "pages/api/function_index.md",
                                    ],
         "Resources"             => Any[
-                                    "Input Schema" => "pages/IO/Schema.md",
+                                    "Input Schema" => Any[
+                                        "Overview" => "pages/IO/Schema.md",
+                                        "Radiative Transfer" => "pages/IO/Schema/radiative_transfer.md",
+                                        "Geometry" => "pages/IO/Schema/geometry.md",
+                                        "Atmospheric Profile" => "pages/IO/Schema/atmospheric_profile.md",
+                                        "Absorption" => "pages/IO/Schema/absorption.md",
+                                        "scattering (aerosols)" => "pages/IO/Schema/aerosols.md",
+                                        "Surface" => "pages/IO/Schema/surface.md",
+                                        "Canopy" => "pages/IO/Schema/canopy.md",
+                                        "Spectral Bands" => "pages/IO/Schema/spec_bands.md",
+                                        "Sources" => "pages/IO/Schema/sources.md",
+                                       ],
                                     "IO Examples" => "pages/IO/Examples.md",
                                     "HITRAN Data Management" => "pages/Absorption/HITRAN_Data.md",
                                     "References" => "pages/vSmartMOM/References.md",

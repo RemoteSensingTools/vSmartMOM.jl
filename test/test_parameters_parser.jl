@@ -1,8 +1,11 @@
 using Test
+using Logging
 using vSmartMOM
 using vSmartMOM.IO
 using vSmartMOM.CoreRT
 using CanopyOptics
+using Distributions: Normal
+import JSON
 
 function _minimal_parameter_dict(; surface = ["LambertianSurfaceScalar(0.1)"],
                                    float_type = "Float64",
@@ -25,7 +28,7 @@ function _minimal_parameter_dict(; surface = ["LambertianSurfaceScalar(0.1)"],
             "sza" => 30.0,
             "vza" => [0.0],
             "vaz" => [0.0],
-            "obs_alt" => 1000.0,
+            "obs_alt" => [0.0],
         ),
         "atmospheric_profile" => Dict(
             "T" => [290.0],
@@ -42,6 +45,8 @@ end
     @test params.architecture isa vSmartMOM.Architectures.CPU
     @test params.brdf[1] isa LambertianSurfaceScalar{Float64}
     @test params.spec_bands == [[13000.0, 13000.1]]
+    @test params.obs_alt == [0.0]
+    @test params.obs_alt isa Vector{Float64}
 
     iq_cfg = _minimal_parameter_dict()
     iq_cfg["radiative_transfer"]["polarization_type"] = "Stokes_IQ()"
@@ -55,6 +60,29 @@ end
     ))
     @test metal_params.float_type === Float32
     @test metal_params.architecture isa vSmartMOM.Architectures.MetalGPU
+end
+
+@testset "observer-height scalar/vector contract" begin
+    scalar_cfg = _minimal_parameter_dict()
+    scalar_cfg["geometry"]["obs_alt"] = 0
+    scalar = parameters_from_dict(scalar_cfg)
+    @test scalar.obs_alt === 0.0
+
+    vector_cfg = _minimal_parameter_dict(float_type="Float32")
+    vector_cfg["geometry"]["obs_alt"] = Real[0, 2.5]
+    vector = parameters_from_dict(vector_cfg)
+    @test vector.obs_alt == Float32[0, 2.5]
+    @test vector.obs_alt isa Vector{Float32}
+
+    null_reduction = _minimal_parameter_dict()
+    null_reduction["atmospheric_profile"]["profile_reduction"] = nothing
+    @test parameters_from_dict(null_reduction).profile_reduction_n == -1
+
+    for invalid in (Any[], [-1.0], [Inf], ["5"], true)
+        cfg = _minimal_parameter_dict()
+        cfg["geometry"]["obs_alt"] = invalid
+        @test_throws ArgumentError parameters_from_dict(cfg)
+    end
 end
 
 @testset "TOML file input" begin
@@ -78,7 +106,7 @@ end
                 sza = 30.0
                 vza = [0.0]
                 vaz = [0.0]
-                obs_alt = 1000.0
+                obs_alt = [0.0]
 
                 [atmospheric_profile]
                 T = [290.0]
@@ -126,7 +154,11 @@ end
         "decomp_type" => "NAI2()",
     )
 
-    params = parameters_from_dict(cfg)
+    params = @test_logs (:warn, r"Aerosol configuration omits.*greek_beta_cutoff") match_mode=:any parameters_from_dict(cfg)
+    # An explicit null documents the decision to keep full series support and
+    # suppresses the migration warning in subsequent parses of this fixture.
+    cfg["radiative_transfer"]["greek_beta_cutoff"] = nothing
+    @test_logs min_level=Logging.Warn parameters_from_dict(cfg)
     aer = params.scattering_params.rt_aerosols[1]
     @test aer.phase_function isa vSmartMOM.Scattering.SyntheticPolarizedHenyeyGreensteinPhaseFunction
     @test aer.ϖ == 0.92
@@ -222,6 +254,137 @@ end
     end
 end
 
+@testset "TOML mixed integer/float arrays and ENV paths in CIA/MT_CKD" begin
+    # TOML gives Vector{Any} for [60, 45.5]; it must parse like YAML.
+    toml = joinpath(mktempdir(), "mixed.toml")
+    text = read(joinpath(pkgdir(vSmartMOM), "config", "quickstart.toml"), String)
+    @test occursin("vza = [60.0]", text)
+    write(toml, replace(text, "vza = [60.0]" => "vza = [60, 45.5]",
+                              "vaz = [180.0]" => "vaz = [180, 0]"))
+    params = with_logger(NullLogger()) do
+        read_parameters(toml)
+    end
+    @test params.vza == [60.0, 45.5]
+    @test params.vaz == [180.0, 0.0]
+
+    env_key = "VSMARTMOM_TEST_CIA_DIR"
+    old_value = get(ENV, env_key, nothing)
+    try
+        ENV[env_key] = "/data/cia"
+        cfg = _minimal_parameter_dict()
+        cfg["absorption"] = Dict(
+            "fixed_molecules" => [String[]], "variable_molecules" => [String[]],
+            "vmr" => Dict{String,Any}(), "broadening" => "Voigt()",
+            "CEF" => "HumlicekWeidemann32SDErrorFunction()", "wing_cutoff" => 20,
+            "cia_files" => ["\${ENV:$(env_key)}/O2-O2_2024.cia"],
+            "mtckd_file" => "\${ENV:$(env_key)}/absco-ref_wv-mt-ckd.nc")
+        ap = parameters_from_dict(cfg).absorption_params
+        @test ap.cia_files == [normpath("/data/cia/O2-O2_2024.cia")]
+        @test ap.mtckd_file == normpath("/data/cia/absco-ref_wv-mt-ckd.nc")
+    finally
+        old_value === nothing ? delete!(ENV, env_key) : (ENV[env_key] = old_value)
+    end
+end
+
+@testset "surplus surface entries warn" begin
+    cfg = _minimal_parameter_dict(surface = ["LambertianSurfaceScalar(0.1)",
+                                             "LambertianSurfaceScalar(0.2)"])
+    @test_logs (:warn, r"entries beyond band 1 are ignored") match_mode=:any parameters_from_dict(cfg)
+
+    # Fewer surfaces than bands fail clearly at model construction.
+    cfg = _minimal_parameter_dict()
+    cfg["radiative_transfer"]["spec_bands"] = ["[13000.0, 13000.1]", "[13100.0, 13100.1]"]
+    cfg["atmospheric_profile"]["T"] = [250.0, 290.0]
+    cfg["atmospheric_profile"]["p"] = [0.1, 500.0, 1000.0]
+    cfg["atmospheric_profile"]["profile_reduction"] = nothing
+    params = parameters_from_dict(cfg)
+    @test_throws r"one surface per band" model_from_parameters(params)
+    @test_throws r"one surface per band" model_from_parameters(LinMode(), params)
+end
+
+@testset "per-band H2O absorption switch" begin
+    cfg = _minimal_parameter_dict()
+    cfg["atmospheric_profile"]["q"] = [0.01]
+    cfg["absorption"] = Dict(
+        "fixed_molecules" => [String[]],
+        "variable_molecules" => [String[]],
+        "h2o_absorption" => [false],
+        "vmr" => Dict{String,Any}(),
+        "broadening" => "Voigt()",
+        "CEF" => "HumlicekWeidemann32SDErrorFunction()",
+        "wing_cutoff" => 20,
+    )
+    params = parameters_from_dict(cfg)
+    @test params.absorption_params.h2o_lut == Any[:disabled]
+
+    cfg["absorption"]["h2o_absorption"] = [false, true]
+    @test_throws ArgumentError parameters_from_dict(cfg)
+end
+
+@testset "no absorption block means no gas absorption" begin
+    # q still enters the dry-air column, but without an `absorption` block
+    # neither the forward nor the LinMode builder adds H₂O lines.
+    cfg = _minimal_parameter_dict()
+    cfg["atmospheric_profile"]["T"] = [250.0, 290.0]
+    cfg["atmospheric_profile"]["p"] = [0.1, 500.0, 1000.0]
+    cfg["atmospheric_profile"]["q"] = [0.001, 0.01]
+    cfg["atmospheric_profile"]["profile_reduction"] = nothing
+    params = parameters_from_dict(cfg)
+    @test params.absorption_params === nothing
+    forward = model_from_parameters(params)
+    model, lin_model = model_from_parameters(LinMode(), params)
+    @test all(iszero, forward.optics.τ_abs[1])
+    @test all(iszero, model.optics.τ_abs[1])
+    @test all(iszero, lin_model.τ̇_abs[1])
+end
+
+@testset "retired Δ_angle is accepted and stored as zero" begin
+    cfg = _minimal_parameter_dict()
+    cfg["radiative_transfer"]["Δ_angle"] = 2.0
+    params = @test_logs (:warn, r"retired") match_mode=:any parameters_from_dict(cfg)
+    @test params.Δ_angle == 0
+end
+
+@testset "unknown configuration keys warn once" begin
+    cfg = _minimal_parameter_dict()
+    cfg["radiative_transfer"]["nstreams_misspelt"] = 16
+    cfg["geometry"]["VZA_misspelt"] = [10.0]
+    cfg["absorptoin_misspelt"] = Dict("vmr" => Dict("O2" => 0.21))
+    @test_logs (:warn, r"`radiative_transfer.nstreams_misspelt`") (:warn, r"`geometry.VZA_misspelt`") (:warn, r"`absorptoin_misspelt`") match_mode=:any parameters_from_dict(cfg)
+    @test_logs parameters_from_dict(cfg)          # once per key and session
+    @test_logs parameters_from_dict(_minimal_parameter_dict())
+
+    # The known keys are exactly the schema's closed sections.
+    schema = JSON.parsefile(joinpath(pkgdir(vSmartMOM), "schemas",
+                                     "vsmartmom-parameters.schema.json"))
+    @test schema["additionalProperties"] == false
+    known = vSmartMOM.IO._KNOWN_CONFIG_KEYS
+    @test Set(known.top) == Set(keys(schema["properties"]))
+    for section in (:radiative_transfer, :geometry)
+        ref = schema["properties"][string(section)]["\$ref"]       # "#/<defs>/<name>"
+        _, defs, name = split(ref, "/")
+        block = schema[defs][name]
+        @test get(block, "additionalProperties", true) == false
+        @test Set(getproperty(known, section)) == Set(keys(block["properties"]))
+    end
+end
+
+@testset "default parameters place the aerosol in hPa" begin
+    params = with_logger(NullLogger()) do
+        CoreRT.default_parameters()
+    end
+    profile = only(params.scattering_params.rt_aerosols).profile
+    p_surf = maximum(params.p)
+    @test 0 < profile.μ < p_surf
+    @test profile.σ < p_surf
+    # Pa values here underflowed every layer weight to 0/0 in Float32.
+    atm, _ = CoreRT.prepare_observer_profile(Float32.(params.T), Float32.(params.p),
+        Float32.(params.q), Dict{String,Any}(), 0f0, -1)
+    τ = CoreRT.getAerosolLayerOptProp(1f0, Normal(Float32(profile.μ), Float32(profile.σ)), atm)
+    @test all(isfinite, τ)
+    @test sum(τ) ≈ 1
+end
+
 @testset "invalid configuration raises ArgumentError" begin
     cfg = _minimal_parameter_dict(float_type = "Float16")
     @test_throws ArgumentError parameters_from_dict(cfg)
@@ -235,4 +398,33 @@ end
     cfg = _minimal_parameter_dict()
     delete!(cfg["geometry"], "sza")
     @test_throws ArgumentError parameters_from_dict(cfg)
+end
+
+
+@testset "numerics schema/parser contract" begin
+    for FT in (Float32, Float64)
+        parse_numerics(n) = vSmartMOM.IO._parse_numerics(
+            Dict("radiative_transfer" => Dict("numerics" => n)), FT)
+        for selection in ("all", "none", nothing)
+            @test parse_numerics(Dict("fourier_convergence" => selection)).fourier_convergence isa AllFourierMoments
+        end
+        for (selection, expected) in (("intensity", IntensityConvergence),
+                                      ("stokes", StokesConvergence), ("iqu", StokesConvergence))
+            @test parse_numerics(Dict("fourier_convergence" => selection,
+                "fourier_tolerance" => 1e-5, "fourier_min_m" => 3,
+                "fourier_n_consecutive" => 2)).fourier_convergence isa expected
+        end
+        @test parse_numerics(Dict("dtau_max_threshold" => 0.001)).dτ_max_threshold === FT(0.001)
+        for n in (Dict("fourier_convergence" => "all", "fourier_tolerance" => 1e-5),
+                  Dict("fourier_tolerance" => 1e-5),
+                  Dict("fourier_convergence" => "intensity", "fourier_tolerance" => 0),
+                  Dict("fourier_convergence" => "stokes", "fourier_min_m" => 2),
+                  Dict("fourier_convergence" => "stokes", "fourier_n_consecutive" => 0),
+                  Dict("fourier_convergence" => "unknown"), Dict("ss_correction" => "unknown"),
+                  Dict("fourier_tolernace" => 1e-5),
+                  Dict("dtau_max_threshold" => 0.001, "dτ_max_threshold" => 0.002))
+            @test_throws ArgumentError parse_numerics(n)
+        end
+        @test_throws ArgumentError parse_numerics("all")
+    end
 end

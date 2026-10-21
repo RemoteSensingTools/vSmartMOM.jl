@@ -53,6 +53,15 @@ end
 # compilation; the batched RT path uses its own backend via `devi`.
 Architectures.ka_backend(::vSmartMOM.Architectures.GPU) = CUDA.CUDABackend()
 
+# Backend policy: on CUDA the ScatteringInterface_11 interaction updates are
+# plain batched GEMMs at N≈36 — cuBLAS's best case — and the fused KA kernels
+# measured SLOWER (3.27 s vs 2.89 s, production satellite solve, A100). Keep
+# the `_bmm!` ladder under `:auto` here; `_FUSED_INTERACTION_MODE[] = :on`
+# still forces the fused path (needed for cuBLAS-free CUDA-graph capture).
+# Non-CUDA GPU backends keep CoreRT's generic `true` default.
+CoreRT._fused_interaction_default(::CUDA.CUDABackend) = false
+CoreRT._jacobian_tiles_supported(::CUDA.CUDABackend) = true
+
 # Default GPU Mie precision policy, FT-aware:
 #   Float64 → NativeFloat64 (hardware FP64 Dₙ recursion) — right for datacenter
 #             GPUs (A100/V100) and bit-for-bit with the CPU reference.
@@ -84,6 +93,7 @@ Architectures.has_gpu_mie(::vSmartMOM.Architectures.GPU) = true
 
 # Include GPU-specific batched operations
 include("gpu_batched_cuda.jl")
+include("gpu_jacobian_cuda.jl")
 
 # Module initialization - called when extension is loaded
 function __init__()

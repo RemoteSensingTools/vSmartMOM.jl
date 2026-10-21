@@ -1,0 +1,3 @@
+CORE_MEASURE nSpec=10000 pol=3 nparams=1 forward=(median = 0.188812439, samples = [0.221259814, 0.188812439, 0.184856562]) combined=(median = 0.490974019, samples = [0.490974019, 0.500886475, 0.489281566]) ratio=2.600326660681503
+CORE_MEASURE nSpec=10000 pol=3 nparams=3 forward=(median = 0.187219063, samples = [0.187219063, 0.185280128, 0.189634745]) combined=(median = 0.923897796, samples = [0.937189205, 0.923897796, 0.923409808]) ratio=4.934848947513427
+CORE_MEASURE nSpec=10000 pol=3 nparams=15 forward=(median = 0.184702121, samples = [0.191109999, 0.182319923, 0.184702121]) combined=(median = 3.528532654, samples = [3.528532654, 3.525333539, 3.558607618]) ratio=19.103909770478488

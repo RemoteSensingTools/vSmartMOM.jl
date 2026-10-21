@@ -1,0 +1,39 @@
+CORE_MEASURE nSpec=10000 pol=3 nparams=3 forward=(median = 0.181518845, samples = [0.183258686, 0.181171733, 0.181518845]) combined=(median = 1.304882734, samples = [1.302884417, 1.320740829, 1.304882734]) ratio=7.188690155008423
+CORE_PROFILE nparams=3 forward
+─────────────────────────────────────────────────────────────────────────────────────
+                                            Time                    Allocations
+                                   ───────────────────────   ────────────────────────
+         Tot / % measured:              1.25s /  13.8%           77.1MiB /   1.4%
+
+Section                    ncalls     time    %tot     avg     alloc    %tot      avg
+─────────────────────────────────────────────────────────────────────────────────────
+doubling                       15    142ms   82.4%  9.47ms    608KiB   53.5%  40.6KiB
+  sync_doubling                15    133ms   77.3%  8.89ms   60.7KiB    5.3%  4.05KiB
+  apply_D_matrix               15   3.15ms    1.8%   210μs   77.2KiB    6.8%  5.15KiB
+  source_update               141   1.96ms    1.1%  13.9μs    187KiB   16.5%  1.33KiB
+  rt_update                   141   1.76ms    1.0%  12.5μs    145KiB   12.8%  1.03KiB
+  Batch Inv Doubling          141   1.66ms    1.0%  11.8μs    132KiB   11.6%     960B
+  source_update_by_src        141   18.6μs    0.0%   132ns     0.00B    0.0%    0.00B
+  doubling_allocs              15   2.06μs    0.0%   138ns     0.00B    0.0%    0.00B
+interaction                    12   23.5ms   13.6%  1.96ms    327KiB   28.7%  27.3KiB
+  interaction inv1 fused       12    308μs    0.2%  25.7μs   12.6KiB    1.1%  1.05KiB
+  interaction inv2 fused       12    191μs    0.1%  15.9μs   12.6KiB    1.1%  1.05KiB
+elemental                      15   6.79ms    3.9%   453μs    202KiB   17.8%  13.5KiB
+volume_source                  15    530ns    0.0%  35.3ns     0.00B    0.0%    0.00B
+─────────────────────────────────────────────────────────────────────────────────────
+CORE_PROFILE nparams=3 combined
+────────────────────────────────────────────────────────────────────────────
+                                   Time                    Allocations
+                          ───────────────────────   ────────────────────────
+    Tot / % measured:          1.76s /  96.4%           61.7MiB /  22.0%
+
+Section           ncalls     time    %tot     avg     alloc    %tot      avg
+────────────────────────────────────────────────────────────────────────────
+doubling              15    1.06s   62.5%  70.6ms   11.6MiB   85.4%   792KiB
+  getrf_strided      141   4.26ms    0.3%  30.2μs    247KiB    1.8%  1.75KiB
+  getri_strided      141   4.11ms    0.2%  29.2μs    380KiB    2.7%  2.69KiB
+elemental             15    469ms   27.6%  31.3ms    745KiB    5.4%  49.6KiB
+interaction           12    168ms    9.9%  14.0ms   1.26MiB    9.3%   107KiB
+  getrf_strided       24   1.03ms    0.1%  42.9μs   42.0KiB    0.3%  1.75KiB
+  getri_strided       24    812μs    0.0%  33.9μs   64.5KiB    0.5%  2.69KiB
+────────────────────────────────────────────────────────────────────────────

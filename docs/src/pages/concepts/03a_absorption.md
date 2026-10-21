@@ -22,21 +22,23 @@ number density of the absorbing species in the layer. Once computed,
 ``\tau_\lambda = \tau_\mathrm{abs} + \tau_\mathrm{scat}`` in
 [Concepts/03c](03c_mixing.md).
 
-!!! note "RT pipeline uses AtmosphericAbsorption.jl (since externalAbsorption merge)"
+!!! warning "AtmosphericAbsorption.jl is the only supported path going forward"
     The **production RT path** (`model_from_parameters` → `rt_run`) now delegates
     line-by-line absorption to the external
     [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl)
     package (`AtmosphericAbsorption.load_lines` + `LineByLineModel`; TIPS-2021 partition
     functions). The diagram and prose below describe the underlying physics — the same
     line-shape equations apply — but `make_hitran_model` is **not** on the `rt_run` call
-    path since this merge. `make_hitran_model` / `read_hitran` / `absorption_cross_section`
-    remain the supported standalone cross-section API (TIPS-2017) for users who need direct
-    σ(ν, T, p) access outside the full RT pipeline.
+    path since this merge. The internal line-by-line model (`make_hitran_model` /
+    `HitranModel`, used with `read_hitran` and `absorption_cross_section`) is deprecated
+    in 2.2 (a one-time notice on first use lists the AtmosphericAbsorption calls) and
+    will be removed in 3.0; new direct σ(ν, T, p) and ABSCO workflows should use
+    AtmosphericAbsorption.jl. YAML `LUTfiles` accept OCO-2 ABSCO HDF files and AtmosphericAbsorption `.absco` tables (`save_absco_lut`), as well as vSmartMOM JLD2 tables from `make_interpolation_model`; AtmosphericAbsorption's own interpolation tables (`build_interpolation_model`/`save_interpolation_model`) are not read by the 2.x loader.
 
 ## HITRAN line-by-line
 
 The HITRAN line list is the primary source for molecular absorption parameters.
-For standalone cross-section work, the internal `Absorption` module exposes:
+For historical context, the legacy internal `Absorption` module exposes:
 
 - `read_hitran(...)` to read a `HitranTable` from a HITRAN-format file.
 - `make_hitran_model(...)` to build a `HitranModel` carrying the line list,
@@ -88,7 +90,8 @@ implementations including a GPU-friendly Humlicek-style approximation
 The internal `Absorption` module exposes a direct σ(ν, T, p) API
 (`read_hitran` / `make_hitran_model` / `absorption_cross_section`) backed by
 a KernelAbstractions Voigt kernel.  This is the path used by the Tutorial on
-Absorption and by code that needs custom grids or cross-section comparisons.
+Absorption and by code that needs custom grids or cross-section comparisons;
+`make_hitran_model` is deprecated in 2.2 (see the warning above).
 
 > **RT pipeline note:** `model_from_parameters` → `rt_run` computes LBL gas
 > absorption internally via
@@ -99,7 +102,7 @@ Absorption and by code that needs custom grids or cross-section comparisons.
 Because the line-shape sum is a per-grid-point reduction over thousands of
 contributing lines, it parallelizes trivially across the spectral grid —
 exactly the workload pattern of the RT solver. The Voigt kernel from
-[`src/Absorption/compute_absorption_cross_section.jl:229–280`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Absorption/compute_absorption_cross_section.jl#L229-L280):
+[`src/Absorption/compute_absorption_cross_section.jl:316–332`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Absorption/compute_absorption_cross_section.jl#L316-L332):
 
 ```julia
 @kernel function line_shape_batch!(A, @Const(grid), @Const(ν_arr), @Const(γ_d_arr),
@@ -126,11 +129,39 @@ uses this to enable backend-specific optimizations (constant-memory caching
 on CUDA, etc.). `@index(Global, Linear)` extracts the spectral index. The
 kernel runs **identically on CPU, CUDA, and Metal** via the same KA
 dispatch as the RT kernels. See [Concepts/07](07_architecture.md) for the
-backend story.
+backend story. Production absorption through AtmosphericAbsorption is,
+however, experimental and not yet supported on Metal; see the
+[GPU page](../gpu.md).
 
 The window `istart_arr[j] ... istop_arr[j]` is the wavenumber sub-range
 where line `j` contributes non-negligibly — pre-computed to avoid evaluating
 distant lines.
+
+## Reusing loaded tables across retrieval trials
+
+A parameter template may own gigabytes of absorption lookup tables. When
+those tables are fixed, use [`copy_parameters`](@ref) to give each trial its
+own mutable state while sharing the table storage:
+
+```julia
+trial = copy_parameters(template; share_luts=true)
+grid = FixedPressureGrid()   # or FixedAltitudeGrid()
+trial.p = surface_pressure_interfaces(grid, template.p, new_surface_pressure)
+model, lin_model = model_from_parameters(LinMode(), trial; vertical_grid=grid)
+```
+
+The same grid convention must rebuild the interfaces and select the
+surface-pressure tangents; see [`FixedPressureGrid`](@ref) and
+[`FixedAltitudeGrid`](@ref).
+
+Atmospheric profiles, gas VMRs, aerosols, surfaces, and the LUT container lists
+are copied. The loaded gas and H₂O tables remain shared and must be treated as
+read-only, including their coefficients, grids and mutable metadata. Replacing
+a table entry in a trial's list does not alter the template. Absorption optical
+depths are still recomputed for each trial's pressure, temperature and abundance;
+this is storage reuse, not reuse of state-dependent opacities. The default
+`copy_parameters(template)` and ordinary `deepcopy(template)` copy table
+storage too.
 
 ## Where `τ_abs` enters the layer-optics pipeline
 
@@ -140,7 +171,7 @@ gives ``\tau_\mathrm{abs}(\nu, z)``. This is wrapped in a
 `CoreAbsorptionOpticalProperties` and added to the layer-optics build chain:
 
 ```julia
-# inside compEffectiveLayerProperties.jl:58 (paraphrased)
+# inside compEffectiveLayerProperties.jl:363 (paraphrased)
 combo = rayleigh + sum(aerosols)                       # τ_scat, ϖ, Z accumulated
 final = combo + CoreAbsorptionOpticalProperties(τ_abs) # τ_λ = τ_abs + τ_scat,
                                                         # ϖ_λ = τ_scat·ϖ / τ_λ
@@ -157,8 +188,8 @@ scattering-vs-total τ split that makes this work.
 |---|---|
 | HITRAN parser | [`src/Absorption/read_hitran.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Absorption/read_hitran.jl) |
 | Absorption types | [`src/Absorption/types.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Absorption/types.jl) |
-| Cross-section computation | [`src/Absorption/compute_absorption_cross_section.jl:32–280`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Absorption/compute_absorption_cross_section.jl#L32-L280) |
-| Line-shape kernel (`@kernel`) | [`src/Absorption/compute_absorption_cross_section.jl:229–280`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Absorption/compute_absorption_cross_section.jl#L229-L280) |
+| Cross-section computation | [`src/Absorption/compute_absorption_cross_section.jl:32–332`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Absorption/compute_absorption_cross_section.jl#L32-L332) |
+| Line-shape kernel (`@kernel`) | [`src/Absorption/compute_absorption_cross_section.jl:316–332`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Absorption/compute_absorption_cross_section.jl#L316-L332) |
 | Complex error functions | [`src/Absorption/complex_error_functions.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Absorption/complex_error_functions.jl) |
 | Constants & TIPS partition function | `src/Absorption/constants/` |
 

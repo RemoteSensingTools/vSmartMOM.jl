@@ -6,16 +6,20 @@ leaf-reflectance samples bundled under `src/SIF_emission/`.
 using DelimitedFiles: readdlm
 using DataInterpolations: LinearInterpolation
 
-export load_sif_spectrum, load_ficus_reflectance, sif_data_path, build_sif_source
+export load_sif_spectrum, sif_reference_state, load_ficus_reflectance,
+       sif_data_path, build_sif_source
 
 """
     sif_data_path(filename) -> String
 
-Absolute path to `filename` inside `src/SIF_emission/`. Benchmark scripts
-should use this helper rather than hardcoded absolute paths so that the
-package remains relocatable via `pkgdir(vSmartMOM)`.
+Absolute path to `filename` inside the SIF data directory. The directory is
+`src/SIF_emission/` by default and can be overridden with
+`VSMARTMOM_SIF_DATA_DIR` when the external CSV/DAT resources are intentionally
+kept out of a source-only checkout. Benchmark scripts should use this helper
+rather than hardcoded absolute paths.
 """
-sif_data_path(filename::AbstractString) = joinpath(@__DIR__, filename)
+sif_data_path(filename::AbstractString) = joinpath(
+    get(ENV, "VSMARTMOM_SIF_DATA_DIR", @__DIR__), filename)
 
 """
     load_sif_spectrum(path=sif_data_path("sif-spectra.csv"); column=:SIF_OLD,
@@ -28,15 +32,15 @@ Load a SIF emission spectrum from a CSV file and return
 - `jSIF` is the SIF flux in mW/m²/cm⁻¹ (converted from mW/m²/nm via the
   dλ/dν = 1e7/ν² Jacobian).
 
-`column` selects which SIF spectrum to read — the `sif-spectra.csv`
-file ships three: `:SIF_OLD`, `:SIF_NEW`, `:SIF_DEF`. Defaults to
+`column` selects which SIF spectrum to read. The externally supplied study
+`SIF` table (`sif-spectra.csv`) provides three columns: `:SIF_OLD`, `:SIF_NEW`, `:SIF_DEF`. Defaults to
 `:SIF_OLD` to match the benchmark scripts.
 
-TODO: The (0.5π / maximum(J_SIF)) rescaling is an intentional hack to
-make SIF magnitude data-independent for grid generation. This normalizes
-shape but discards absolute physical magnitude. Revisit: confirm the
-downstream physics depends only on SIF shape (not absolute flux), or
-replace with physical units (mW/m²/cm⁻¹). Not a merge blocker.
+With `rescale_to_peak=true`, the wavelength-space spectrum is normalized
+to a peak of `0.5π` before conversion to wavenumber density. This is a shape
+normalization, not a calibration of physical SIF amplitude. Use
+`rescale_to_peak=false` to preserve the supplied amplitude, or
+[`sif_reference_state`](@ref) for the explicit 760-nm campaign convention.
 """
 function load_sif_spectrum(path::AbstractString = sif_data_path("sif-spectra.csv");
                            column::Symbol = :SIF_OLD,
@@ -61,6 +65,46 @@ function load_sif_spectrum(path::AbstractString = sif_data_path("sif-spectra.csv
     jSIF .*= 1e7 ./ (ν .^ 2)
 
     return ν, jSIF
+end
+
+"""
+    sif_reference_state(; total_sif=0.5, reference_wavelength_nm=760,
+                        column=:SIF_OLD, path=sif_data_path("sif-spectra.csv"))
+
+Normalize the supplied SIF shape so that its wavelength-space integral is
+`total_sif` (mW m⁻² sr⁻¹), convert it to spectral radiance per cm⁻¹, and
+return the local wavenumber-linear state at `reference_wavelength_nm`:
+
+`(SIF760=SIF(ν₇₆₀), mSIF=dSIF/dν|₇₆₀, ν_ref=ν₇₆₀, ν, spectrum)`.
+
+The `SIF760` property retains that name for the retrieval convention even if
+a different diagnostic reference wavelength is requested. The slope is a
+centered secant through the nearest tabulated samples bracketing the reference.
+"""
+function sif_reference_state(; total_sif::Real=0.5,
+                             reference_wavelength_nm::Real=760,
+                             column::Symbol=:SIF_OLD,
+                             path::AbstractString=sif_data_path("sif-spectra.csv"))
+    total_sif >= 0 || throw(ArgumentError("total_sif must be nonnegative"))
+    ν, shape_ν = load_sif_spectrum(path; column, rescale_to_peak=false)
+    area = sum(((@view shape_ν[1:end-1]) .+ (@view shape_ν[2:end])) .* diff(ν)) / 2
+    area > 0 || throw(ArgumentError("SIF spectrum has nonpositive integrated area"))
+    spectrum = shape_ν .* (total_sif / area)
+    ν_ref = 1e7 / reference_wavelength_nm
+    ihi = searchsortedfirst(ν, ν_ref)
+    1 < ihi <= length(ν) || throw(ArgumentError(
+        "reference wavelength $reference_wavelength_nm nm lies outside the SIF spectrum"))
+    ilo = ihi - 1
+    SIF760 = spectrum[ilo] + (spectrum[ihi] - spectrum[ilo]) *
+             (ν_ref - ν[ilo]) / (ν[ihi] - ν[ilo])
+    # Use one sample on either side of an exact tabulated reference so the
+    # derivative is centered rather than selecting one piecewise-linear side.
+    if isapprox(ν[ihi], ν_ref; rtol=0, atol=8eps(ν_ref)) && ihi < length(ν)
+        ilo = ihi - 1
+        ihi += 1
+    end
+    mSIF = (spectrum[ihi] - spectrum[ilo]) / (ν[ihi] - ν[ilo])
+    return (; SIF760, mSIF, ν_ref, ν, spectrum)
 end
 
 """

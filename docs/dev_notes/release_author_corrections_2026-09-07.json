@@ -1,0 +1,540 @@
+{
+  "basis": "User confirmed this is Sanghavi code; cfranken is assisting. Scientific linearization, Raman and retrieval methodology credited to Sanghavi; engineering and speed work retain helper credit.",
+  "base": "b524a0d85ae36ab0eecf8b23a939f4d6ce62c456",
+  "old_head": "0540d37a8fda40acd6f2cd1d1cfee48ab769c2c9",
+  "new_head": "5534c7b144ce59ab3f7cdc1d9422abaa7b6360b7",
+  "commits": [
+    {
+      "old": "d8ec00964f78ebb5bbea9a2c0ce6724d3efb534f",
+      "new": "d8ec00964f78ebb5bbea9a2c0ce6724d3efb534f",
+      "author_changed": false,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Fix angular cache sizing for spectral Greek coefficients"
+    },
+    {
+      "old": "7cb8ae9857d0ff191b75bb518b5b294b87147c52",
+      "new": "7cb8ae9857d0ff191b75bb518b5b294b87147c52",
+      "author_changed": false,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Batch physical Jacobians across wavelengths and parameters"
+    },
+    {
+      "old": "8aa6079e50dcdb0ba5606aae705e1f67ec55c0b0",
+      "new": "8aa6079e50dcdb0ba5606aae705e1f67ec55c0b0",
+      "author_changed": false,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Batch Lambertian source Jacobians over spectral and parameter axes"
+    },
+    {
+      "old": "b0c95071e5fb68e9753bd35ddd9056b1962c895d",
+      "new": "b0c95071e5fb68e9753bd35ddd9056b1962c895d",
+      "author_changed": false,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Record integration release audit and Jacobian profiling"
+    },
+    {
+      "old": "73cf894f50cf30b0dc3d2fd93be9e2f3e88aa461",
+      "new": "73cf894f50cf30b0dc3d2fd93be9e2f3e88aa461",
+      "author_changed": false,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Document validated Jacobian optimizations and 10000-point scaling"
+    },
+    {
+      "old": "fa67f888518965a4065e3e26b9a1c0011150548a",
+      "new": "9191aba3c6945cb900c882de620ca0b9c1aff083",
+      "author_changed": true,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "sunitisanghavi",
+        "suniti.sanghavi@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Accelerate polarized Jacobians and verify core-basis factorization"
+    },
+    {
+      "old": "4360a1a9d2bf893c74dcc4734a947a8d5172271d",
+      "new": "62537c5c0716209c4d45d7f40f8879ce14316c40",
+      "author_changed": true,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "sunitisanghavi",
+        "suniti.sanghavi@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Trace historical Fortran Jacobian ordering and retain modern solver baseline"
+    },
+    {
+      "old": "f48c7515f796499baf7077bfe06ca15ac65d952f",
+      "new": "d5ff6e8583e575c15c73319e2f178cc252ece31f",
+      "author_changed": false,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Fix convergence strategy documentation build"
+    },
+    {
+      "old": "fe6b865e501420af44a9df20904bfcaddc2a32d7",
+      "new": "50b12afff5852b99827560526aafd4f4efc44580",
+      "author_changed": true,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "sunitisanghavi",
+        "suniti.sanghavi@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Factor local optical Jacobians before doubling"
+    },
+    {
+      "old": "ce3d38a407988690f6cba1203436aaf1ae704da1",
+      "new": "5502951be6f91cf4b18173595be9e1a2cf64aadc",
+      "author_changed": false,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Enable blocked Jacobian products for medium CUDA operators"
+    },
+    {
+      "old": "4df62396318bc65321c7d084fdccb80f0cea444b",
+      "new": "35a3495d08abdf09de293046a7cce533ffb01fbb",
+      "author_changed": true,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "sunitisanghavi",
+        "suniti.sanghavi@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Preserve elemental Jacobians at zero optical factors"
+    },
+    {
+      "old": "6da6df70ade507b32a6936361f7ff283ac3a9a9a",
+      "new": "ebb9c1fd580062d7051d17fb48be8e3c80fa3c94",
+      "author_changed": false,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Assert actual solar representation in local Jacobian tests"
+    },
+    {
+      "old": "e06a1a5460c118923c154c22b8245090ad90d544",
+      "new": "b469feabfa241000f75d7ca1c6cbea97d464c3a1",
+      "author_changed": false,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Select CUDA Jacobian products by operator size"
+    },
+    {
+      "old": "4b5a2408b914ce1f807952e8a541044151f3b954",
+      "new": "3ec6d36f7c71e00e886a53b3b1a4d5f5df6ba21b",
+      "author_changed": false,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Correct solar-mode onboarding and Jacobian code references"
+    },
+    {
+      "old": "58f9e149f4ce6fab4a00dfb71e77061f936b90b8",
+      "new": "76d631ebfad4b7f685e122d1ae551f417490683f",
+      "author_changed": true,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "sunitisanghavi",
+        "suniti.sanghavi@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Document local optical Jacobians and compare equivalent-source solves"
+    },
+    {
+      "old": "8bc60941e2f0babc18df2c58169a2e9556a19922",
+      "new": "7ef84106cc91423a7cbec63ad22273c2166dac9e",
+      "author_changed": true,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "sunitisanghavi",
+        "suniti.sanghavi@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Add equivalent-source Jacobian adding and fix aerosol normalization"
+    },
+    {
+      "old": "e5a4d38e08c5726f14d97f76ee2bc2b9be3cd59b",
+      "new": "ee0a87227170907cb958d2b1576ff0cdd0aaed4d",
+      "author_changed": false,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Reuse HITRAN spectroscopy and specialize native Mie derivatives"
+    },
+    {
+      "old": "075b341208653db7d914e625aac28ee733944f51",
+      "new": "686fa0fdbec2ebde3ccd03f184b2f88739824424",
+      "author_changed": false,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Record first-to-current Jacobian performance comparison"
+    },
+    {
+      "old": "00e670e186779b614142bbcff8a31f75def705e6",
+      "new": "900130199c249122048f7e9167286c9b9c340229",
+      "author_changed": true,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "sunitisanghavi",
+        "suniti.sanghavi@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Support surface SIF in equivalent-source Jacobians"
+    },
+    {
+      "old": "4284e13ae0f757b3f94524e36d58ee741d301823",
+      "new": "3fd88fa9d6278e2d0f7528a8ef38ea6069b2092d",
+      "author_changed": true,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "sunitisanghavi",
+        "suniti.sanghavi@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Preserve optical precision across Jacobian bases"
+    },
+    {
+      "old": "6cbaccc11cd788eac4bfbe9544619e8e328f6aeb",
+      "new": "160d93040e5994cf2be99d5ce8e173ecd08dd597",
+      "author_changed": true,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "sunitisanghavi",
+        "suniti.sanghavi@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Record SIF-enabled inversion replay and validation"
+    },
+    {
+      "old": "85652ad992e1ae143f51e4583dc75a327fecdeb3",
+      "new": "40c295c3fa1f116f856cd15c7f89676c68f5204d",
+      "author_changed": false,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Prune fixed microphysics from local Jacobian bases"
+    },
+    {
+      "old": "9bc89f08c1cde2636b29560e837205a65419401f",
+      "new": "fb7360aa98c3b2255aa7ae98c65bce1c79a1c3ba",
+      "author_changed": false,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Share read-only absorption LUTs in explicit trial parameter copies"
+    },
+    {
+      "old": "748c90a10a0debed8ab44aee7f3425cfb760a696",
+      "new": "576b2fa9ab9bdbb462a4cb57fc0cb60b1357a24c",
+      "author_changed": true,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "sunitisanghavi",
+        "suniti.sanghavi@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Validate Jacobian extension contracts and record OE convergence"
+    },
+    {
+      "old": "3d5bd1063d989dae51df351e094dfa503961caef",
+      "new": "5bbeac5316df35594c64121c14c923886616b2b0",
+      "author_changed": true,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "sunitisanghavi",
+        "suniti.sanghavi@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Diagnose retrieval spectral differences with matched precision controls"
+    },
+    {
+      "old": "b453c4477548a00c763c3148bfceb290f372d7c8",
+      "new": "39dd79f10294bac53dd63930e92dd0490d6efb50",
+      "author_changed": true,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "sunitisanghavi",
+        "suniti.sanghavi@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Isolate retrieval precision effects from RT arithmetic and spectral grids"
+    },
+    {
+      "old": "c0318416bc0f2bb1ff3d77382c70be4305c5461d",
+      "new": "9d10f06ddd83896832ca74c376962568f5e89316",
+      "author_changed": true,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "sunitisanghavi",
+        "suniti.sanghavi@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Verify precision differences after instrument convolution and sampling"
+    },
+    {
+      "old": "0540d37a8fda40acd6f2cd1d1cfee48ab769c2c9",
+      "new": "5534c7b144ce59ab3f7cdc1d9422abaa7b6360b7",
+      "author_changed": true,
+      "old_author": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "new_author": [
+        "sunitisanghavi",
+        "suniti.sanghavi@gmail.com"
+      ],
+      "committer": [
+        "cfranken",
+        "fronge@gmail.com"
+      ],
+      "tree_unchanged": true,
+      "subject": "Measure precision retrieval shifts and summarize study speedups"
+    }
+  ]
+}

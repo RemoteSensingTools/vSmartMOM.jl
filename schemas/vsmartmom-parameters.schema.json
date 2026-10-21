@@ -66,7 +66,13 @@
         },
         "surface": {
           "$ref": "#/definitions/stringArray",
-          "description": "One surface expression per band. Parser supports LambertianSurfaceScalar, LambertianSurfaceSpectrum, LambertianSurfaceLegendre, rpvSurfaceScalar, RossLiSurfaceScalar, and CoxMunkSurface."
+          "description": "One surface expression per band. Parser supports LambertianSurfaceScalar(albedo), LambertianSurfaceSpectrum([albedos]), LambertianSurfaceLegendre([coefficients]), rpvSurfaceScalar(ρ₀, ρ_c, k, Θ), RossLiSurfaceScalar(fvol, fgeo, fiso[, zenith_cap_deg=θ]) and CoxMunkSurface(wind_speed=U[, n_water=n, whitecap_albedo=a, include_whitecaps=true, shadowing=true]). RossLiSurfaceScalar caps both kernel zenith angles at zenith_cap_deg (default 80°, allowed (0, 90]); zenith_cap_deg=nothing (or null) uses the true angles, as MODIS and VLIDORT do. CoxMunkSurface without n_water uses the Segelstein (1981) water index at every spectral point.",
+          "examples": [
+            ["LambertianSurfaceScalar(0.05)"],
+            ["RossLiSurfaceScalar(0.05, 0.02, 0.12)"],
+            ["RossLiSurfaceScalar(0.05, 0.02, 0.12, zenith_cap_deg=nothing)"],
+            ["CoxMunkSurface(wind_speed=5.0)"]
+          ]
         },
         "quadrature_type": {
           "type": ["string", "null"],
@@ -95,7 +101,7 @@
           ],
           "enumDescriptions": [
             "Scalar intensity only. Fastest option; suitable for scalar surfaces and unpolarized diagnostics.",
-            "Intensity plus linear Q polarization. Useful when U/V are known to be unnecessary.",
+            "Intensity plus linear Q polarization. Parsed, but rejected by the RT solvers (neglecting U can cause intensity errors of several percent); use Stokes_IQU().",
             "Intensity plus both linear polarization components. Good default for polarized reflection without circular polarization.",
             "Full Stokes vector including circular polarization V. Most complete and most expensive option."
           ]
@@ -110,6 +116,12 @@
           "minimum": 0,
           "description": "v0.7 explicit Fourier loop bound (order). Optional override clamping the trait-derived bound from above. Default null."
         },
+        "greek_beta_cutoff": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "exclusiveMinimum": true,
+          "description": "Optional second-stage aerosol Fourier-support cutoff. The maximum size parameter first sets the conservative Mie coefficient ceiling; after size-distribution integration, each aerosol retains through the last degree satisfying abs(beta_l) >= cutoff at any wavelength in the band. Only beta is tested (not alpha/gamma/delta/epsilon/zeta). The maximum across aerosol species enters the component aggregator before stream/user caps. This reduces Fourier moments but does not change nstreams. Null/omitted disables the cutoff."
+        },
         "max_m": {
           "type": "integer",
           "minimum": 0,
@@ -117,7 +129,7 @@
         },
         "Δ_angle": {
           "type": "number",
-          "description": "Optional forward-peak exclusion angle in degrees consumed by δBGE truncation. Defaults to 0.0 (no forward-peak excluded) when omitted; legacy YAMLs may still set 2.0 explicitly. In TOML, quote the Unicode key as \"Δ_angle\" = 0.0."
+          "description": "Legacy compatibility field. The forward-peak exclusion cone is retired: the current δBGE calculation uses the full angular interval, regardless of this value. Defaults to 0.0. In TOML, quote the Unicode key as \"Δ_angle\" = 0.0."
         },
         "l_trunc": {
           "type": "integer",
@@ -148,11 +160,28 @@
               "description": "YAML only. Same as NoTruncation(). TOML has no null value, so use NoTruncation() or omit the key depending on intent."
             }
           ],
-          "examples": ["auto", "NoTruncation()", "δBGE(20, 2.0)"]
+          "examples": ["auto", "NoTruncation()", "δBGE(20, 0.0)"]
         },
         "depol": {
           "type": "number",
-          "description": "Rayleigh depolarization factor."
+          "description": "Rayleigh depolarization factor. A negative value (-1) derives it per band from the N2/O2 polarizability tensors; a value >= 0 is used uniformly."
+        },
+        "rayleigh_anisotropy": {
+          "type": "string",
+          "description": "Wavelength dependence of the N2/O2 polarizability tensor behind the automatic (depol < 0) Rayleigh depolarization of greek_rayleigh and tau_rayl. DispersiveAnisotropy() (default): mean polarizability and anisotropy from the refractive-index fits and King factors of UsingRefInd. ConstantAnisotropy(): the Raman-module constants with a wavelength-independent anisotropy (v2.2 pre-release behaviour). Cabannes fractions and Raman cross sections always use the Raman-module constants.",
+          "enum": [
+            "DispersiveAnisotropy()",
+            "ConstantAnisotropy()",
+            "DispersiveAnisotropy",
+            "ConstantAnisotropy"
+          ],
+          "enumDescriptions": [
+            "Default. Polarizability tensor from the UsingRefInd refractivity and King factor; the depolarization varies with wavelength.",
+            "Raman-module constants with a wavelength-independent anisotropy (v2.2 pre-release behaviour).",
+            "Same as DispersiveAnisotropy().",
+            "Same as ConstantAnisotropy()."
+          ],
+          "default": "DispersiveAnisotropy()"
         },
         "float_type": {
           "type": "string",
@@ -204,13 +233,118 @@
               "description": "Absolute floor on dτ_max as a multiple of eps(FT). Default 1024·eps(FT) ≈ 1.2e-4 for Float32 and 2.3e-13 for Float64."
             },
             "blas_threads": {
-              "type": ["integer", "null"],
+              "type": [
+                "integer",
+                "null"
+              ],
               "minimum": 1,
               "description": "Per-model BLAS thread cap. null = leave global BLAS alone (default). Recommend 4-8 for batched runs."
             },
             "verbose": {
               "type": "boolean",
               "description": "When true, rt_run prints the TimerOutputs timing tree at the end of each call. Default false (quiet). Useful for profiling, noisy in batched loops."
+            },
+            "dtau_max_threshold": {
+              "type": "number",
+              "minimum": 0,
+              "description": "ASCII alias of dτ_max_threshold."
+            },
+            "dtau_min_floor": {
+              "type": "number",
+              "minimum": 0,
+              "description": "ASCII alias of dτ_min_floor; an absolute optical-depth floor."
+            },
+            "fourier_convergence": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "all",
+                "none",
+                "intensity",
+                "stokes",
+                "iqu",
+                null
+              ],
+              "default": "all",
+              "description": "All moments, intensity convergence, or joint I/Q/U convergence. none/null aliases all; iqu aliases stokes."
+            },
+            "fourier_tolerance": {
+              "type": "number",
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "default": 1e-05,
+              "description": "Positive convergence tolerance; requires intensity or stokes convergence."
+            },
+            "fourier_min_m": {
+              "type": "integer",
+              "minimum": 3,
+              "default": 3,
+              "description": "First eligible convergence order; guard includes the polarized Rayleigh m=2 term."
+            },
+            "fourier_n_consecutive": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 2,
+              "description": "Number of consecutive eligible passing Fourier moments."
+            },
+            "ss_correction": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "none",
+                "tms",
+                null
+              ],
+              "default": "none",
+              "description": "Optional aerosol TMS correction; forward elastic SFI only. Cox–Munk glint correction is built in separately."
+            }
+          },
+          "dependencies": {
+            "fourier_tolerance": {
+              "required": [
+                "fourier_convergence"
+              ],
+              "properties": {
+                "fourier_convergence": {
+                  "enum": [
+                    "intensity",
+                    "stokes",
+                    "iqu"
+                  ]
+                }
+              }
+            },
+            "fourier_min_m": {
+              "required": [
+                "fourier_convergence"
+              ],
+              "properties": {
+                "fourier_convergence": {
+                  "enum": [
+                    "intensity",
+                    "stokes",
+                    "iqu"
+                  ]
+                }
+              }
+            },
+            "fourier_n_consecutive": {
+              "required": [
+                "fourier_convergence"
+              ],
+              "properties": {
+                "fourier_convergence": {
+                  "enum": [
+                    "intensity",
+                    "stokes",
+                    "iqu"
+                  ]
+                }
+              }
             }
           }
         }
@@ -239,8 +373,21 @@
           "description": "Viewing azimuth angles in degrees."
         },
         "obs_alt": {
-          "type": "number",
-          "description": "Observer altitude/pressure coordinate used by the existing parser."
+          "description": "Observer height selection in km above model BOA. Scalar 0 selects BOA only; scalar H selects H (or TOA when H is at or above it); [0] selects TOA+BOA; vectors select arbitrary interior heights, with 0 adding both endpoints.",
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          ]
         }
       }
     },
@@ -263,11 +410,14 @@
         },
         "q": {
           "$ref": "#/definitions/numberArray",
-          "description": "Optional specific humidity profile."
+          "description": "Optional specific humidity mass fraction [kg/kg], supplied at N layer centers or N+1 pressure interfaces. Interface values are interpolated to layer centers in log pressure."
         },
         "profile_reduction": {
-          "type": "integer",
-          "description": "Profile reduction level. TOML has no null value, so omit future optional semantics carefully or use an integer."
+          "anyOf": [
+            { "enum": [-1, null] },
+            { "type": "integer", "minimum": 1 }
+          ],
+          "description": "Profile reduction target. A positive integer coarsens the atmosphere; -1 or null disables reduction. Requested interior observer interfaces are retained, raising the effective target to K+1 layers when necessary."
         }
       }
     },
@@ -284,8 +434,13 @@
         },
         "vmr": {
           "type": "object",
-          "additionalProperties": true,
-          "description": "Volume mixing ratios by molecule name."
+          "additionalProperties": {
+            "anyOf": [
+              { "type": "number" },
+              { "$ref": "#/definitions/numberArray" }
+            ]
+          },
+          "description": "Dry-air molar ratios (mol species per mol dry air) by non-H2O molecule name. Each value is a scalar, an N-value layer profile, or an N+1-value pressure-interface profile. H2O is derived from atmospheric_profile.q."
         },
         "broadening": {
           "type": "string",
@@ -313,6 +468,51 @@
         },
         "wing_cutoff": {
           "type": "integer"
+        },
+        "cia_files": {
+          "type": "array",
+          "description": "HITRAN CIA files. A bare path is accepted only when reference-family coverage is unambiguous on the requested grid; otherwise use an object to select reference_codes.",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path"],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reference_codes": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    ]
+                  },
+                  "negative_policy": {
+                    "type": "string",
+                    "enum": ["error", "clamp_zero"]
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "mtckd_file": {
+          "type": "string"
         }
       }
     },
@@ -330,6 +530,13 @@
         },
         "r_max": {
           "type": "number"
+        },
+        "r_min": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMinimum": true,
+          "default": 0.001,
+          "description": "Lower radius bound of the size-distribution quadrature (µm), fixed for the run and independent of the aerosol size parameters; must be below r_max."
         },
         "nquad_radius": {
           "type": "number"

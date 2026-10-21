@@ -1,0 +1,120 @@
+AUDIT GPU: NVIDIA A100-PCIE-40GB
+AUDIT_GPU_BEGIN test_mie_gpu.jl
+  DS add max relative error: 2.21e-12
+  DS mul max relative error: 1.48e-14
+  DS div max relative error: 2.13e-14
+  ComplexDS max relative error: 2.29e-14
+  Harmonic(10000): exact=9.7876060360
+  Naive Float32 error:    6.88e-06
+  Neumaier Float32 error: 2.03e-07
+  Alternating(10000): exact=-0.6930971831
+  Naive error:    5.49e-06
+  Neumaier error: 8.89e-09
+  Wide range: naive rel err = 1.41e-07, Neumaier rel err = 1.88e-08
+  Dn(x=10, m=1.5 - 0.1im): max rel error = 2.33e-14 (n_max=29, nmx=80)
+  Dn(x=50, m=1.5 - 0.1im): max rel error = 1.69e-14 (n_max=75, nmx=126)
+  Dn(x=100, m=1.5 - 0.1im): max rel error = 2.83e-14 (n_max=129, nmx=201)
+  Dn(x=200, m=1.33 + 0.0im): max rel error = 2.39e-11 (n_max=234, nmx=317)
+  Dn(x=100, m=2.0 - 1.0im): max rel error = 2.02e-14 (n_max=129, nmx=275)
+  Dn(x=500, m=1.5 - 0.1im): max rel error = 5.78e-14 (n_max=542, nmx=803)
+  NativeFloat32 (log-normal, KA-CPU): k relerr=1.05e-07  ω̃ relerr=2.30e-08
+  NativeFloat32 (log-normal, real CUDA): k relerr=2.14e-07  ω̃ relerr=2.30e-08
+AUDIT_GPU_BEGIN test_raman_fused_kernels.jl
+AUDIT_GPU_BEGIN test_multisensor_heights_gpu.jl
+[ Info: test_mie_gpu: CUDA is functional — running real-GPU Mie testsets.
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO /tmp/vsmartmom-release-review/src/IO/Parameters.jl:677
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO /tmp/vsmartmom-release-review/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 4, 4, 1)
+Looping over layers ...  67%|██████████████████▋         |  ETA: 0:00:03[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:05[K
+┌ Info: Processing on: GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 4, 4, 1)
+Looping over layers ...  67%|██████████████████▋         |  ETA: 0:00:06[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:11[K
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (4, 4, 1)
+Looping over layers ...  67%|██████████████████▋         |  ETA: 0:00:03[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:06[K
+┌ Info: Processing on: GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (4, 4, 1)
+Looping over layers ...  67%|██████████████████▋         |  ETA: 0:00:05[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:10[K
+┌ Info: Processing on: CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (2, 4, 4, 1)
+Looping over layers ...  67%|██████████████████▋         |  ETA: 0:00:04[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:08[K
+┌ Info: Processing on: GPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (2, 4, 4, 1)
+Looping over layers ...  67%|██████████████████▋         |  ETA: 0:00:06[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:11[K
+┌ Info: Processing on: CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (4, 4, 1)
+Looping over layers ...  67%|██████████████████▋         |  ETA: 0:00:04[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:07[K
+┌ Info: Processing on: GPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (4, 4, 1)
+Looping over layers ...  67%|██████████████████▋         |  ETA: 0:00:04[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:08[K
+AUDIT_GPU_BEGIN test_forward_raman_gpu.jl
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO /tmp/vsmartmom-release-review/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (12, 12, 68)
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:07[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:04[K
+┌ Info: Processing on: GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (12, 12, 68)
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:04[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+  Running Raman forward on GPU (nSpec=68)...
+    R shape: (4, 3, 68), all finite and positive.
+    noRS baseline on GPU: all finite and positive.
+    Ring effect: mean=0.46%, max=1.03%
+
+Raman GPU tests complete.
+AUDIT_GPU_BEGIN test_jacobians_GPU.jl
+┌ Info: Processing on: GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (12, 12, 68)
+┌ Info: Processing on: GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (12, 12, 68)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO /tmp/vsmartmom-release-review/src/IO/Parameters.jl:677
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO /tmp/vsmartmom-release-review/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+Running linearized RT on GPU...
+  GPU vs CPU: R and dR match within rtol=0.0001
+  ✓ GPU Jacobian tests passed.
+
+GPU Jacobian tests complete.
+Test Summary:                          |  Pass  Total     Time
+GPU tests with corrected include paths | 20291  20291  6m50.7s

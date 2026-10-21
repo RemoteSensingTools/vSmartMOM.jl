@@ -322,7 +322,7 @@ end
                 "sza" => 35.0,
                 "vza" => [20.0, 50.0],
                 "vaz" => [0.0, 90.0],
-                "obs_alt" => 1000.0,
+                "obs_alt" => [0.0],
             ),
             "atmospheric_profile" => Dict(
                 "T" => [280.0],
@@ -387,12 +387,11 @@ end
         @test size(cox_result.path2) == (2, 3, 1)
         @test all(isfinite.(cox_result.path2))
 
+        # CoreRT models reject Stokes_IQ; the I/Q single-scattering paths
+        # remain available through ExactSSConfig (tested below).
         iq_cox_cfg = deepcopy(cox_cfg)
         iq_cox_cfg["radiative_transfer"]["polarization_type"] = "Stokes_IQ()"
-        iq_cox_model = model_from_parameters(parameters_from_dict(iq_cox_cfg))
-        iq_cox_result = run_exact_ss(iq_cox_model; paths=:path2)
-        @test size(iq_cox_result.path2) == (2, 2, 1)
-        @test all(isfinite.(iq_cox_result.path2))
+        @test_throws ArgumentError model_from_parameters(parameters_from_dict(iq_cox_cfg))
     end
 
     @testset "Rayleigh path 1 and Lambertian path 2" begin
@@ -559,7 +558,7 @@ end
         τ = sum(absorption.τ[:, 1])
         for iv in eachindex(geometry.μv)
             M = vSmartMOM.CoreRT.coxmunk_brdf_mueller(
-                core_surface, 1, geometry.μv[iv], geometry.μ₀,
+                core_surface, 1, geometry.μ₀, geometry.μv[iv],
                 geometry.Δϕ[iv]; n_water=n_water)
             expected[iv, 1, 1] = geometry.μ₀ * M[1, 1] *
                                  exp(-τ / geometry.μ₀) *
@@ -578,7 +577,7 @@ end
         vector_expected = zeros(FT, 2, 4, 1)
         for iv in eachindex(geometry.μv)
             M = vSmartMOM.CoreRT.coxmunk_brdf_mueller(
-                core_surface, 4, geometry.μv[iv], geometry.μ₀,
+                core_surface, 4, geometry.μ₀, geometry.μv[iv],
                 geometry.Δϕ[iv]; n_water=n_water)
             vector_expected[iv, :, 1] .= geometry.μ₀ .* M[:, 1] .*
                                          exp(-τ / geometry.μ₀) .*
@@ -594,7 +593,7 @@ end
         iq_expected = zeros(FT, 2, 2, 1)
         for iv in eachindex(geometry.μv)
             M = vSmartMOM.CoreRT.coxmunk_brdf_mueller(
-                core_surface, 2, geometry.μv[iv], geometry.μ₀,
+                core_surface, 2, geometry.μ₀, geometry.μv[iv],
                 geometry.Δϕ[iv]; n_water=n_water)
             iq_expected[iv, :, 1] .= geometry.μ₀ .* M[:, 1] .*
                                      exp(-τ / geometry.μ₀) .*
@@ -675,6 +674,10 @@ end
         cox_m48 = truncated_ss_path2(cox_config, 48)
         @test all(isfinite.(cox_m48))
         @test norm(vec(cox_m48 .- cox_exact)) < norm(vec(cox_m1 .- cox_exact))
+        # The Fourier series converges to the exact BRDF; the m = 0 term
+        # carries the azimuthal mean with weight one.
+        @test cox_m48 ≈ cox_exact rtol=1e-10
+        @test truncated_ss_path2(cox_config, 200) ≈ cox_exact rtol=1e-10
         @test_throws ArgumentError truncated_ss_path2(cox_config, 0)
     end
 

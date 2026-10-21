@@ -25,23 +25,31 @@ function get_n₀_n₁(ieJ₁⁺, Δ)
     return n₀, n₁
 end
 # Currently assuming same T for all vertical atmospheric layers (so that a uniform Raman wavelength grid can be assumed for rt_interactions)
+"""
+    getRamanAtmoConstants(ν̃, T, [vmr_n2, vmr_o2], [anisotropy])
+
+Return the N₂ and O₂ `MolecularConstants` (VMR 0.8 and 0.2 unless given) with
+effective polarizabilities, energy levels, and Rayleigh, Cabannes, rotational
+and vibrational Raman coefficients at wavenumber `ν̃` (cm⁻¹) and temperature
+`T` (K).
+
+Without `anisotropy` (or with [`ConstantAnisotropy`](@ref)) the Raman-module
+tensor is used: the constants of the published Raman tables (Sanghavi 2022,
+JQSRT 291, 108328; Sanghavi 2026, Table 1). `DispersiveAnisotropy()` instead
+takes the mean polarizability and anisotropy from the `UsingRefInd`
+refractivity and King factor (see [`compute_effective_coefficents!`](@ref));
+it changes the rotational Raman line strengths (∝ γ²) and the Cabannes
+fractions and is not used by default by any RT path.
+"""
 function getRamanAtmoConstants(ν̃::AbstractFloat, T::AbstractFloat)
     ν̃, T = promote(ν̃, T)
     n2 = InelasticScattering.getMolecularConstants(InelasticScattering.N₂(), (0.8));
     compute_effective_coefficents!(ν̃, T, n2)
-    compute_energy_levels!(n2)
-    compute_σ_Rayl_coeff!(n2)
-    compute_σ_Rayl_VibRaman_coeff_hires!(T, n2)
-    compute_σ_VibRaman_coeff!(T, n2)
-    compute_σ_RoVibRaman_coeff!(T, n2)
+    _compute_raman_coefficients!(T, n2)
 
     o2 = InelasticScattering.getMolecularConstants(InelasticScattering.O₂(), (0.2));
     compute_effective_coefficents!(ν̃, T, o2)
-    compute_energy_levels!(o2)
-    compute_σ_Rayl_coeff!(o2)
-    compute_σ_Rayl_VibRaman_coeff_hires!(T, o2)
-    compute_σ_VibRaman_coeff!(T, o2)
-    compute_σ_RoVibRaman_coeff!(T, o2)
+    _compute_raman_coefficients!(T, o2)
 
     return n2,o2
 end
@@ -51,26 +59,77 @@ function getRamanAtmoConstants(ν̃::AbstractFloat, T::AbstractFloat, vmr_n2::Ab
     @assert 0<=vmr_n2+vmr_o2<=1
     n2 = InelasticScattering.getMolecularConstants(InelasticScattering.N₂(), vmr_n2);
     compute_effective_coefficents!(ν̃, T, n2)
-    compute_energy_levels!(n2)
-    compute_σ_Rayl_coeff!(n2)
-    compute_σ_Rayl_VibRaman_coeff_hires!(T, n2)
-    compute_σ_VibRaman_coeff!(T, n2)
-    compute_σ_RoVibRaman_coeff!(T, n2)
+    _compute_raman_coefficients!(T, n2)
 
     o2 = InelasticScattering.getMolecularConstants(InelasticScattering.O₂(), vmr_o2);
     compute_effective_coefficents!(ν̃, T, o2)
-    compute_energy_levels!(o2)
-    compute_σ_Rayl_coeff!(o2)
-    compute_σ_Rayl_VibRaman_coeff_hires!(T, o2)
-    compute_σ_VibRaman_coeff!(T, o2)
-    compute_σ_RoVibRaman_coeff!(T, o2)
+    _compute_raman_coefficients!(T, o2)
 
     return n2,o2
 end
 
+getRamanAtmoConstants(ν̃::AbstractFloat, T::AbstractFloat, ::ConstantAnisotropy) =
+    getRamanAtmoConstants(ν̃, T)
+
+getRamanAtmoConstants(ν̃::AbstractFloat, T::AbstractFloat, vmr_n2::AbstractFloat,
+                      vmr_o2::AbstractFloat, ::ConstantAnisotropy) =
+    getRamanAtmoConstants(ν̃, T, vmr_n2, vmr_o2)
+
+getRamanAtmoConstants(ν̃::AbstractFloat, T::AbstractFloat, a::DispersiveAnisotropy) =
+    getRamanAtmoConstants(ν̃, T, 0.8, 0.2, a)
+
+function getRamanAtmoConstants(ν̃::AbstractFloat, T::AbstractFloat,
+                               vmr_n2::AbstractFloat, vmr_o2::AbstractFloat,
+                               anisotropy::DispersiveAnisotropy)
+    ν̃, T, vmr_n2, vmr_o2 = promote(ν̃, T, vmr_n2, vmr_o2)
+    @assert 0<=vmr_n2+vmr_o2<=1
+    n2 = InelasticScattering.getMolecularConstants(InelasticScattering.N₂(), vmr_n2);
+    compute_effective_coefficents!(ν̃, T, n2, InelasticScattering.N₂(), anisotropy)
+    _compute_raman_coefficients!(T, n2)
+
+    o2 = InelasticScattering.getMolecularConstants(InelasticScattering.O₂(), vmr_o2);
+    compute_effective_coefficents!(ν̃, T, o2, InelasticScattering.O₂(), anisotropy)
+    _compute_raman_coefficients!(T, o2)
+
+    return n2,o2
+end
+
+# Everything `getRamanAtmoConstants` derives after the effective polarizabilities.
+function _compute_raman_coefficients!(T, mol)
+    compute_energy_levels!(mol)
+    compute_σ_Rayl_coeff!(mol)
+    compute_σ_Rayl_VibRaman_coeff_hires!(T, mol)
+    compute_σ_VibRaman_coeff!(T, mol)
+    compute_σ_RoVibRaman_coeff!(T, mol)
+    return mol
+end
+
+"""
+    rayleigh_air_depolarization(anisotropy, λ₀, T) -> (depol, σ_air)
+
+Depolarization ratio (in the convention of `get_greek_rayleigh`) and cross
+section (cm² molecule⁻¹) of the N₂/O₂ Rayleigh mixture (VMR 0.8/0.2, as in
+`getRamanAtmoConstants`) at wavelength `λ₀` (nm) and temperature `T` (K), with
+the tensor dispersion `anisotropy`. This is the depolarization the RT model
+uses for `depol: -1`. Only the Rayleigh coefficients are computed.
+"""
+function rayleigh_air_depolarization(anisotropy::Scattering.AbstractPolarizabilityDispersion,
+                                     λ₀, T)
+    λ = float(λ₀)
+    ν̃, T′ = promote(oftype(λ, 1.0e7) / λ, T)
+    n2 = InelasticScattering.getMolecularConstants(InelasticScattering.N₂(), (0.8))
+    compute_effective_coefficents!(ν̃, T′, n2, InelasticScattering.N₂(), anisotropy)
+    compute_σ_Rayl_coeff!(n2)
+    o2 = InelasticScattering.getMolecularConstants(InelasticScattering.O₂(), (0.2))
+    compute_effective_coefficents!(ν̃, T′, o2, InelasticScattering.O₂(), anisotropy)
+    compute_σ_Rayl_coeff!(o2)
+    γ_air, σ_air = compute_γ_air_Rayleigh!(λ, n2, o2)
+    return 2γ_air / (1 + γ_air), σ_air
+end
+
 function compute_ϖ_Cabannes(RS_type::noRS, depol, λ₀)
-    RS_type.ϖ_Cabannes = 1.0;
-    return RS_type.ϖ_Cabannes;
+    fill!(RS_type.ϖ_Cabannes, one(eltype(RS_type.ϖ_Cabannes)))
+    return RS_type.ϖ_Cabannes
 end
 
 #=function compute_ϖ_Cabannes(
@@ -442,8 +501,8 @@ function apply_lineshape!(Δνᵢ, σᵢ,  # discrete transitions
     grid_min = minimum(Δν_out) 
 
     # Interpolators from grid bounds to index values
-    grid_idx_interp_low  = LinearInterpolation(Δν_out, 1:1:length(Δν_out), extrapolation_bc=1)
-    grid_idx_interp_high = LinearInterpolation(Δν_out, 1:1:length(Δν_out), extrapolation_bc=length(Δν_out))
+    grid_idx_interp_low  = linear_interpolation(Δν_out, 1:1:length(Δν_out), extrapolation_bc=1)
+    grid_idx_interp_high = linear_interpolation(Δν_out, 1:1:length(Δν_out), extrapolation_bc=length(Δν_out))
 
     S_sum=0.0
     # Loop through all transition lines:
@@ -484,17 +543,23 @@ function apply_lineshape!(Δνᵢ, σᵢ,  # discrete transitions
     #@show S_sum, sum(σ_out)*dν
 end
 
+"""
+    apply_gridlines!(Δνᵢ, σᵢ, λ₀, ν_in, σ_out; wavelength_flag=false)
+
+Put discrete Raman lines (shifts `Δνᵢ` in cm⁻¹ from ν₀ = 10⁷/λ₀, coefficients
+`σᵢ`) on the sorted wavenumber grid `ν_in`, writing `σ_out`. A line of
+strength S = σᵢ (ν₀ + Δνᵢ)⁴ inside the grid (end points included) is shared
+between its two bracketing grid points by linear interpolation, S(1 − f) and
+S f with f = (ν₀ + Δνᵢ − νₖ)/(νₖ₊₁ − νₖ), which keeps both the line strength
+and its position (first moment). Lines outside the grid are dropped.
+"""
 function apply_gridlines!(Δνᵢ, σᵢ,  # discrete transitions
     λ₀,                 # incident  wavelength [nm]
     # Note:  λ₀ can either be used to denote an individual 
     # wavelength or as a representative (e.g. central) 
     # wavelength for a specific band
-    ν_in,             # Output grid (equidistant)
+    ν_in,             # Output grid (sorted, ascending or descending)
     σ_out;              # σ at output grid
-    
-    #pressure::Real,     # actual pressure [hPa]
-    #temperature::Real,  # Temperature (K)
-    #molMass; 
     wavelength_flag::Bool=false)    
     σ_out .= 0;
     # Notify user of wavelength grid
@@ -503,57 +568,30 @@ function apply_gridlines!(Δνᵢ, σᵢ,  # discrete transitions
         Note: Rayleigh/Raman Cross-section reported to wavelength grid (nm)
         """  maxlog = 5
     end
-    Δν_in = ν_in .- nm_per_cm/λ₀
+    ν₀ = nm_per_cm/λ₀
+    # Shifts of the grid points from ν₀, in Float64 for any grid type.
+    Δν_in = Float64.(ν_in) .- ν₀
+    n = length(Δν_in)
+    rev = first(Δν_in) > last(Δν_in)
+    grid_min, grid_max = extrema(Δν_in)
 
-    # Max min range (ignoring wing cutoff here)
-    grid_max = maximum(Δν_in) 
-    grid_min = minimum(Δν_in) 
-
-    # Interpolators from grid bounds to index values
-    #grid_idx_interp_low  = LinearInterpolation(Δν_out, 1:1:length(Δν_out), extrapolation_bc=1) 
-    #grid_idx_interp_high = LinearInterpolation(Δν_out, 1:1:length(Δν_out), extrapolation_bc=length(Δν_out))
-    S_sum = 0.0
     # Loop through all transition lines:
     for j in eachindex(Δνᵢ)
-        #@show(grid_min, Δνᵢ[j], grid_max)
-        # Test that this ν lies within the grid
-        if grid_min < Δνᵢ[j] < grid_max
-            
-            ν = Δνᵢ[j] + nm_per_cm/λ₀#13500.0 #Dummy for now #Suniti
-
-            # Compute Doppler HWHM, ν still needs to be supplied, @Suniti?:
-            #γ_d = ((cSqrt2Ln2 / cc_) * sqrt(cBolts_ / cMassMol) * sqrt(temperature) * ν / sqrt(molMass))
-            # line intensity 
-            S = σᵢ[j] *  ν^4 #Suniti
-            #@show γ_d, Δνᵢ[j], S, ν, λ₀, cMassMol
-            S_sum += S
-            #wing_cutoff = 2γ_d 
-            i=argmin(abs.(Δνᵢ[j].-Δν_in))
-            #@show i, Δνᵢ[j]-Δν_in[i]    
-            if Δν_in[i]<Δνᵢ[j]
-                ind_start = i
-                ind_stop  = i+1
-            else
-                ind_start = i-1
-                ind_stop  = i
-            end         
-            # Calculate index range that this transition impacts
-            #ind_start = Int64(floor(grid_idx_interp_low(Δνᵢ[j] - wing_cutoff)))
-            #ind_stop  = Int64(ceil(grid_idx_interp_high(Δνᵢ[j] + wing_cutoff)))
-
-            # Create views from the result and grid arrays
-            result_view   = view(σ_out,  ind_start:ind_stop);
-            grid_view     = view(Δν_in, ind_start:ind_stop);
-
-            # Just Doppler broadening for now, can be modified with any line-shape later (using a kernel ideally)
-            for I in eachindex(grid_view)
-                # If we undersample the line-width, we have to make sure the integral is conserved (almost), TBD
-                @inbounds result_view[I] += S/2.# * cSqrtLn2divSqrtPi * exp(-cLn2 * (((grid_view[I]) - Δνᵢ[j]) / γ_d)^2) / γ_d
-                #@show grid_view[I], result_view[I]
-            end
+        # Test that this ν lies within the grid (end points included)
+        grid_min ≤ Δνᵢ[j] ≤ grid_max || continue
+        # line intensity at the scattered wavenumber
+        S = σᵢ[j] * (Δνᵢ[j] + ν₀)^4
+        if n == 1
+            σ_out[1] += S
+            continue
         end
+        # Bracketing grid points k, k+1 and the linear-interpolation weight
+        # (a line on the last grid point goes to it with f = 1)
+        k = min(searchsortedlast(Δν_in, Δνᵢ[j]; rev), n - 1)
+        f = (Δνᵢ[j] - Δν_in[k]) / (Δν_in[k+1] - Δν_in[k])
+        σ_out[k]   += (1 - f) * S
+        σ_out[k+1] += f * S
     end
-    #@show S_sum, sum(σ_out)
     nothing
 end
 
@@ -567,43 +605,89 @@ function compute_optical_Rayl(λ₀, n2, o2)
     return atmo_σ_Rayl;
 end
 
+"Smallest and largest |shift| (cm⁻¹) of the populated rotational Raman lines of `mol`."
+function _rrs_shift_range(mol)
+    e = mol.effCoeff
+    Δν = vcat(parent(e.Δν̃_RoRaman_coeff_JtoJp2), parent(e.Δν̃_RoRaman_coeff_JtoJm2))
+    σ = vcat(parent(e.σ_RoRaman_coeff_JtoJp2), parent(e.σ_RoRaman_coeff_JtoJm2))
+    shifts = [abs(Δν[k]) for k in eachindex(Δν, σ) if σ[k] > 0]
+    return extrema(shifts)
+end
+
+"""
+    _no_rrs_line_error(grid, ν₀, n2, o2, raman_fraction)
+
+`ArgumentError` for a rotational Raman band `grid` (cm⁻¹) that holds no N₂/O₂
+rotational line around the reference wavenumber `ν₀`. The elastic part would
+still be reduced to the Cabannes fraction, so the Raman fraction
+`raman_fraction` = 1 − ϖ_Cabannes of the Rayleigh scattering would be lost.
+"""
+function _no_rrs_line_error(grid, ν₀, n2, o2, raman_fraction)
+    min_n2, max_n2 = _rrs_shift_range(n2)
+    min_o2, max_o2 = _rrs_shift_range(o2)
+    fmt(x) = string(round(x, digits = 1))
+    return ArgumentError(
+        "rotational Raman (RRS): the band $(fmt(first(grid)))–$(fmt(last(grid))) cm⁻¹ " *
+        "holds no N₂/O₂ rotational Raman line around ν₀ = $(fmt(ν₀)) cm⁻¹. The smallest " *
+        "shifts are ±$(fmt(min_n2)) cm⁻¹ (N₂) and ±$(fmt(min_o2)) cm⁻¹ (O₂), so the Raman " *
+        "fraction 1 − ϖ_Cabannes = $(round(100 * raman_fraction, sigdigits = 3)) % of the " *
+        "Rayleigh scattering would be removed from the elastic part and not redistributed. " *
+        "Widen the band beyond ±$(fmt(min(min_n2, min_o2))) cm⁻¹ around ν₀ (±$(fmt(max(min_n2, min_o2))) " *
+        "cm⁻¹ for lines of both molecules; all lines lie within ±$(fmt(max(max_n2, max_o2))) cm⁻¹), " *
+        "or use noRS() for this band.")
+end
+
+"""
+    compute_optical_RS!(rs::RRS, grid_in, λ₀, n2, o2) -> (offsets, σ_RRS)
+
+Rotational Raman cross sections (cm², VMR-weighted N₂ + O₂) on the uniform
+band grid `grid_in` (cm⁻¹). The line shifts are measured from the grid point
+`k₀` nearest the reference wavenumber 10⁷/λ₀, so the result does not depend on
+whether λ₀ falls on a grid point (the mean of an even-length band lies between
+two). `σ_RRS[k]` is the cross section from a source point to the output point
+`offsets[k]` grid steps away (output = source + offset; on an ascending
+grid, Stokes lines have negative offsets).
+"""
 function compute_optical_RS!(RS_type::RRS, grid_in, λ₀, n2, o2)
-    #plotly()
-    # grid_in is a uniform wavenumber grid covering the entire band spectrum 
-    # TMP: grid_in = nm_per_cm/λ₀.+collect(-250:0.002:250) #this is a wavenumber grid
-    # get_greek_raman!(RS_type, n2, o2)
-    
     grid_in_collected = collect(grid_in)
+    # Reference grid point: the line shifts, and hence the offsets, are taken
+    # from it, never from an off-grid ν₀.
+    ν_ref = nm_per_cm/λ₀
+    k₀ = argmin(abs.(grid_in_collected .- ν_ref))
+    if length(grid_in_collected) > 1
+        # λ₀ must lie within the band, up to rounding: 10⁻³ of a grid step plus
+        # a few ulps of the λ₀ and grid precisions (Float32 inputs).
+        tol = 1e-3 * minimum(abs, diff(grid_in_collected)) +
+              4 * (eps(float(typeof(λ₀))) + eps(float(eltype(grid_in_collected)))) * abs(ν_ref)
+        ν_min, ν_max = extrema(grid_in_collected)
+        ν_min - tol ≤ ν_ref ≤ ν_max + tol || throw(ArgumentError(
+            "rotational Raman (RRS): the reference wavelength λ = $(λ₀) nm " *
+            "($(ν_ref) cm⁻¹) lies outside the band grid " *
+            "$(first(grid_in_collected))–$(last(grid_in_collected)) cm⁻¹; use the band " *
+            "centre, λ = 1e7 / mean(ν)"))
+    end
+    λ_ref = nm_per_cm/Float64(grid_in_collected[k₀])
+
     σ_out = similar(grid_in_collected);
-    atmo_σ_RRS_JtoJp2 = similar(grid_in_collected);
-    atmo_σ_RRS_JtoJm2 = similar(grid_in_collected);
     σ_tmp = similar(grid_in_collected);
 
     # N2
-    apply_gridlines!(n2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2, n2.effCoeff.σ_RoRaman_coeff_JtoJp2,  λ₀, grid_in_collected, σ_out);
+    apply_gridlines!(n2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2, n2.effCoeff.σ_RoRaman_coeff_JtoJp2, λ_ref, grid_in_collected, σ_out);
     atmo_σ_RRS_JtoJp2 = n2.vmr * σ_out #cross section in cm^2
 
-    apply_gridlines!(n2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2, n2.effCoeff.σ_RoRaman_coeff_JtoJm2, λ₀, grid_in_collected, σ_out);
+    apply_gridlines!(n2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2, n2.effCoeff.σ_RoRaman_coeff_JtoJm2, λ_ref, grid_in_collected, σ_out);
     atmo_σ_RRS_JtoJm2 = n2.vmr * σ_out #cross section in cm^2
     # O2
-    apply_gridlines!(o2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2, o2.effCoeff.σ_RoRaman_coeff_JtoJp2, λ₀, grid_in_collected, σ_out);
+    apply_gridlines!(o2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2, o2.effCoeff.σ_RoRaman_coeff_JtoJp2, λ_ref, grid_in_collected, σ_out);
     atmo_σ_RRS_JtoJp2 += o2.vmr * σ_out #cross section in cm^2
 
-    apply_gridlines!(o2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2, o2.effCoeff.σ_RoRaman_coeff_JtoJm2, λ₀, grid_in_collected, σ_out);
+    apply_gridlines!(o2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2, o2.effCoeff.σ_RoRaman_coeff_JtoJm2, λ_ref, grid_in_collected, σ_out);
     atmo_σ_RRS_JtoJm2 += o2.vmr * σ_out #cross section in cm^2
 
     σ_tmp .= atmo_σ_RRS_JtoJm2 .+ atmo_σ_RRS_JtoJp2
     index_ramangrid_out = findall(>(0), σ_tmp)
     atmo_σ_RRS = σ_tmp[index_ramangrid_out]
-    if (nm_per_cm/λ₀>grid_in[1] && nm_per_cm/λ₀<grid_in[end])
-        index_ramangrid_out .-= argmin(abs.(grid_in_collected .- nm_per_cm/λ₀))
-    end 
-    #for I in eachindex(atmo_σ_RRS)
-    #    @show grid_in[argmin(abs.(grid_in .- nm_per_cm/λ₀))+index_ramangrid_out[I]], index_ramangrid_out[I], atmo_σ_RRS[I]
-    #end    
-    return index_ramangrid_out, atmo_σ_RRS;
-    #plot(grid_out, atmo_σ_RRS_JtoJp2, yscale=:log10)
-    #plot(1.e7/λ₀ .+ grid_out, atmo_σ_RRS_plot*1.e40)
+    return index_ramangrid_out .- k₀, atmo_σ_RRS;
 end
 
 function compute_optical_RS!(RS_type::Union{VS_0to1, VS_0to1_plus}, grid_in, λ₀, n2, o2)
@@ -825,17 +909,32 @@ function get_greek_raman(RS_type::Union{RRS, VS_0to1, VS_0to1_plus, VS_1to0, VS_
     #return nothing
 end
 
+# Vibrational level from which the lines of each vibrational Raman mode start.
+_vs_initial_level(::Union{VS_0to1, VS_0to1_plus}) = 0
+_vs_initial_level(::Union{VS_1to0, VS_1to0_plus}) = 1
+
 """
     get_greek_raman_VS(rs, molecule)
 
-Return vibrational Raman phase-function Greek coefficients for one molecular
-species.
+Return the Greek coefficients of the vibrational Q-branch (ΔJ = 0) phase
+matrix of one molecular species. The Q branch is the sum of the per-J lines of
+`compute_σ_Rayl_VibRaman_coeff_hires!`, each a Rayleigh-type line with
+isotropic part α′²/3 and anisotropic part (2/27) b_JJ γ′². Their sum is a
+single Rayleigh-type line with the population-weighted ⟨b_JJ⟩
+(`q_branch_mean_b`, same temperature as the lines), so the phase
+matrix uses
+
+    γ_C = 3⟨b_JJ⟩γ′² / (45α′² + 4⟨b_JJ⟩γ′²),   ρ = 2γ_C / (1 + γ_C).
+
+(The O and S branches are separate RVRS lines with the RRS phase matrix.)
 """
 function get_greek_raman_VS(RS_type::Union{VS_0to1, VS_0to1_plus, VS_1to0, VS_1to0_plus}, 
                             in_molec)
-    
-    depol = in_molec.effCoeff.rho_depol_VibRaman
-    
+    e = in_molec.effCoeff
+    b̄ = q_branch_mean_b(in_molec, _vs_initial_level(RS_type))
+    γ_C = _q_branch_depolarization(e.α_prime, e.γ_prime, b̄)
+    depol = 2γ_C / (1 + γ_C)
+
     FT = eltype(depol)
     # Rayleigh Greek Parameters
     dpl_p = (1 - depol)  / (1 + depol / 2)
@@ -864,6 +963,27 @@ function computeRamanZλ!(RS_type::RRS, pol_type, qp_μ, m, arr_type)
                                         RS_type.greek_raman, 
                                         m, 
                                         arr_type = arr_type);
+    nothing
+end
+
+
+"""
+    computeRamanZλ!(rs::RRS, pol_type, qp_μ, m, arr_type, μ₀)
+
+Build separate angular representations for Raman scattering. The square
+`Zλ₁λ₀` matrices couple diffuse incident and output streams. With
+`external_solar=true`, the fixed solar direction is excluded from those
+matrices and evaluated independently as rectangular `Z₀` columns. Host arrays
+are retained in `RRS`; elemental kernels transfer them to the active backend,
+matching the historical Raman storage contract.
+"""
+function computeRamanZλ!(RS_type::RRS, pol_type, qp_μ, m, arr_type, μ₀)
+    μ = Array(qp_μ)
+    RS_type.Z⁺⁺_λ₁λ₀, RS_type.Z⁻⁺_λ₁λ₀ =
+        Scattering.compute_Z_moments(pol_type, μ, RS_type.greek_raman, m)
+    RS_type.Z₀⁺⁺_λ₁λ₀, RS_type.Z₀⁻⁺_λ₁λ₀ =
+        Scattering.compute_Z_source_moments(
+            pol_type, μ, μ₀, RS_type.greek_raman, m)
     nothing
 end
 

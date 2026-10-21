@@ -1,0 +1,50 @@
+{
+  "cases": [
+    {
+      "case": "state001_corrected_siffalse",
+      "historical_evaluation_total_seconds": 246.306796701,
+      "optimized_full_solve_seconds": 31.205453035,
+      "historical_ratio": 7.893069087147768,
+      "current_reference_full_solve_seconds": 223.011824425,
+      "current_reference_ratio": 7.1465658317753045,
+      "historical_terminal_seconds": 57.583056435,
+      "first_pair_includes_compilation": true
+    },
+    {
+      "case": "state001_uncorrected_siffalse",
+      "historical_evaluation_total_seconds": 247.418162793,
+      "optimized_full_solve_seconds": 20.692115357,
+      "historical_ratio": 11.957122726425364,
+      "current_reference_full_solve_seconds": 68.886821075,
+      "current_reference_ratio": 3.329133821578859,
+      "historical_terminal_seconds": 57.861388752,
+      "first_pair_includes_compilation": false
+    },
+    {
+      "case": "state035_corrected_siffalse",
+      "historical_evaluation_total_seconds": 698.148929876,
+      "optimized_full_solve_seconds": 36.652541876,
+      "historical_ratio": 19.04776296928935,
+      "current_reference_full_solve_seconds": 119.450962826,
+      "current_reference_ratio": 3.259008972150338,
+      "historical_terminal_seconds": 117.289165037,
+      "first_pair_includes_compilation": false
+    },
+    {
+      "case": "state035_uncorrected_siffalse",
+      "historical_evaluation_total_seconds": 702.038431584,
+      "optimized_full_solve_seconds": 35.80151733,
+      "historical_ratio": 19.60918094931481,
+      "current_reference_full_solve_seconds": 116.35494687,
+      "current_reference_ratio": 3.2500004342693036,
+      "historical_terminal_seconds": 117.84252159,
+      "first_pair_includes_compilation": false
+    }
+  ],
+  "complete_evaluation": {
+    "historical_seconds": 117.289165037,
+    "optimized_warmed_median_seconds": 5.367628512,
+    "historical_ratio": 21.851207618929948
+  },
+  "caveat": "Archived campaign versus isolated replay; original branch was not rerun under matched worker load. Historical totals sum model evaluations including terminal evaluation, excluding startup and campaign I/O."
+}

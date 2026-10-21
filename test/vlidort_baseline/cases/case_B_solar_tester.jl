@@ -23,21 +23,21 @@ const AEROSOL_NMOMENTS   = 15           # match VLIDORT NMOMENTS = 2·NSTREAMS�
 
 "Build the HG `AerosolOptics` matching VLIDORT solar_tester aerosol moments
 `aermoms[L] = (2L+1) * g^L`. β[L+1] holds the L-th coefficient (1-indexed)."
-function solar_tester_aerosol_optics()
+function solar_tester_aerosol_optics(FT::Type{<:AbstractFloat} = Float64)
     Lp1 = AEROSOL_NMOMENTS + 1   # L = 0..AEROSOL_NMOMENTS
-    α = zeros(Float64, Lp1)
-    β = zeros(Float64, Lp1)
-    γ = zeros(Float64, Lp1)
-    δ = zeros(Float64, Lp1)
-    ϵ = zeros(Float64, Lp1)
-    ζ = zeros(Float64, Lp1)
-    β[1] = 1.0
+    α = zeros(FT, Lp1)
+    β = zeros(FT, Lp1)
+    γ = zeros(FT, Lp1)
+    δ = zeros(FT, Lp1)
+    ϵ = zeros(FT, Lp1)
+    ζ = zeros(FT, Lp1)
+    β[1] = 1
     for L in 1:AEROSOL_NMOMENTS
-        β[L + 1] = (2L + 1) * AEROSOL_G ^ L
+        β[L + 1] = FT((2L + 1) * AEROSOL_G ^ L)
     end
     greek = Scattering.GreekCoefs(α, β, γ, δ, ϵ, ζ)
-    return Scattering.AerosolOptics(greek_coefs=greek, ω̃=AEROSOL_OMEGA,
-                                    k=1.0, fᵗ=0.0)
+    return Scattering.AerosolOptics(greek_coefs=greek, ω̃=FT(AEROSOL_OMEGA),
+                                    k=FT(1), fᵗ=FT(0))
 end
 
 "VLIDORT-style aerosol extinction per layer: parcel × (h[n−1] − h[n])."
@@ -61,7 +61,10 @@ Sets:
 plus injects the HG aerosol_optics."
 function inject_solar_tester_optics!(model)
     aerext = solar_tester_aerosol_extinction()
-    model.aerosol_optics[1][1] = solar_tester_aerosol_optics()
+    # Match the model float type: a Float64 AerosolOptics injected into a
+    # Float32 model promotes the mixed layer τ/ϖ to Float64 through the δ-M
+    # product and breaks the uniform-FT GPU kernels.
+    model.aerosol_optics[1][1] = solar_tester_aerosol_optics(CoreRT.float_type(model))
     @assert size(model.τ_rayl[1], 2) == 23 "expected 23 layers, got $(size(model.τ_rayl[1], 2))"
     for n in 1:23
         ext = SOLAR_TESTER_MOLEXT[n]

@@ -1,4 +1,4 @@
-# GEOSChem Integration for vSmartMOM
+# GEOS-Chem Integration for vSmartMOM
 
 This document describes the new clean API for integrating GEOSChem NetCDF output files with vSmartMOM radiative transfer calculations.
 
@@ -47,7 +47,7 @@ R = rt_run(model)
 
 # Option 2: Get Dict and customize
 config = geoschem_to_dict(src)
-config["radiative_transfer"]["spec_bands"] = [(1e7/777):0.015:(1e7/757)]
+config["radiative_transfer"]["spec_bands"] = ["(1e7/777):0.015:(1e7/757)"]
 params = read_parameters(config)
 ```
 
@@ -69,17 +69,17 @@ config = geoschem_to_dict(src)
 #   - Temperature profile (T)
 #   - Pressure levels (p)
 #   - Specific humidity (q)
-#   - Trace gas VMRs (CO2, CO, CH4, N2O, C2H6, H2O)
+#   - Trace gas VMRs (CO2, CO, CH4, N2O, C2H6)
+#   - H2O derived from Met_SPHU specific humidity
 #   - Geographic location (lat, lon)
 
 # Add radiative transfer parameters
 config["radiative_transfer"] = Dict(
-    "spec_bands" => [(1e7/777):0.015:(1e7/757)],
+    "spec_bands" => ["(1e7/777):0.015:(1e7/757)"],   # band strings, as in YAML
     "surface" => ["LambertianSurfaceScalar(0.15)"],
     "quadrature_type" => "GaussLegQuad()",
     "polarization_type" => "Stokes_I()",
     "max_m" => 3,
-    "Δ_angle" => 2.0,
     "l_trunc" => 20,
     "depol" => 0.0,
     "float_type" => "Float64",
@@ -90,7 +90,7 @@ config["geometry"] = Dict(
     "sza" => 60.0,
     "vza" => [0.0, 30.0, 60.0],
     "vaz" => [0.0, 0.0, 0.0],
-    "obs_alt" => 1000.0
+    "obs_alt" => [0.0]  # TOA upwelling + BOA downwelling
 )
 
 # Convert to parameters and run
@@ -111,10 +111,11 @@ R = run_rt_with_geoschem_v2("GEOSChem.Custom.20190101_0000z.nc4", 10, 20, 1)
 R = run_rt_with_geoschem_v2(
     "GEOSChem.Custom.20190101_0000z.nc4", 
     10, 20, 1;
-    spec_bands = [(1e7/777):0.015:(1e7/757)],
+    spec_bands = ["(1e7/777):0.015:(1e7/757)"],
     sza = 45.0,
     vza = [0.0, 30.0, 60.0],
-    architecture = GPU()
+    vaz = [0.0, 0.0, 0.0],
+    architecture = "GPU()"
 )
 ```
 
@@ -151,9 +152,12 @@ geoschem_to_dict(src::GeosChemSource) -> Dict
 
 Read GEOSChem file and convert to vSmartMOM configuration Dict.
 
-**Returns:** Dict with keys:
+**Returns:** a complete configuration Dict. It starts from the package
+defaults (`src/CoreRT/DefaultParameters.yaml`, including its
+`radiative_transfer`, `geometry` and default `scattering` aerosol, whose
+`p₀`/`σp` are in hPa) and replaces or adds:
 - `"atmospheric_profile"`: T, p, q, vmr, profile_reduction
-- `"absorption"`: molecules, vmr, broadening, CEF, wing_cutoff
+- `"absorption"`: fixed_molecules, variable_molecules, vmr, broadening, CEF, wing_cutoff
 - `"_metadata"`: source_file, latitude, longitude, time, etc.
 
 #### `read_geoschem_profile`
@@ -183,7 +187,7 @@ GEOSChem output files have dimensions: `(Xdim, Ydim, nf, lev, time)`
 | `Met_T` | `T` | K | Temperature profile |
 | `Met_PS2WET` | Surface pressure | hPa | Used to compute pressure grid |
 | `Met_DELP` | Layer thickness | hPa | Used to compute pressure grid |
-| `Met_SPHU` | `q` | g/kg | Specific humidity |
+| `Met_SPHU` | `q` | g/kg → kg/kg | Specific humidity, converted to vSmartMOM's mass-fraction convention |
 | `SpeciesConcVV_*` | `vmr[molecule]` | mol/mol | Trace gas VMRs |
 | `lats`, `lons` | Metadata | degrees | Geographic location |
 
@@ -194,10 +198,11 @@ GEOSChem output files have dimensions: `(Xdim, Ydim, nf, lev, time)`
 2. **Pressure Grid**: Computed from surface pressure (`Met_PS2WET`) and layer thicknesses (`Met_DELP`).
 
 3. **Trace Gases**: Automatically extracts available molecules:
-   - N2O, CH4, C2H6, CO2, CO, H2O
-   - O2 is added to molecule list but uses vSmartMOM defaults (not in GEOSChem output)
+   - N2O, CH4, C2H6, CO2, CO
+   - H2O is derived from `Met_SPHU`; O2 is added at a fixed dry-air VMR of 0.2095
 
-4. **Units**: All conversions handled automatically to match vSmartMOM conventions.
+4. **Units**: All conversions are handled automatically to match vSmartMOM
+   conventions, including dividing `Met_SPHU` by 1000 from g/kg to kg/kg.
 
 ## Extensibility
 

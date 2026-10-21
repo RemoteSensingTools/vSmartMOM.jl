@@ -1,4 +1,5 @@
 using Interpolations
+using NCDatasets
 
 # Test that a hitran fixed-width file is correctly parsed
 @testset "read_hitran" begin
@@ -70,6 +71,60 @@ using Interpolations
     test_ht = Absorption.read_hitran(CO2_test_file, mol=2, iso=1)
     @test length(test_ht.mol) == 12
 
+end
+
+@testset "read_hitran rejects malformed required fields" begin
+    valid_record = first(eachline("test_profiles/testCO2.data"))
+
+    function replace_field(record, first_byte, last_byte, value)
+        width = last_byte - first_byte + 1
+        replacement = rpad(value, width)
+        ncodeunits(replacement) == width || error("replacement must fit its field")
+        bytes = collect(codeunits(record))
+        bytes[first_byte:last_byte] .= codeunits(replacement)
+        return String(bytes)
+    end
+
+    function parse_record(record; kwargs...)
+        return mktemp() do path, io
+            write(io, record, '\n')
+            close(io)
+            Absorption.read_hitran(path; kwargs...)
+        end
+    end
+
+    malformed_ν = replace_field(valid_record, 4, 15, "BROKEN")
+    error = try
+        parse_record(malformed_ν)
+        nothing
+    catch exception
+        exception
+    end
+    @test error isa ArgumentError
+    @test occursin(":1: invalid HITRAN nu field", sprint(showerror, error))
+
+    @test_throws ArgumentError parse_record(valid_record[1:159])
+    @test_throws ArgumentError parse_record("é" * valid_record[2:end])
+    @test_throws ArgumentError parse_record(replace_field(valid_record, 1, 2, "X"))
+    @test_throws ArgumentError parse_record(replace_field(valid_record, 3, 3, "?"))
+    @test_throws ArgumentError parse_record(replace_field(valid_record, 26, 35, "bad"))
+
+    # HITRAN permits missing statistical weights. Preserve the established
+    # zero representation for these two optional numeric fields only.
+    blank_weights = replace_field(replace_field(valid_record, 147, 153, ""),
+                                  154, 160, "")
+    parsed = parse_record(blank_weights)
+    @test parsed.g′ == [0.0]
+    @test parsed.g″ == [0.0]
+
+    # The one-character traditional format encodes local isotopologues 10, 11,
+    # and 12 as 0, A, and B respectively.
+    @test only(parse_record(replace_field(valid_record, 3, 3, "0")).iso) == 10
+    @test only(parse_record(replace_field(valid_record, 3, 3, "A")).iso) == 11
+    @test only(parse_record(replace_field(valid_record, 3, 3, "B")).iso) == 12
+
+    @test_throws Absorption.HitranEmptyError parse_record(
+        valid_record; ν_min=1.0e6)
 end
 
 # Test that absorption cross sections are calculated correctly 
@@ -154,6 +209,25 @@ end
     model = make_hitran_model(hitran_data, Voigt(), wing_cutoff = 40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=CPU())
     grid = 6000:0.01:6400
     @test absorption_cross_section(model, grid, 1000.1, 296.1) ≈ reverse(absorption_cross_section(model, reverse(1e7 ./ collect(grid)), 1000.1, 296.1, wavelength_flag=true));
+end
+
+@testset "interpolation_model_wavelength_order" begin
+    ν_grid = 20000.0:1000.0:25000.0
+    p_grid = range(100.0, 1000.0; length=2)
+    t_grid = range(200.0, 300.0; length=2)
+    coefs = zeros(Float64, length(ν_grid), length(p_grid), length(t_grid))
+    for i in eachindex(ν_grid)
+        coefs[i, :, :] .= ν_grid[i]
+    end
+    model = InterpolationModel(interpolate(coefs, BSpline(Linear())),
+                               999, 1, ν_grid, p_grid, t_grid)
+    λ_grid = [400.0, 500.0] # increasing wavelength -> decreasing wavenumber
+    σλ = compute_absorption_cross_section(model, λ_grid, 500.0, 250.0;
+                                           wavelength_flag=true)
+    @test σλ == [25000.0, 20000.0]
+    @test σλ == [only(compute_absorption_cross_section(model, [1e7 / λ],
+                                                        500.0, 250.0))
+                 for λ in λ_grid]
 end
 
 # Regression test: the wing-cutoff line-admission window must be computed in
@@ -271,6 +345,43 @@ end
 
 end 
 
+# B5 (docs/dev_notes/RELEASE_READINESS_AND_CLAUDE_HANDOFF_2026-10-16.md): the
+# legacy table builder ignored `vmr`, and its wavelength path failed with a
+# MethodError deep inside construction.
+@testset "make_interpolation_model: vmr and spectral grid" begin
+    ht = Absorption.read_hitran(artifact("CO2"), mol=2, iso=1,
+                                ν_min=6199, ν_max=6201)
+    ν_grid, p_grid, t_grid = 6199.5:0.25:6200.5, 600.0:100.0:800.0, 260.0:10.0:280.0
+    lut(vmr) = make_interpolation_model(ht, Voigt(), ν_grid, p_grid, t_grid; vmr,
+                                        CEF=HumlicekWeidemann32SDErrorFunction(),
+                                        architecture=CPU())
+    direct(vmr) = make_hitran_model(ht, Voigt(); vmr,
+                                    CEF=HumlicekWeidemann32SDErrorFunction(),
+                                    architecture=CPU())
+    tables = Dict(vmr => lut(vmr) for vmr in (0.0, 0.5))
+    for (vmr, table) in tables
+        model = direct(vmr)
+        for p in p_grid, T in t_grid    # the table interpolates through its nodes
+            @test absorption_cross_section(table, ν_grid, p, T) ≈
+                  absorption_cross_section(model, ν_grid, p, T) rtol = 1e-10
+        end
+    end
+    # Self-broadening changes the line shapes, so the tables must differ.
+    σ0 = absorption_cross_section(tables[0.0], ν_grid, 700.0, 270.0)
+    σ½ = absorption_cross_section(tables[0.5], ν_grid, 700.0, 270.0)
+    @test norm(σ½ - σ0) / norm(σ0) > 1e-3
+    # Wavelength grids are rejected up front with migration guidance.
+    λ_grid = 1612.8:0.01:1613.0
+    err = try
+        make_interpolation_model(ht, Voigt(), λ_grid, p_grid, t_grid; wavelength_flag=true)
+        nothing
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    @test occursin("uniform wavenumber grid", sprint(showerror, err))
+end
+
 @testset "absorption_cross_section_interpolator_outside_band" begin
     ν_grid = 6000.0:1.0:6002.0
     p_grid = 1000.0:100.0:1100.0
@@ -338,4 +449,89 @@ end
     # the nm grid above is the elementwise map of the ν grid).
     @test maximum(abs.(σ_nm .- σ_ν)) ≤ 1e-15 * maximum(σ_ν)
     @test maximum(σ_ν) > 0   # the window actually contains CO2 lines
+end
+
+@testset "AtmosphericAbsorption ABSCO LUT integration" begin
+    FT = Float32
+    ν = FT[6140.00, 6140.01, 6140.02]
+    p = FT[100, 1000]
+    T = FT[200 205; 220 225]
+    h2o_vmr = FT[0, 0.03, 0.06]
+    σ = FT[1 + 10v + FT(1e-3)t + FT(1e-4)pp
+           for x in ν, v in h2o_vmr, t in T[:, 1], pp in p]
+    for ip in eachindex(p), it in axes(T, 1), iv in eachindex(h2o_vmr), iν in eachindex(ν)
+        σ[iν, iv, it, ip] = 1 + 10 * h2o_vmr[iv] + FT(1e-3) * T[it, ip] +
+                             FT(1e-4) * p[ip] + FT(0.01) * (iν - 1)
+    end
+    lut = AtmosphericAbsorption.AbscoLUT(2, -1, ν, p, T, h2o_vmr, σ;
+                                         architecture=AtmosphericAbsorption.CPU())
+
+    # Standalone vSmartMOM API forwards the H₂O broadener VMR to AA's linear interpolator.
+    dry = absorption_cross_section(lut, ν, FT(100), FT(200); vmr=FT(0))
+    wet = absorption_cross_section(lut, ν, FT(100), FT(200); vmr=FT(0.06))
+    @test eltype(wet) === FT
+    @test wet != dry
+    @test wet == σ[:, 3, 1, 1]
+
+    # The profile route automatically uses each layer's atmospheric H₂O VMR for broadening, while
+    # the separate `absorber_vmr` still controls conversion from cross section to optical depth.
+    profile = vSmartMOM.CoreRT.AtmosphericProfile(
+        FT[200, 225], FT[100, 1000], FT[0, 0], FT[550], FT[0, 0.06],
+        FT[1, 1], FT[0, 0.06], Dict("CO2" => FT(1)), FT[1, 1],
+    )
+    τ = zeros(FT, length(ν), 2)
+    vSmartMOM.CoreRT.compute_absorption_profile!(τ, lut, ν, FT(1), profile)
+    @test τ[:, 1] == σ[:, 1, 1, 1]
+    @test τ[:, 2] == σ[:, 3, 2, 2]
+
+    # A raw ABSCO-shaped HDF file and a portable `.absco` file both load through the same vSmartMOM
+    # LUT configuration helper, retaining Float32 and all broadener nodes.
+    tempdir = mktempdir()
+    hdf_path = joinpath(tempdir, "co2_fixture.hdf")
+    NCDataset(hdf_path, "c") do ds
+        defDim(ds, "nu", length(ν)); defDim(ds, "b", length(h2o_vmr))
+        defDim(ds, "t", size(T, 1)); defDim(ds, "p", length(p))
+        defVar(ds, "Wavenumber", Float64.(ν), ("nu",))
+        defVar(ds, "Pressure", Float64.(p .* 100), ("p",))
+        defVar(ds, "Temperature", Float64.(T), ("t", "p"))
+        defVar(ds, "Broadener_01_VMR", Float64.(h2o_vmr), ("b",))
+        defVar(ds, "Gas_02_Absorption", σ, ("nu", "b", "t", "p"))
+    end
+    from_hdf = vSmartMOM.IO._load_absorption_lut(hdf_path, ν, FT, CPU())
+    @test from_hdf isa AtmosphericAbsorption.AbscoLUT
+    @test from_hdf.σ == σ
+    @test from_hdf.vmr == h2o_vmr
+
+    # The legacy `loadAbsco` route (used to build `.jld2` interpolation tables)
+    # keeps the table 4-D; reading it with `[:]` used to flatten it.
+    NCDataset(hdf_path, "a") do ds
+        defDim(ds, "one", 1)
+        defVar(ds, "Gas_Index", ["02"], ("one",))
+    end
+    legacy = vSmartMOM.CoreRT.loadAbsco(hdf_path; scale=0.5)
+    @test legacy isa vSmartMOM.Absorption.AbscoTable{FT}
+    @test legacy.mol == 2
+    @test legacy.σ == FT(0.5) .* σ
+    @test legacy.T == T
+    @test legacy.p == p
+    @test legacy.ν == ν
+    # A temperature grid that does not match σ's temperature axis is refused.
+    bad_path = joinpath(tempdir, "co2_bad_temperature.hdf")
+    NCDataset(bad_path, "c") do ds
+        defDim(ds, "nu", length(ν)); defDim(ds, "b", length(h2o_vmr))
+        defDim(ds, "t", size(T, 1)); defDim(ds, "t3", 3); defDim(ds, "p", length(p))
+        defDim(ds, "one", 1)
+        defVar(ds, "Gas_Index", ["02"], ("one",))
+        defVar(ds, "Wavenumber", Float64.(ν), ("nu",))
+        defVar(ds, "Pressure", Float64.(p .* 100), ("p",))
+        defVar(ds, "Temperature", fill(250.0, 3, length(p)), ("t3", "p"))
+        defVar(ds, "Gas_02_Absorption", σ, ("nu", "b", "t", "p"))
+    end
+    @test_throws DimensionMismatch vSmartMOM.CoreRT.loadAbsco(bad_path)
+
+    lut_path = joinpath(tempdir, "co2_fixture.absco")
+    AtmosphericAbsorption.save_absco_lut(lut_path, lut)
+    from_lut = vSmartMOM.IO._load_absorption_lut(lut_path, ν, FT, CPU())
+    @test from_lut isa AtmosphericAbsorption.AbscoLUT
+    @test from_lut.σ == σ
 end

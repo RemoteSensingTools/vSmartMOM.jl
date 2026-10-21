@@ -1,0 +1,2 @@
+Test Summary:                    | Pass  Total   Time
+Batched Jacobian propagation CPU |  416    416  47.0s

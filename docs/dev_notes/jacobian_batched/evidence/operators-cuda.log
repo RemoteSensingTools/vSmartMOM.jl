@@ -1,0 +1,4 @@
+Test Summary:                    | Pass  Total   Time
+Batched Jacobian propagation CPU |  416    416  46.9s
+Test Summary:                     | Pass  Total     Time
+Batched Jacobian propagation CUDA |  416    416  1m02.3s

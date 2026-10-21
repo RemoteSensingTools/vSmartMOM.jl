@@ -1,0 +1,13 @@
+{
+  "exit_code": 0,
+  "gpu_index": "0",
+  "metric": "sampled process GPU memory in MiB, including reserved pool",
+  "sample_interval_seconds": 0.25,
+  "peak_mib_by_phase": {
+    "construction/compilation": 446,
+    "reference parity only": 24922,
+    "enabled=true kind=full": 8346,
+    "enabled=true kind=selected": 8346,
+    "kind=forward": 3194
+  }
+}

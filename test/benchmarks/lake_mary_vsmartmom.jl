@@ -76,7 +76,7 @@ L_emit_meas = Float64.(emit_rad_data[:])
 
 @info "  EMIT bands: $n_emit, λ range = [$(λ_emit_nm[1]), $(λ_emit_nm[end])] nm"
 
-ρ_surf_itp = LinearInterpolation(λ_emit_nm, ρ_surf_mean, extrapolation_bc=Flat())
+ρ_surf_itp = linear_interpolation(λ_emit_nm, ρ_surf_mean, extrapolation_bc=Flat())
 
 # ---- Solar irradiance from MODTRAN LUT -------------------------------------
 
@@ -85,7 +85,7 @@ ds_lut = NCDataset(LUT_PATH, "r")
 wl_lut_nm   = Float64.(ds_lut["wl"][:])
 solar_irr_lut = Float64.(ds_lut["solar_irr"][:])
 close(ds_lut)
-solar_itp = LinearInterpolation(wl_lut_nm, solar_irr_lut, extrapolation_bc=Flat())
+solar_itp = linear_interpolation(wl_lut_nm, solar_irr_lut, extrapolation_bc=Flat())
 
 # ---- Load YAML and apply Lake Mary overrides --------------------------------
 
@@ -108,7 +108,7 @@ n_spec = length(spec_band_nm)
 # Build interpolator over EMIT λ grid (typed as FT), and pass spec_band_nm as wlGrid.
 ρ_surf_FT = FT.(ρ_surf_mean)
 λ_emit_nm_FT = FT.(λ_emit_nm)
-surf_interp = LinearInterpolation(λ_emit_nm_FT, ρ_surf_FT, extrapolation_bc=Flat())
+surf_interp = linear_interpolation(λ_emit_nm_FT, ρ_surf_FT, extrapolation_bc=Flat())
 params.brdf = CoreRT.AbstractSurfaceType[CoreRT.LambertianSurfaceSpline{FT}(surf_interp, spec_band_nm)]
 ρ_s_native = FT.(clamp.([ρ_surf_itp(λ) for λ in spec_band_nm], FT(0), FT(1)))   # for diagnostics
 

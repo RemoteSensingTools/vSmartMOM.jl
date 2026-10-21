@@ -1,0 +1,22 @@
+BENCH_BEGIN cuda-n10000-t4
+BENCH_PHASE enabled=false kind=full
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:36[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:24[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+BENCH_PHASE enabled=false kind=selected
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+BENCH_PHASE enabled=true kind=full
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:06[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+BENCH_PHASE enabled=true kind=selected
+BENCH_PHASE kind=forward
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:09[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:06[K
+SELECTED_PARITY dR=0.0
+MODEL backend=cuda nSpec=10000 operator=6 full_columns=14 selected_columns=4
+PARITY R=6.938893903907228e-18 T=1.3877787807814457e-17 dR=8.326672684688674e-17 dT=4.440892098500626e-16 forward_R=5.377642775528102e-17
+MEASURE enabled=false kind=full median_seconds=16.716343587 median_bytes=3.819167976e9 median_gpu_bytes=2.23740120486e11 samples=[(time = 16.716343587, bytes = 3819196072, gctime = 1.309125, gpu_bytes = 223740120486), (time = 16.825692957, bytes = 3819130776, gctime = 1.41501528, gpu_bytes = 223740120486), (time = 16.286665027, bytes = 3819167976, gctime = 1.01100864, gpu_bytes = 223740120486)]
+MEASURE enabled=false kind=selected median_seconds=4.263098872 median_bytes=6.97736392e8 median_gpu_bytes=5.9209893476e10 samples=[(time = 4.263098872, bytes = 697844088, gctime = 0.185527759, gpu_bytes = 59209893476), (time = 4.377207938, bytes = 697736392, gctime = 0.187058237, gpu_bytes = 59209893476), (time = 4.227910284, bytes = 697640568, gctime = 0.158158483, gpu_bytes = 59209893476)]
+MEASURE enabled=true kind=full median_seconds=10.461651525 median_bytes=3.622534248e9 median_gpu_bytes=1.4411254886e10 samples=[(time = 10.461651525, bytes = 3622534248, gctime = 0.865837009, gpu_bytes = 14411254886), (time = 10.443062767, bytes = 3622573080, gctime = 0.651353226, gpu_bytes = 14411254886), (time = 10.805650154, bytes = 3622506104, gctime = 0.9473386, gpu_bytes = 14411254886)]
+MEASURE enabled=true kind=selected median_seconds=2.734513936 median_bytes=6.54933944e8 median_gpu_bytes=3.417683876e9 samples=[(time = 2.790868978, bytes = 655054920, gctime = 0.083029441, gpu_bytes = 3417683876), (time = 2.734513936, bytes = 654867704, gctime = 0.075889287, gpu_bytes = 3417683876), (time = 2.657924213, bytes = 654933944, gctime = 0.072419874, gpu_bytes = 3417683876)]
+FORWARD median_seconds=0.154860012
+BENCH_DONE cuda-n10000-t4

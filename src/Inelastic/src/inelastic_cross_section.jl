@@ -17,6 +17,17 @@ molecular cross-section precomputations.
 @inline _rayleigh_prefactor64() = 128 * Float64(π)^5
 
 """
+    _q_branch_depolarization(α, γ, b_JJ)
+
+Chandrasekhar depolarization factor γ_C = 3·b_JJ·γ²/(45α² + 4·b_JJ·γ²) of a
+Q-branch (ΔJ = 0) line whose anisotropic part carries the Placzek–Teller
+weight `b_JJ` (to first power; see `compute_σ_Rayl_VibRaman_coeff_hires!`).
+Written with the dimensionless ratio α/γ so that Float32 polarizabilities of
+order 1e-24 cm³ do not underflow; `b_JJ = 0` (J = 0) gives γ_C = 0.
+"""
+@inline _q_branch_depolarization(α, γ, b_JJ) = 3 / (4 + 45 * (α / γ)^2 / b_JJ)
+
+"""
     _rovib_prefactor64()
 
 Return the rotational/rovibrational Raman coefficient prefactor in Float64 for
@@ -26,19 +37,55 @@ CPU-side molecular cross-section precomputations.
 
 """
     compute_effective_coefficents!(ν_eff, T, mol)
+    compute_effective_coefficents!(ν_eff, T, mol, molecule, anisotropy)
 
 Update molecular effective polarizability, anisotropy, depolarization, and
 Greek-coefficient factors at effective wavenumber `ν_eff` and temperature `T`.
+
+The three-argument form (and `anisotropy =` [`ConstantAnisotropy`](@ref)) uses
+the Raman-module tensor: the Buldakov et al. mean polarizability
+``\\bar\\alpha(\\nu, T)`` and the wavelength-independent anisotropy
+``\\bar\\gamma_{00}``. These are the constants of the published Raman tables.
+With `anisotropy =` [`DispersiveAnisotropy`](@ref), `molecule ∈ (N₂(), O₂())`
+takes ``\\bar\\alpha(\\nu, T)`` and ``\\gamma(\\nu)`` from the `UsingRefInd`
+refractivity and King factor (see `Scattering._dispersive_polarizability_tensor`);
+H₂ has no such data and keeps the Raman-module tensor. The derivative terms
+`α_prime` and `γ_prime` (vibrational Raman) are the Raman-module constants in
+both cases.
 """
 function compute_effective_coefficents!(ν_eff, T, mol::MolecularConstants{FT}) where {FT}#molecules::Array{MolecularConstants{FT}}) where {FT}   
-    #@unpack Y = mol
-    @unpack α̅,  γ̅, α_prime, γ_prime, ϵ, ϵ_prime = mol.effCoeff
-    @unpack α̅₀₀, γ̅₀₀, ω₀, α_b, α_c, α₀₀_prime, γ₀₀_prime = mol.PolTensor
+    @unpack α̅₀₀, γ̅₀₀, ω₀, α_b, α_c = mol.PolTensor
     #Computing α̅
     # Buldakov et al. define ω as angular frequency, while ν_eff is a
     # wavenumber in cm⁻¹. Convert with ω = 2πcν_eff.
     α̅ = α̅₀₀*(1 + α_b*T + α_c*T^2)/(1-(2π*c*ν_eff/ω₀)^2)
     γ̅ = γ̅₀₀
+    return _set_effective_coefficients!(mol, α̅, γ̅)
+end
+
+compute_effective_coefficents!(ν_eff, T, mol::MolecularConstants,
+                               ::AbstractMolecule, ::ConstantAnisotropy) =
+    compute_effective_coefficents!(ν_eff, T, mol)
+
+function compute_effective_coefficents!(ν_eff, T, mol::MolecularConstants,
+                                        molecule::Union{N₂, O₂},
+                                        ::DispersiveAnisotropy)
+    @unpack α_b, α_c = mol.PolTensor
+    gas = molecule isa N₂ ? :N2 : :O2
+    tensor = Scattering._dispersive_polarizability_tensor(
+        gas, Float64(ν_eff), Float64(T), Float64(α_b), Float64(α_c))
+    return _set_effective_coefficients!(mol, tensor.α̅, tensor.γ̅)
+end
+
+# H₂ has no refractive-index fit in `UsingRefInd`: keep the Raman-module tensor.
+compute_effective_coefficents!(ν_eff, T, mol::MolecularConstants, ::H₂,
+                               ::DispersiveAnisotropy) =
+    compute_effective_coefficents!(ν_eff, T, mol)
+
+# Store α̅, γ̅ and every quantity derived from them (and from the
+# Raman-module derivatives α₀₀′, γ₀₀′) on `mol.effCoeff`.
+function _set_effective_coefficients!(mol::MolecularConstants, α̅, γ̅)
+    @unpack α₀₀_prime, γ₀₀_prime = mol.PolTensor
     ϵ = α̅/γ̅ 
     α_prime = α₀₀_prime * sqrt(mol.Y[1,2]/mol.Y[2,1]) # see Eqs (36a-39b) of Buldakov et al. 1996 (Spectrochimica Acta Part A) 
     γ_prime = γ₀₀_prime * sqrt(mol.Y[1,2]/mol.Y[2,1]) # see Eqs (36a-39b) of Buldakov et al. 1996 (Spectrochimica Acta Part A) 
@@ -92,6 +139,15 @@ function compute_σ_Rayl_VibRaman_coeff_hires!(T, mol::MolecularConstants{FT}; J
     #σ_Rayl_coeff_hires = 128π^5 * α̅^2 * (1+2*γ_C_Rayl)/(3-4*γ_C_Rayl)# * ν^4
     Z_pf = 0
     for Ji in 0:Jmax   
+        # Placzek–Teller coefficient of the Q branch (ΔJ = 0), Sanghavi (2022)
+        # Eq. 31: the squared Clebsch–Gordan coefficient ⟨J0;20|J0⟩². With the
+        # O/S coefficients b_{J∓2,J} of the RRS/RVRS lines below (Eq. 19) it
+        # sums to 1, so the anisotropic scattering γ² is shared out exactly
+        # between the branches, while the isotropic part α² stays in Q. A Q
+        # line therefore carries α²/3 + (2/27)·b_JJ·γ² (b to the first power),
+        # and Rayleigh = Cabannes + RRS line by line (Sanghavi & Frankenberg
+        # 2023, Eq. 3; Placzek & Teller 1933; Long 1977). See
+        # docs/dev_notes/raman_q_branch_placzek_teller.md.
         b_JJ   = Ji*(Ji+1)/((2Ji-1)*(2Ji+3))
         g_N = gₛ[2-Ji%2]    
 
@@ -100,7 +156,9 @@ function compute_σ_Rayl_VibRaman_coeff_hires!(T, mol::MolecularConstants{FT}; J
         vf = 0 
         #Ni_by_N = exp(-h*c*E_vJ[vi,Ji]/(k_B*T))  
         Ni_by_N = exp(-h*c*E_vJ[0,Ji]/(k_B*T)) + exp(-h*c*E_vJ[1,Ji]/(k_B*T)) + exp(-h*c*E_vJ[2,Ji]/(k_B*T)) 
-        γ_C = 3/(4+45(α̅/(b_JJ*γ̅))^2)
+        # Cabannes line; the prefactor (1+2γ_C)/(3-4γ_C) below then gives
+        # ᾱ²/3 + (2/27)·b_JJ·γ̄².
+        γ_C = _q_branch_depolarization(α̅, γ̅, b_JJ)
         Z_pf += g_N * (2Ji+1) * (exp(-h*c*E_vJ[0,Ji]/(k_B*T)) + exp(-h*c*E_vJ[1,Ji]/(k_B*T))) #accounting for both the ground- and the first excited vibrational state - depending on the ambient temperature (e.g. on hot exoplanets), more states may have to be accounted for   
         # Molecular energy level
         Δν =  E_vJ[vi, Ji]
@@ -116,7 +174,8 @@ function compute_σ_Rayl_VibRaman_coeff_hires!(T, mol::MolecularConstants{FT}; J
         vi = 0
         vf = 1 
         Ni_by_N = exp(-h*c*E_vJ[vi,Ji]/(k_B*T))  
-        γ_C = 3/(4+45(α_prime/(b_JJ*γ_prime))^2)
+        # Same Q-branch weight for the vibrational transition (α′, γ′).
+        γ_C = _q_branch_depolarization(α_prime, γ_prime, b_JJ)
         # Molecular energy level
         Δν =  E_vJ[vf, Ji] - E_vJ[vi, Ji]
         # Wavenumber change of scattered light
@@ -146,7 +205,34 @@ function compute_σ_Rayl_VibRaman_coeff_hires!(T, mol::MolecularConstants{FT}; J
     σ_VibRaman_coeff_0to1_hires /= Z_pf
     σ_VibRaman_coeff_1to0_hires /= Z_pf
     #@show Z_pf
-    @pack! mol.effCoeff = σ_Rayl_coeff_hires, σ_VibRaman_coeff_0to1_hires, σ_VibRaman_coeff_1to0_hires, Δν̃_Rayl_coeff_hires, Δν̃_VibRaman_coeff_0to1_hires, Δν̃_VibRaman_coeff_1to0_hires
+    # T is kept as the temperature of these per-J lines (see q_branch_mean_b).
+    @pack! mol.effCoeff = σ_Rayl_coeff_hires, σ_VibRaman_coeff_0to1_hires, σ_VibRaman_coeff_1to0_hires, Δν̃_Rayl_coeff_hires, Δν̃_VibRaman_coeff_0to1_hires, Δν̃_VibRaman_coeff_1to0_hires, T
+end
+
+"""
+    q_branch_mean_b(mol, v)
+
+Population-weighted Placzek–Teller coefficient of the Q-branch (ΔJ = 0) lines
+that start in vibrational level `v`,
+
+    ⟨b_JJ⟩ = Σ_J w_J b_JJ / Σ_J w_J,   w_J = g_J (2J+1) exp(−hc E(v,J)/(k T)),
+
+with b_JJ = J(J+1)/((2J−1)(2J+3)) (Sanghavi 2022, Eq. 31) and g_J the nuclear
+spin weight. The sum runs over the levels J = 0…Jmax of the per-J lines of
+`compute_σ_Rayl_VibRaman_coeff_hires!`, at the temperature T they were
+computed for (`mol.effCoeff.T`). Each of those lines carries the anisotropy
+b_JJ γ², so their sum carries ⟨b_JJ⟩ γ².
+"""
+function q_branch_mean_b(mol, v)
+    (; E_vJ, T, σ_VibRaman_coeff_0to1_hires) = mol.effCoeff
+    num = 0.0
+    den = 0.0
+    for J in axes(σ_VibRaman_coeff_0to1_hires, 1)
+        w = mol.gₛ[2 - J % 2] * (2J + 1) * exp(-h * c * E_vJ[v, J] / (k_B * T))
+        num += w * J * (J + 1) / ((2J - 1) * (2J + 3))
+        den += w
+    end
+    return num / den
 end
 
 """

@@ -38,12 +38,17 @@ using DocStringExtensions          # For documenting
 using YAML                         # For reading properties files 
 using ForwardDiff                  # Automatic Differentiation
 using NNlib                        # For batched multiplications
-import NNlib.batched_mul           # Required to overwrite batched_mul for Duals
+import NNlib                       # module handle (batched_mul! for the in-place hot path)
+# Package-owned operation: backend/Dual specializations must not change NNlib
+# dispatch for ordinary arrays in other packages loaded into the same process.
+batched_mul(A, B) = NNlib.batched_mul(A, B)
 using NCDatasets                   # For loading absco lookup tables
 using QuadGK
 using CanopyOptics
 using SpecialFunctions: erfc         # For Smith (1967) shadowing in Cox-Munk
 using StaticArrays                   # For Fresnel/Cox-Munk Mueller matrices
+
+include("tools/hitran_cache.jl")       # Shared read-only spectroscopy across builds
 
 import Base.show                   # For overloading show for custom types
 
@@ -58,8 +63,10 @@ include("Sources/types.jl")                    # v0.6 AbstractSource / SourceSet
 include("types.jl")
 include("parameter_layout.jl")                 # ParameterLayout struct for Jacobian indexing
 include("types_lin.jl")                        # Types for linearized RT
+include("LayerOpticalProperties/local_jacobian_types.jl")
 include("Sources/solar_beam.jl")               # v0.6 SolarBeam + PreparedSolarBeam (Phase 2)
 include("Sources/surface_sif.jl")              # v0.6 SurfaceSIF + PreparedSurfaceSIF (Phase 5)
+include("Sources/validation.jl")               # Shared source/geometry/surface contract
 include("Sources/thermal_emission.jl")         # v0.7 Phase A: ThermalEmission per-layer Planck volume source
 
 # Note: Raman types (AbstractRamanType, noRS, RRS, etc.) come from 
@@ -72,13 +79,17 @@ include("CoreKernel/fused_raman_kernels.jl") # Fused KA kernels for RRS per-Δn 
 
 # Solvers -- Elemental
 include("CoreKernel/elemental.jl")             # Elemental (elastic)
-include("CoreKernel/elemental_lin.jl")         # Elemental (linearized)
+include("CoreKernel/elemental_partials_lin.jl") # Reference elemental core partials
+include("CoreKernel/elemental_fused_lin.jl")    # Fused elemental tangent kernels
+include("CoreKernel/elemental_lin.jl")          # Elemental dispatch and symmetry
 include("CoreKernel/elemental_inelastic.jl")   # Elemental for inelastic scattering
 include("CoreKernel/elemental_inelastic_plus.jl")   # Elemental for inelastic scattering (VS/RVRS)
 include("CoreKernel/elemental_canopy.jl")
 
 # Solvers -- Doubling
 include("CoreKernel/doubling.jl")              # Doubling (elastic)
+include("CoreKernel/jacobian_blocked.jl")
+include("CoreKernel/jacobian_batched.jl")      # Batched physical-parameter propagation
 include("CoreKernel/doubling_lin.jl")          # Doubling (linearized)
 include("CoreKernel/doubling_inelastic.jl")    # Doubling for elastic + inelastic scattering 
 
@@ -93,26 +104,35 @@ include("CoreKernel/interlayer_flux.jl")       # Interlayer flux
 
 # Solvers -- RT Kernels
 include("CoreKernel/rt_kernel.jl")             # Handle Core RT (Elemental/Doubling/Interaction)
+include("CoreKernel/source_adding_lin.jl")
+include("CoreKernel/local_jacobian.jl")        # Local doubling and delayed contraction
 include("CoreKernel/rt_kernel_lin.jl")         # Linearized RT kernel
 include("CoreKernel/rt_kernel_ss.jl")          # Single scattering RT kernel
 include("CoreKernel/rt_kernel_multisensor.jl") # Multi-sensor RT kernel
 
 # Postprocessing
 include("tools/postprocessing_vza.jl")               # Postprocess (Azimuthal Weighting)
+include("tools/fourier_convergence.jl")              # VLIDORT-style Fourier-loop convergence (LIDORT_CONVERGE analog)
 include("tools/postprocessing_vza_lin.jl")           # Postprocess linearized
 include("tools/postprocessing_vza_ms.jl")
 
 # RT Run entry points
-include("rt_run.jl")                           # Starting point for RT 
+include("rt_run.jl")                           # Starting point for RT
 include("rt_run_lin.jl")                       # Linearized RT run
 include("rt_run_multisensor.jl")
+include("tools/single_scattering.jl")         # Exact-SS engine: TMS correction + rt_run_ss_exact
+include("rt_run_split.jl")                     # Atmosphere/surface split: rt_run_atmosphere/_surface/_multi_surface
+include("tools/lambertian_closure.jl")         # Analytic O(1)-per-albedo Lambertian closure (surface_split_albedo_sweep.md §3)
+include("tools/scenario_sweep.jl")             # SZA × view-pair × BRDF scenario sweeps (surface_split_albedo_sweep.md §6/§7 PR 3)
 
 # CPU batched operations (always available)
 include("tools/ka_batched_kernels.jl")         # Portable KA batched kernels
 include("tools/cpu_batched.jl")                   # CPU batched linear algebra operations
 
 # Utilities / Helper Functions
+include("tools/vertical_grid.jl")                 # Surface-pressure vertical-grid conventions
 include("tools/atmo_prof.jl")                     # Helper Functions for Handling Atmospheric Profiles
+include("tools/absorption_pressure.jl")            # Upstream line/LUT pressure derivatives
 include("tools/atmo_prof_lin.jl")                 # Linearized atmosphere profile
 include("tools/rt_helper_functions.jl")           # Miscellaneous Utility Functions
 include("tools/rt_helper_functions_lin.jl")       # Linearized helper functions
@@ -125,15 +145,22 @@ _to_aa_arch(arch::AtmosphericAbsorption.AbstractArchitecture) = arch  # already 
 
 include("tools/model_from_parameters.jl")         # Converting parameters to derived model attributes
 include("tools/lin_model_from_parameters.jl")     # Linearized model from parameters
+include("tools/jacobian_plans.jl")                # Retrieval-selective Jacobian layouts
 include("tools/update_model.jl")                  # BatchContext + update_model! for batch processing
 include("tools/show_utils.jl")                    # Pretty-printing objects
+include("LayerOpticalProperties/phase_interpolation.jl")
 include("LayerOpticalProperties/compEffectiveLayerProperties.jl")
 include("LayerOpticalProperties/delta_m_truncation.jl")         # δ-M truncation + chain rule
+include("LayerOpticalProperties/phase_blocks_lin.jl")
+include("LayerOpticalProperties/optical_jacobian_cache.jl")
 include("LayerOpticalProperties/compEffectiveLayerProperties_lin.jl")
+include("LayerOpticalProperties/local_jacobian_cache.jl")
+include("LayerOpticalProperties/local_jacobian.jl")
 
 # Surfaces
 include("Surfaces/lambertian_surface.jl")            # Lambertian Surface 
 include("Surfaces/lambertian_surface_lin.jl")        # Linearized Lambertian Surface
+include("Surfaces/analytic_surface.jl")              # Shared analytic-BRDF assembly
 include("Surfaces/rpv_surface.jl")                   # RPV Surface 
 include("Surfaces/rossli_surface.jl")                # Ross-Li Surface
 include("Surfaces/canopy_surface.jl")                # Canopy + soil composite surface
@@ -149,27 +176,52 @@ include("Surfaces/coxmunk_surface_lin.jl")           # Linearized Cox-Munk (Jaco
 include("component_m_max.jl")
 
 # Functions to export
+include("tools/copy_parameters.jl")
 export model_from_parameters,               # Converting the parameters to model
+       copy_parameters,                    # Trial-state copy with opt-in read-only LUT sharing
        model_from_parameters_lin,           # Convenience alias for linearized model
-       rt_run, rt_run_lin, rt_run_ss,       # Run the RT code (forward, linearized, single scatter)
+       rt_run, rt_run_toa, rt_run_lin, rt_run_ss, # Run RT (forward, TOA-only, linearized, single scatter)
+       rt_run_ss_exact,                     # Exact (untruncated, real-space) first-order reference
        rt_run_streams, StreamRTResult,      # Per-Fourier-moment quadrature-stream RT (Phase H)
+       rt_run_atmosphere, rt_run_surface,   # Atmosphere/surface split — cache the atmosphere,
+       rt_run_multi_surface, AtmosphereRTCache, # replay/sweep the surface phase
+       LambertianClosure, lambertian_closure,   # Analytic O(1)-per-albedo Lambertian closure
+       albedo_jacobian, invert_albedo,          # (surface_split_albedo_sweep.md §3)
+       remake_geometry,                     # Cheap per-geometry RTModel rebuild (§6/§7 PR 3)
+       ScenarioSweep, SweepResult, run_sweep,   # SZA × view-pair × BRDF scenario sweeps
        default_parameters,                  # Set of default parameters
        BatchContext, update_model!,         # Batch-processing context + scene updater
+       clear_spectroscopy_cache!,           # Release parsed HITRAN data, not downloads
        update_aerosol_loading!,             # Phase 2: cheap τ_ref / profile update (no Mie)
        update_aerosol_microphysics!         # Phase 2: expensive Mie re-run + Fourier re-derivation
 export OpticalPropertyJacobian,               # AD boundary struct alias
        RawAerosolJacobian,                    # AD boundary for raw aerosol derivatives
        delta_m_forward, delta_m_truncation_lin, # δ-M truncation functions
-       ParameterLayout,                       # Jacobian parameter layout descriptor
+       AbstractParameterLayout, ParameterLayout, ActiveParameterLayout,
+       ParameterKey, AbstractJacobianFlavor, OCO_RRS_synth, JacobianPlan,
+       PlannedRTModelLin, jacobian_plan, band_layout, parameter_names,
+       local_to_global, native_layer_columns, n_global, globalize_jacobian,
+       requires_aerosol_microphysics_jacobians, requires_h2o_jacobians,
+       requires_pressure_jacobians,
        n_total, aerosol_range, gas_range,     # ParameterLayout accessors
-       surface_range, surface_index,
+       gas_profile_range, gas_layer_index,
+       surface_range, surface_index, sif_range, sif755_index, sif_slope_index,
+       sif760_index, msif_index,
+       atmosphere_range, psurf_index,
+       AbstractVerticalGridConvention, FixedPressureGrid, FixedAltitudeGrid,
+       surface_pressure_interfaces,
+       surface_parameter_count, supports_linearized_surface,
        canopy_range, n_layer_params
 
 # Export new hierarchical model types
 export AbstractRTModel, RTModel,
        SolverConfig, RTNumericalParameters,
+       AbstractFourierConvergence, AllFourierMoments, IntensityConvergence,
+       StokesConvergence,
        Atmosphere, RayleighScattering, AerosolState, Optics, OpticsLin,
-       RTModelLin
+       RTModelLin, ObserverRTResult, LevelRadiance,
+       ObserverRTResultLin, LevelRadianceLin,
+       total_downwelling, total_downwelling_jacobian
 
 # v0.6 source-term vocabulary (Phase 1: types only; behaviour lands in Phase 2+)
 export AbstractSource, AbstractPreparedSource,
@@ -182,10 +234,12 @@ export AbstractSource, AbstractPreparedSource,
 # Phase 5: SurfaceSIF + double-dispatch surface_source_contribute!
 # v0.7 Phase A: ThermalEmission per-layer Planck volume source + contribute! seam
 export SolarBeam, PreparedSolarBeam, prepare_source, prepare_sources, BlackbodySource,
-       SurfaceSIF, PreparedSurfaceSIF, surface_source_contribute!,
+       SurfaceSIF, PreparedSurfaceSIF, surface_source_contribute!, surface_source_contribute_lin!,
+       surface_sif_parameter_count, validate_sif_solar_spectrum, supports_surface_sif,
        ThermalEmission, PreparedThermalEmission, contribute!, has_thermal_emission
 
 # Export types to show easily
+export AbstractSingleScatteringCorrection, NoSSCorrection, TMSCorrection
 export RadauQuad, GaussLegQuad,
        LambertianSurfaceScalar, LambertianSurfaceSpectrum,
        CanopySurface, CanopySurface_from_prospect, invalidate_canopy_cache!,

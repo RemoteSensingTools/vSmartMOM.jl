@@ -110,7 +110,7 @@ function itp_solar_to_ν_grid(solar, ν_grid)
 
     solar_subset = solar[solar_idx_start:solar_idx_end, :]
 
-    itp = LinearInterpolation(solar_subset[:, 1], 
+    itp = linear_interpolation(solar_subset[:, 1], 
                               solar_subset[:, 2])
 
     return itp.(ν_grid)
@@ -244,7 +244,14 @@ end
 """
     $(FUNCTIONNAME)(ν_grid::Union{AbstractRange{<:Real}, AbstractArray} = 600.0:0.01:26316.0)
 
-Get the default solar spectrum and interpolate to wavenumber grid (entire grid if not specified)
+Get the default solar spectrum and interpolate to wavenumber grid (entire grid if not specified).
+
+Returns an `(n, 2)` matrix `[ν E]` with `ν` in cm⁻¹ and `E` the spectral
+irradiance at 1 AU of a 5777 K blackbody, diluted by `(R☉/AU)² = 2.1629e-5`
+and multiplied by the TCCON solar line transmission. `E` is in
+**photons s⁻¹ m⁻² µm⁻¹** — a per-wavelength density sampled at `ν` — not in
+the mW m⁻² (cm⁻¹)⁻¹ irradiance units of `SolarBeam` `F₀`; convert before using
+it as `F₀`.
 """
 function default_solar_spectrum_at_earth(ν_grid::Union{AbstractRange{<:Real}, AbstractArray} = 600.0:0.01:26316.0)
 

@@ -71,8 +71,8 @@ function compute_absorption_cross_section(
     # Interpolators from grid bounds to index values
     N_grid = length(grid)
     if N_grid > 1
-        grid_idx_interp_low  = LinearInterpolation(grid, 1:1:N_grid, extrapolation_bc=1)
-        grid_idx_interp_high = LinearInterpolation(grid, 1:1:N_grid, extrapolation_bc=N_grid)
+        grid_idx_interp_low  = linear_interpolation(grid, 1:1:N_grid, extrapolation_bc=1)
+        grid_idx_interp_high = linear_interpolation(grid, 1:1:N_grid, extrapolation_bc=N_grid)
     end
 
     # --- Pre-compute line parameters on CPU (Steps 1b + 3: batch + cache qoft) ---
@@ -229,16 +229,19 @@ function compute_absorption_cross_section(
     ν_lo, ν_hi = extrema(model.ν_grid)
     grid_lo, grid_hi = extrema(grid)
     if grid_lo >= ν_lo && grid_hi <= ν_hi
-        return sitp(grid, pressure, temperature)
-    end
-    clamped = clamp.(grid, ν_lo, ν_hi)
-    result = sitp(clamped, pressure, temperature)
-    @inbounds for i in eachindex(grid)
-        if grid[i] < ν_lo || grid[i] > ν_hi
-            result[i] = 0
+        result = sitp(grid, pressure, temperature)
+    else
+        clamped = clamp.(grid, ν_lo, ν_hi)
+        result = sitp(clamped, pressure, temperature)
+        @inbounds for i in eachindex(grid)
+            if grid[i] < ν_lo || grid[i] > ν_hi
+                result[i] = 0
+            end
         end
     end
-    return result
+    # `grid` was reversed above to make wavenumber increase. Restore the
+    # caller's increasing-wavelength order before returning cross sections.
+    return wavelength_flag ? reverse(result) : result
 end
 
 #=

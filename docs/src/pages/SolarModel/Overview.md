@@ -2,7 +2,7 @@
 
 **For:** users supplying solar spectra or checking the package default solar transmission table.
 
-**Next:** [Configure a Scene](../IO/Overview.md), [Vector RTE & Discretization (Concepts)](../concepts/02_rt_theory.md), [Library](../api_reference.md).
+**Next:** [Configure a Scene (step by step)](../IO/ConfigurationGuide.md), [Vector RTE & Discretization (Concepts)](../concepts/02_rt_theory.md), [Library](../api_reference.md).
 
 The `SolarModel` module provides Planck-spectrum helpers and solar transmission readers used by vSmartMOM examples and RT configurations. It is intentionally small: it loads or generates spectral inputs, while the CoreRT solver applies those inputs through the solar source-function path.
 
@@ -12,7 +12,7 @@ The `SolarModel` module provides Planck-spectrum helpers and solar transmission 
 | --- | --- | --- |
 | `planck_spectrum_wn` | wavenumber in `cm^-1` | black-body radiance in `mW m^-2 sr^-1 cm` |
 | `planck_spectrum_wl` | wavelength in micrometers | black-body radiance in `W m^-2 sr^-1 um^-1` |
-| `default_solar_spectrum_at_earth` | wavenumber in `cm^-1` | approximate photon spectrum multiplied by the default solar transmission |
+| `default_solar_spectrum_at_earth` | wavenumber in `cm^-1` | `(n, 2)` matrix `[ν E]`: a 5777 K blackbody at 1 AU multiplied by the default solar transmission, `E` in photons `s^-1 m^-2 um^-1` (not the `mW m^-2 (cm^-1)^-1` units of `SolarBeam` `F₀`; convert before using it as `F₀`) |
 
 The default solar spectrum helper is available as `vSmartMOM.SolarModel.default_solar_spectrum_at_earth`.
 

@@ -29,14 +29,34 @@ Ross-Li BRDF model (Ross & Li, 2000): linear combination of isotropic, volumetri
 - **fgeo**: Geometric (Li Sparse) coefficient — models shadowing effects.
 
 For scalar RT (n=1) only; returns zero for polarized. See Ross & Li (2000), RSE.
+
+By default (`zenith_cap_deg = 80`) incident and reflected zenith angles are
+capped at 80° before the kernels are evaluated: a package regularization of
+the grazing quadrature nodes, not MODIS practice, so reflectances beyond 80°
+equal those at 80°. `zenith_cap_deg = nothing` uses the true angles (the
+MODIS/VLIDORT kernels).
 """
 function reflectance(RossLi::RossLiSurfaceScalar{FT},n, μᵢ::FT, μᵣ::FT, dϕ::FT) where FT
-    (; fiso, fvol, fgeo) = RossLi
+    (; fiso, fvol, fgeo, zenith_cap_deg) = RossLi
     # Function was defined for RAMI definition, have to reverse here:
     dϕ = π - dϕ
     # Convert cosines to angles for Ross-Li kernels
-    θᵢ   = acos(μᵢ) #assert 0<=θᵢ<=π/2
-    θᵣ   = acos(μᵣ) #assert 0<=θᵣ<=π/2
+    # clamp: F32 rounding can push cosines an ulp past ±1 → acos = NaN.
+    θᵢ   = acos(clamp(μᵢ, FT(-1), FT(1))) #assert 0<=θᵢ<=π/2
+    θᵣ   = acos(clamp(μᵣ, FT(-1), FT(1))) #assert 0<=θᵣ<=π/2
+    # Optional cap of the kernel zenith angles (default 80°): the LiSparse
+    # geometric kernel grows like sec θ·sec θ' and the BRDF turns strongly
+    # negative at the grazing discrete-ordinate nodes (θ ≈ 89.4°) — far
+    # outside the kernel's validity (MODIS MCD43 weights are retrieved for
+    # θ ≲ 65°) — which can make the surface-interaction geometric series
+    # (E − r⁻⁺R⁺⁻)⁻¹ near-singular and NaN-prone in Float32. The cap is a
+    # vSmartMOM regularization, not MODIS (MCD43) practice: beyond the cap the
+    # BRDF is the kernel value at the cap.
+    if zenith_cap_deg !== nothing
+        θ_cap = zenith_cap_deg * FT(π) / FT(180)
+        θᵢ = min(θᵢ, θ_cap)
+        θᵣ = min(θᵣ, θ_cap)
+    end
 
     if n==1
         return fiso * RossLi_K_iso() + 
@@ -58,7 +78,11 @@ Ross Thick volumetric kernel: models dense vegetation scattering.
 ``K_{\\text{vol}} = ((\\pi/2 - \\xi)\\cos\\xi + \\sin\\xi)/(\\cos\\theta_i + \\cos\\theta_r) - \\pi/4``
 """
 function RossLi_K_vol(θᵢ::FT, θᵣ::FT, dϕ::FT) where FT
-    ξ = acos(cos(θᵢ)*cos(θᵣ) + sin(θᵢ)*sin(θᵣ)*cos(dϕ))
+    # cos ξ = cosθᵢcosθᵣ + sinθᵢsinθᵣ cos Δφ ∈ [-1,1] exactly in ℝ, but F32
+    # rounding exceeds 1 by an ulp on the θᵢ≈θᵣ, Δφ≈0 diagonal (quadrature
+    # node pairs hit this for some SZA values) → acos = NaN poisoning the
+    # whole surface layer. Clamp — the same guard the author applied to `ct`.
+    ξ = acos(clamp(cos(θᵢ)*cos(θᵣ) + sin(θᵢ)*sin(θᵣ)*cos(dϕ), FT(-1), FT(1)))
     #@show ξ
     K_vol = ((π/FT(2) - ξ)*cos(ξ) + sin(ξ))/(cos(θᵢ)+cos(θᵣ)) - (π/FT(4))
     #@show K_vol
@@ -78,9 +102,10 @@ function RossLi_K_geo(θᵢ::FT, θᵣ::FT, dϕ::FT) where FT
     θᵢᵖ = atan(tan(θᵢ)*b_by_r)
     θᵣᵖ = atan(tan(θᵣ)*b_by_r)
     #@show θᵢᵖ, θᵣᵖ
-    ξᵖ = acos(cos(θᵢᵖ)*cos(θᵣᵖ) + sin(θᵢᵖ)*sin(θᵣᵖ)*cos(dϕ))
+    ξᵖ = acos(clamp(cos(θᵢᵖ)*cos(θᵣᵖ) + sin(θᵢᵖ)*sin(θᵣᵖ)*cos(dϕ), FT(-1), FT(1)))  # same ulp guard as ξ
     #@show ξᵖ
-    D = sqrt(tan(θᵢᵖ)^2 + tan(θᵣᵖ)^2 - 2tan(θᵢᵖ)*tan(θᵣᵖ)*cos(dϕ))
+    # D² = (tanθᵢᵖ − tanθᵣᵖ)² ≥ 0 in ℝ at Δφ = 0, but rounds negative in F32
+    D = sqrt(max(tan(θᵢᵖ)^2 + tan(θᵣᵖ)^2 - 2tan(θᵢᵖ)*tan(θᵣᵖ)*cos(dϕ), FT(0)))
     #@show  D
     ct = h_by_b * sqrt(D^2 + (tan(θᵢᵖ)*tan(θᵣᵖ)*sin(dϕ))^2)/(sec(θᵢᵖ)+sec(θᵣᵖ))
     if ct>FT(1) 

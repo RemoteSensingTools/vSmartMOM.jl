@@ -125,8 +125,6 @@ yaml_path = joinpath(pkgdir(vSmartMOM),
                      "test", "test_parameters", "PureRayleighParameters.yaml")
 params = read_parameters(yaml_path)
 params.architecture = vSmartMOM.Architectures.CPU()
-params.max_m = 2
-params.l_trunc = 20
 
 params.brdf[1] = canopy_scalar
 
@@ -134,38 +132,38 @@ model = model_from_parameters(params)
 R_canopy, T_canopy = rt_run(model)
 
 println("R shape: ", size(R_canopy))
-println("R(nadir, I) with canopy: ", R_canopy[1, 1, 1])
+println("R(VZA 60°, I) with canopy: ", R_canopy[1, 1, 1])
 ```
 
-Compare with bare Lambertian surface:
+Compare with the bare soil (the same Lambertian albedo without the canopy):
 
 ```julia
 params2 = read_parameters(yaml_path)
 params2.architecture = vSmartMOM.Architectures.CPU()
-params2.max_m = 2
-params2.l_trunc = 20
+params2.brdf[1] = LambertianSurfaceScalar(0.1)
 model2 = model_from_parameters(params2)
 R_bare, T_bare = rt_run(model2)
-println("R(nadir, I) bare soil:   ", R_bare[1, 1, 1])
+println("R(VZA 60°, I) bare soil:   ", R_bare[1, 1, 1])
 println("Canopy effect on TOA R:  ",
     round((R_canopy[1,1,1] - R_bare[1,1,1]) / R_bare[1,1,1] * 100, digits=1), "%")
 ```
 
-Compare the reflectance spectra:
+Compare the radiance spectra:
 
 ```julia
 fig = Figure(size=(700, 450))
 ax = Axis(fig[1,1],
     xlabel = "Spectral index",
-    ylabel = "TOA Reflectance (Stokes I)")
+    ylabel = "TOA radiance (Stokes I)")
 lines!(ax, R_canopy[1, 1, :], label="Canopy (LAI=3)")
 lines!(ax, R_bare[1, 1, :],   label="Bare soil (α=0.1)")
 axislegend(ax, position=:rt)
 fig
 ```
 
-The rendered docs include a Plotly red-edge view so the spectral contrast is
-visible even when static Makie figures are not rendered by the docs frontend:
+The Plotly panel below illustrates a red edge with synthetic curves. It
+does not display the PROSPECT or canopy RT calculations above; use their
+returned arrays and Makie figures for numerical interpretation:
 
 ```@raw html
 <iframe title="Canopy spectral response" src="../../assets/plots/canopy_spectral_response.html" loading="lazy" style="width: 100%; height: 520px; border: 1px solid var(--vp-c-divider); border-radius: 8px;"></iframe>
@@ -175,7 +173,7 @@ visible even when static Makie figures are not rendered by the docs frontend:
 
 The within-canopy atmosphere adds gas absorption between canopy sub-layers.
 This matters for tall canopies and strong absorption bands. Here we compare
-the TOA reflectance with and without the canopy atmosphere, using a multi-layer
+the TOA radiance with and without the canopy atmosphere, using a multi-layer
 canopy so the interleaved atmospheric layers have an effect.
 
 ```julia
@@ -204,12 +202,10 @@ Run without canopy atmosphere:
 ```julia
 params_na = read_parameters(yaml_path)
 params_na.architecture = vSmartMOM.Architectures.CPU()
-params_na.max_m = 2
-params_na.l_trunc = 20
 params_na.brdf[1] = canopy_no_atm
 model_na = model_from_parameters(params_na)
 R_no_atm, _ = rt_run(model_na)
-invalidate_canopy_cache!(model_na.params.brdf[1])
+invalidate_canopy_cache!(CoreRT.get_surface(model_na, 1))
 ```
 
 Run with canopy atmosphere:
@@ -217,15 +213,13 @@ Run with canopy atmosphere:
 ```julia
 params_wa = read_parameters(yaml_path)
 params_wa.architecture = vSmartMOM.Architectures.CPU()
-params_wa.max_m = 2
-params_wa.l_trunc = 20
 params_wa.brdf[1] = canopy_with_atm
 model_wa = model_from_parameters(params_wa)
 R_with_atm, _ = rt_run(model_wa)
-invalidate_canopy_cache!(model_wa.params.brdf[1])
+invalidate_canopy_cache!(CoreRT.get_surface(model_wa, 1))
 
-println("R(nadir, I) without canopy atm: ", R_no_atm[1, 1, 1])
-println("R(nadir, I) with canopy atm:    ", R_with_atm[1, 1, 1])
+println("R(VZA 60°, I) without canopy atm: ", R_no_atm[1, 1, 1])
+println("R(VZA 60°, I) with canopy atm:    ", R_with_atm[1, 1, 1])
 diff_pct = (R_with_atm[1,1,1] - R_no_atm[1,1,1]) / R_no_atm[1,1,1] * 100
 println("Within-canopy atmosphere effect: ", round(diff_pct, digits=3), "%")
 ```

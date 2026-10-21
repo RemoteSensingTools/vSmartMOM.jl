@@ -1,0 +1,40 @@
+chunking = "single spectral batch"
+commit = "e5a4d38e"
+absorption = false
+nSpec = 10000
+construction_timed = false
+layers = 5
+columns = 14
+
+[[measurements]]
+polarization = "Stokes_I()"
+mode = "source"
+median_seconds = 0.434226315
+max_forward_parity_error = 0.0
+seconds = [0.530659835, 0.432347313, 0.434226315]
+device_bytes = [2888314820, 2888314820, 2888314820]
+host_bytes = [151828264, 151815816, 151817032]
+[[measurements]]
+polarization = "Stokes_I()"
+mode = "forward"
+median_seconds = 0.10747072
+max_forward_parity_error = 5.377642775528102e-17
+seconds = [0.110052544, 0.107402041, 0.10747072]
+device_bytes = [321185280, 321185280, 321185280]
+host_bytes = [19424664, 19276376, 19274552]
+[[measurements]]
+polarization = "Stokes_IQU()"
+mode = "source"
+median_seconds = 2.343452158
+max_forward_parity_error = 0.0
+seconds = [2.30325198, 2.343452158, 2.348896884]
+device_bytes = [23254035252, 23254035252, 23254035252]
+host_bytes = [366722880, 366733984, 366750464]
+[[measurements]]
+polarization = "Stokes_IQU()"
+mode = "forward"
+median_seconds = 0.28012076
+max_forward_parity_error = 5.898059818321144e-17
+seconds = [0.282837808, 0.28012076, 0.279241416]
+device_bytes = [2447530304, 2447530304, 2447530304]
+host_bytes = [47634448, 47655264, 47652672]

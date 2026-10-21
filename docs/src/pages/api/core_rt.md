@@ -30,12 +30,75 @@ vSmartMOM.CoreRT.QuadPoints
 vSmartMOM.CoreRT.CompositeLayer
 vSmartMOM.CoreRT.AddedLayer
 vSmartMOM.CoreRT.RTNumericalParameters
+vSmartMOM.CoreRT.AbstractFourierConvergence
+vSmartMOM.CoreRT.AllFourierMoments
+vSmartMOM.CoreRT.IntensityConvergence
+vSmartMOM.CoreRT.StokesConvergence
+```
+
+## Single-Scattering Correction
+
+```@docs
+vSmartMOM.CoreRT.AbstractSingleScatteringCorrection
+vSmartMOM.CoreRT.NoSSCorrection
+vSmartMOM.CoreRT.TMSCorrection
+vSmartMOM.CoreRT.rt_run_ss_exact
+```
+
+## Fourier Loop Bound
+
+The azimuthal Fourier loop bound is derived per band at model build: each
+active component (surface, sources, Rayleigh, aerosol modes) declares the
+highest Fourier order it can contribute via the `component_m_max` trait, and
+the band bound is their maximum, clamped by the user's `max_m`. At run time,
+the [`IntensityConvergence`](@ref vSmartMOM.CoreRT.IntensityConvergence)
+strategy above may terminate the loop below that ceiling once the accumulated
+Stokes-I contribution at the user view angles stabilises — the two mechanisms
+compose.
+
+```@docs
+vSmartMOM.CoreRT.component_m_max
+vSmartMOM.CoreRT._aggregate_m_max
+```
+
+## Column Core and TOA Fast Path
+
+Every public forward entry point funnels into the internal single-column
+solver `_rt_run_column`; [`rt_run_toa`](@ref vSmartMOM.rt_run_toa) is the
+lean TOA-only wrapper used by retrieval loops that never consume BOA or
+interior fields (documented under the top-level API).
+
+```@docs
+vSmartMOM.CoreRT._rt_run_column
+```
+
+## Height-Aware Forward and Linearized Output
+
+`rt_run` returns a named `ObserverRTResult`. Endpoint fields are `nothing`
+when not selected by `geometry.obs_alt`; strict-interior outputs are stored as
+`LevelRadiance` records in `result.levels`. See the
+[`geometry` schema](../IO/Schema/geometry.md) for the scalar/vector selection
+convention.
+
+The analytic linearized solver returns `ObserverRTResultLin`. It stores
+endpoint Jacobians alongside the endpoint radiances and uses
+`LevelRadianceLin` records for co-located forward fields and Jacobians at each
+strict-interior height. Both result types retain their historical tuple
+iteration conventions.
+
+```@docs
+vSmartMOM.ObserverRTResult
+vSmartMOM.LevelRadiance
+vSmartMOM.ObserverRTResultLin
+vSmartMOM.LevelRadianceLin
+vSmartMOM.total_downwelling
+vSmartMOM.total_downwelling_jacobian
 ```
 
 > Source-term types (`SolarBeam`, `BlackbodySource`, `SurfaceSIF`,
 > `SourceSet`, `NoSource`, AD-mode traits, `prepare_source` /
 > `surface_source_contribute!` dispatchers) are documented on the
-> [Source terms](../extending/sources.md#api-reference) page.
+> [Source terms](../extending/sources.md#API-reference) page.
 
 ## Batch Scene Processing
 
@@ -50,6 +113,36 @@ vSmartMOM.update_aerosol_loading!
 vSmartMOM.update_aerosol_microphysics!
 ```
 
+## Atmosphere/Surface Split
+
+Run the atmosphere phase once, replay the surface phase per BRDF — see the
+[Fast Re-runs & Batch Processing](../batch_processing.md) guide.
+
+```@docs
+vSmartMOM.rt_run_atmosphere
+vSmartMOM.rt_run_surface
+vSmartMOM.rt_run_multi_surface
+vSmartMOM.AtmosphereRTCache
+```
+
+## Analytic Lambertian Albedo Closure
+
+```@docs
+vSmartMOM.LambertianClosure
+vSmartMOM.lambertian_closure
+vSmartMOM.albedo_jacobian
+vSmartMOM.invert_albedo
+```
+
+## Scenario Sweeps
+
+```@docs
+vSmartMOM.ScenarioSweep
+vSmartMOM.SweepResult
+vSmartMOM.run_sweep
+vSmartMOM.remake_geometry
+```
+
 ## Stream-Level RT Output
 
 ```@docs
@@ -60,12 +153,69 @@ vSmartMOM.CoreRT.rt_run_streams(::Any)
 ## Jacobian Parameter Layout
 
 ```@docs
+vSmartMOM.CoreRT.AbstractParameterLayout
 vSmartMOM.CoreRT.ParameterLayout
+vSmartMOM.CoreRT.ParameterKey
+vSmartMOM.CoreRT.ActiveParameterLayout
 vSmartMOM.CoreRT.n_total
 vSmartMOM.CoreRT.aerosol_range
 vSmartMOM.CoreRT.gas_range
+vSmartMOM.CoreRT.gas_profile_range
+vSmartMOM.CoreRT.gas_layer_index
 vSmartMOM.CoreRT.surface_range
 vSmartMOM.CoreRT.surface_index
+vSmartMOM.CoreRT.surface_parameter_count
+vSmartMOM.CoreRT.supports_linearized_surface
+vSmartMOM.CoreRT.sif_range
+vSmartMOM.CoreRT.atmosphere_range
 vSmartMOM.CoreRT.n_layer_params
 vSmartMOM.CoreRT.canopy_range
+vSmartMOM.sif_reference_state
+```
+
+## Retrieval-Selected Jacobian Plans
+
+The policy types below compile a retrieval definition into a small band-local
+tangent space before the layer optical properties and MOM operators are
+allocated. See [Compute Jacobians](../jacobians.md#Retrieval-Selected-Jacobians)
+for the `OCO_RRS_synth` state ordering, units, and chain rules.
+
+```@docs
+vSmartMOM.CoreRT.AbstractJacobianFlavor
+vSmartMOM.CoreRT.OCO_RRS_synth
+vSmartMOM.CoreRT.JacobianPlan
+vSmartMOM.CoreRT.PlannedRTModelLin
+vSmartMOM.CoreRT.jacobian_plan
+vSmartMOM.CoreRT.requires_aerosol_microphysics_jacobians
+vSmartMOM.CoreRT.requires_h2o_jacobians
+vSmartMOM.CoreRT.requires_pressure_jacobians
+vSmartMOM.CoreRT.globalize_jacobian
+```
+
+## Surface-Pressure Vertical-Grid Conventions
+
+How the vertical grid responds to a change in surface pressure, both when a
+retrieval rebuilds the profile at a trial pressure and in the analytic
+surface-pressure Jacobian (`model_from_parameters(LinMode(), params;
+vertical_grid=...)`). `FixedPressureGrid()` is the default.
+
+```@docs
+vSmartMOM.CoreRT.AbstractVerticalGridConvention
+vSmartMOM.CoreRT.FixedPressureGrid
+vSmartMOM.CoreRT.FixedAltitudeGrid
+vSmartMOM.CoreRT.surface_pressure_interfaces
+```
+
+## Quadrature Types
+
+```@docs
+vSmartMOM.CoreRT.AbstractQuadratureType
+vSmartMOM.CoreRT.RadauQuad
+vSmartMOM.CoreRT.GaussLegQuad
+```
+
+## Quadrature Construction
+
+```@docs
+vSmartMOM.CoreRT.rt_set_streams
 ```

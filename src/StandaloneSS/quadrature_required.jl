@@ -79,8 +79,10 @@ function determine_required_nbrdf_coxmunk(wind_speed_ms::Real;
     wind_speed_ms >= 0 || throw(ArgumentError("wind_speed_ms must be non-negative"))
     target_relative_error > 0 ||
         throw(ArgumentError("target_relative_error must be positive"))
-    σ² = 0.003 + 0.00512 * wind_speed_ms
-    m_max = ceil(Int, log(1 / target_relative_error) / sqrt(σ²))
+    # Heuristic width: Cox–Munk total mean-square slope (twice the per-axis
+    # variance used by CoreRT.wind_to_sigma2); conservative for the glint.
+    mss = 0.003 + 0.00512 * wind_speed_ms
+    m_max = ceil(Int, log(1 / target_relative_error) / sqrt(mss))
     return clamp(m_max, 16, 200)
 end
 

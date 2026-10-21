@@ -17,8 +17,9 @@ params = read_parameters(
     joinpath(pkgdir(vSmartMOM),
              "test", "test_parameters", "PureRayleighParameters.yaml"))
 params.architecture = vSmartMOM.Architectures.CPU()
-params.max_m = 2
-params.l_trunc = 20
+# Angular resolution comes from the YAML's `nstreams: 11`. Do not lower the
+# legacy `max_m` count here: Rayleigh needs Fourier moments m = 0, 1, 2, and
+# `max_m = 2` would keep only m = 0, 1.
 
 # Build the model and run.
 model = model_from_parameters(params)
@@ -26,14 +27,14 @@ R, T = rt_run(model)
 
 # R is the top-of-atmosphere reflected Stokes field [nVZA × nStokes × nSpec].
 println("R shape: ", size(R))
-println("R(nadir, I, λ₁) = ", R[1, 1, 1])
+println("R(VZA 60°, I, ν₁) = ", R[1, 1, 1])
 
 # The generated docs include a Plotly view of this pure-Rayleigh scene across
 # the signed viewing-angle sweep in the YAML file. The first trace is Stokes I;
 # the second trace is Stokes Q.
 #
 # ```@raw html
-# <iframe title="Pure-Rayleigh reflectance by viewing angle" src="../../assets/plots/core_rt_vza_response.html" loading="lazy" style="width: 100%; height: 520px; border: 1px solid var(--vp-c-divider); border-radius: 8px;"></iframe>
+# <iframe title="Pure-Rayleigh radiance by viewing angle" src="../../assets/plots/core_rt_vza_response.html" loading="lazy" style="width: 100%; height: 520px; border: 1px solid var(--vp-c-divider); border-radius: 8px;"></iframe>
 # ```
 
 # ## 2) What happens internally
@@ -65,5 +66,6 @@ println("R(nadir, I, λ₁) = ", R[1, 1, 1])
 # - Truncation updates used by scattering optics:
 #   Sanghavi and Stephens (2015), Eq. (38a)-(38d).
 #
-# For a detailed symbol-to-code mapping, see the documentation page:
-# `vSmartMOM -> Core RT Theory (Doubling/Adding)`.
+# For a detailed symbol-to-code mapping, see the RT basics pages
+# [2 · Vector RTE & Discretization](../concepts/02_rt_theory.md) and
+# [4 · The MOM Solver](../concepts/04_mom_solver.md).

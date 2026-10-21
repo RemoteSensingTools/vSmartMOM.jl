@@ -1,8 +1,7 @@
 # Source terms
 
 `vSmartMOM` v0.6 introduces a first-class **source-term** abstraction.
-Solar beams, surface fluorescence, and (in the near future) thermal
-emission and lidar pulses are all concrete subtypes of
+Solar beams, surface fluorescence, atmospheric thermal emission, and future lidar pulses are all concrete subtypes of
 `AbstractSource`, composed via `+`, and dispatched per layer through
 multiple dispatch — no `if SFI` branching, no `RS_type.F₀`/`RS_type.SIF₀`
 ownership leak.
@@ -23,7 +22,7 @@ that explicit at the type level.
 using vSmartMOM
 using vSmartMOM.CoreRT
 
-params = parameters_from_yaml("config/o2_a_band.yaml")
+params = read_parameters(joinpath(pkgdir(vSmartMOM), "config", "quickstart.yaml"))
 model  = model_from_parameters(params)
 
 # Default — RTModel.sources defaults to a SolarBeam (unit Stokes I irradiance).
@@ -37,7 +36,7 @@ R, T = rt_run(model; sources = SolarBeam() + SurfaceSIF(SIF₀ = sif_spec))
 
 # Thermal-IR / Carbon-I-style scene (1500 K blackbody source at 2-2.4 µm).
 spec_band = collect(model.atmosphere.spec_bands[1])   # cm⁻¹
-sources   = BlackbodySource(1500, spec_band)          # SolarBeam with Planck F₀
+sources   = BlackbodySource(1500, spec_band; pol_n=params.polarization_type.n)          # SolarBeam with Planck F₀
 R, T = rt_run(model; sources = sources)
 ```
 
@@ -49,6 +48,22 @@ model = model_from_parameters(params; sources = SolarBeam() + SurfaceSIF())
 
 The `sources=` kwarg on `rt_run` overrides `model.sources` for that
 specific solve; both flow through the same dispatch.
+
+Entry points that take an explicit mode object (`rt_run(rs, model, i_band)`,
+`rt_run_ss(rs, model, i_band)`, `rt_run_toa(rs::RRS, model)` and the linearized
+`rt_run(rs, model, lin_model, NAer, NGas, NSurf, i_band)`) also accept the
+legacy preset `rs.F₀ = F` (a nonzero `(nStokes, nSpec)` matrix). The solar
+F₀ of a solve is then, in order of precedence: the `SolarBeam` of an explicit
+`sources=` keyword, the preset `rs.F₀`, then `model.sources`. A `sources=`
+keyword applies to its own call only: `rs.F₀` is left as it was, so the next
+call without `sources=` uses the preset again (or `model.sources` when there
+is none).
+
+At solve time, an explicit `SolarBeam.sza` must match the model geometry.
+Change `params.sza` before construction or use `remake_geometry` to change
+the illumination angle. Multiple solar/blackbody beams throw `ArgumentError`;
+for one geometry, sum their irradiance matrices into one `SolarBeam`.
+These checks also cover linearized, single-scatter, TOA and split solves.
 
 ## Composition
 
@@ -71,7 +86,7 @@ source kernels is type-stable on both CPU and GPU.
 |-------------------|--------------------------------------------|-------------------------------------------------------|
 | `NoSource`        | nowhere                                    | identity for source composition                       |
 | `SolarBeam`       | atmospheric layer `j₀±` per Fourier moment | exact finite-δ single-scatter (Fell 1997 Eqs. 1.52-1.54) |
-| `BlackbodySource` | atmospheric layer `j₀±`                    | sugar around `SolarBeam` with `F₀ = factor · π · B(ν, T)` |
+| `BlackbodySource` | atmospheric layer `j₀±`                    | sugar around `SolarBeam` with `F₀ = factor · scale · B(ν, T)` |
 | `SurfaceSIF`      | surface layer `j₀⁻` at m=0                 | factor-2 broadcast across Nquad streams (Lambertian only) |
 
 `BlackbodySource(T, spec_band)` is a constructor that returns a
@@ -79,8 +94,9 @@ source kernels is type-stable on both CPU and GPU.
 Use it for Carbon-I-like scenes (hot lab source illuminating CO₂/CH₄/H₂O
 absorption in the 2-2.4 µm range).
 
-Future versions will add `ThermalEmission` (atmospheric volume Planck
-integral), `DiffuseBoundary`, and (later) `LidarPulse`.
+`ThermalEmission` implements the atmospheric volume Planck source in forward
+RT. Its end-to-end Jacobians remain unsupported. `DiffuseBoundary` and
+`LidarPulse` are future source types.
 
 ## Units convention
 
@@ -88,15 +104,44 @@ integral), `DiffuseBoundary`, and (later) `LidarPulse`.
 |----------------------------|-----------------------------------|
 | `SolarBeam.F₀`             | mW · m⁻² · cm⁻¹                   |
 | `SurfaceSIF.SIF₀`          | mW · m⁻² · cm⁻¹                   |
+| `SurfaceSIF.SIF755`        | same radiance unit as output Stokes I/Q/U/V |
+| `SurfaceSIF.slope`         | output radiance unit per nm          |
 | `rt_run` output (R, T, J)  | mW · m⁻² · sr⁻¹ · cm⁻¹            |
 | `SolarBeam(F₀ = ones(...))`| 1 mW · m⁻² · cm⁻¹ per spectral pt |
 
 All sources in a `SourceSet` should share these units so additive
 composition makes physical sense. `BlackbodySource` defaults to `factor =
-π` (Lambertian-disk → hemispheric irradiance) so its `F₀` is comparable
-to a `SolarBeam(F₀ = 1)` baseline.
+π`, which gives πB, the exitance of a Lambertian emitter at `T`; for the
+irradiance from a distant disk of radius R at distance d, also set
+`scale = (R/d)²` (2.1629e-5 for the Sun at 1 AU). `SolarBeam.F₀` is an
+irradiance, so `factor = 1` alone does not describe a collimated lab beam (it
+leaves the radiance B in `F₀`); for lab illumination set `factor · scale` to
+the solid angle subtended by the source, or the throughput of the optics, that
+converts B into the irradiance of the beam.
+
+For retrievals, `SurfaceSIF(SIF755=..., slope=..., wavelength_nm=...)`
+uses `L_SIF(λ) = SIF755 + slope*(λ_nm-755)`. These two values are
+state-vector parameters in radiance units. A nonzero SIF amplitude or slope requires an
+explicit non-unit Fraunhofer spectrum in `SolarBeam(F₀=...)`; the unit default
+is rejected. This checks for supplied non-unit irradiance; it does not validate
+calibration or Fraunhofer structure. The modern OCO parameterization uses
+`SIF760`, `mSIF`, and `wavenumber_cm1`; see the
+[source configuration reference](../IO/Schema/sources.md) for both coordinate
+conventions, units, and current composition restrictions.
 
 ## Differentiation
+
+Forward source support and a declared AD mode do not establish end-to-end
+Jacobian support. The current linearized driver accepts `SolarBeam`,
+`SurfaceSIF`, `NoSource`, and compositions of these. It rejects thermal and
+other source types whose complete tangent propagation is not implemented.
+The opt-in `jacobian_adding=:source` path additionally restricts surfaces and
+observers to its supported Lambertian endpoint configurations.
+
+To extend this support, implement source values and derivatives through
+elemental construction, doubling, adding, surface coupling, and output
+reconstruction, then validate against forward finite differences. Merely
+declaring `AnalyticSourceJacobian` or `ForwardDiffSourceJacobian` is insufficient.
 
 `AbstractSourceADMode` traits declare how each source's parameters
 participate in linearized RT:
@@ -167,7 +212,18 @@ handled:
 | `PreparedSourceSet`   | any                     | iterate                                |
 | `PreparedSolarBeam`   | any                     | (currently in `create_surface_layer!`; will move to dispatch in a later sub-phase) |
 | `PreparedSurfaceSIF`  | `LambertianSurface*`    | factor-2 SIF₀ broadcast (m=0 only)     |
-| `PreparedSurfaceSIF`  | non-Lambertian          | no-op                                  |
+| `PreparedSurfaceSIF`  | non-Lambertian          | nonzero/retrievable SIF rejected at solve time |
+
+Zero prescribed SIF is a valid placeholder on any surface. Retrievable SIF
+requires injection support even at zero amplitude because its derivatives
+are nonzero. Split surface replay validates the cached prepared sources
+against the replacement surface.
+
+To support fluorescence on a new surface, implement both
+`surface_source_contribute!` and `surface_source_contribute_lin!` for
+`PreparedSurfaceSIF` and your surface type, then specialize
+`CoreRT.supports_surface_sif(::YourSurface) = true`. The shared validation
+uses this trait before entering the kernels.
 
 ## Architecture invariants
 
@@ -191,7 +247,7 @@ handled:
 - [`src/CoreRT/Sources/solar_beam.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/Sources/solar_beam.jl) — `SolarBeam`, `PreparedSolarBeam`, `BlackbodySource`, `source_tangent!`.
 - [`src/CoreRT/Sources/surface_sif.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/Sources/surface_sif.jl) — `SurfaceSIF`, `surface_source_contribute!`.
 - [`test/test_sources.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/test/test_sources.jl) — per-phase regression tests with end-to-end bit-equality assertions.
-- The original v0.6 design note: [`dev_notes/source_terms_architecture_v0_6.md`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/dev_notes/source_terms_architecture_v0_6.md).
+- The original v0.6 design note: [`dev_notes/source_terms_architecture_v0_6.md`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/docs/dev_notes/source_terms_architecture_v0_6.md).
 
 ## API reference
 
@@ -230,6 +286,7 @@ vSmartMOM.CoreRT.source_ad_mode(::vSmartMOM.CoreRT.AbstractSource)
 ### Dispatch entry points
 
 ```@docs
+vSmartMOM.CoreRT.supports_surface_sif
 vSmartMOM.CoreRT.prepare_source(::vSmartMOM.CoreRT.SolarBeam, ::Type{<:AbstractFloat}, ::Integer, ::Integer, ::Any)
 vSmartMOM.CoreRT.prepare_source(::vSmartMOM.CoreRT.SurfaceSIF, ::Type{<:AbstractFloat}, ::Integer, ::Integer, ::Any)
 vSmartMOM.CoreRT.prepare_sources(::vSmartMOM.CoreRT.NoSource, ::Type{<:AbstractFloat}, ::Integer, ::Integer, ::Any)

@@ -1,0 +1,10 @@
+Precompiling packages...
+  24277.0 ms  ✓ vSmartMOM
+  12627.4 ms  ✓ vSmartMOM → vSmartMOMCUDAExt
+  2 dependencies successfully precompiled in 38 seconds. 274 already precompiled.
+Test Summary:               | Pass  Total   Time
+CUDA Jacobian pointer plans |  108    108  46.9s
+Test Summary:                   | Pass  Total   Time
+Shared-memory Jacobian products |   84     84  33.2s
+Test Summary:                    | Pass  Total   Time
+Fused Jacobian geometric inverse |   12     12  22.2s

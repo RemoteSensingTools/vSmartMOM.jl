@@ -9,12 +9,28 @@ measurements.
 Sensors are labeled from TOA->BOA, and each share the same set of viewing angles.
 Upward looking viewing angles are denoted by -90<VZA<0 and downward viewing angles
 are denoted by 0<VZA<90.
+
+Internal legacy transport routine: call `rt_run(model; sources=...)` for the
+public source contract. That wrapper validates the sources, populates the
+Raman irradiance carrier, and scales this routine's unit-beam elastic output.
+Calling this routine directly does not resolve `model.sources`.
 """
 
 function rt_run_test_ms(RS_type::AbstractRamanType,
                         sensor_levels::Vector{Int64},
                         model, iBand)
+    _require_rt_polarization(polarization_type(model))
+    model.quad_points.external_solar && throw(ArgumentError(
+        "external-solar SFI does not yet support multisensor RT"))
     _warn_explicit_depol_raman(RS_type, model)
+
+    Nz = length(model.profile.p_full)
+    isempty(sensor_levels) && throw(ArgumentError("sensor_levels must not be empty"))
+    all(level -> level == 0 || 1 <= level < Nz, sensor_levels) ||
+        throw(ArgumentError("sensor_levels must contain only sentinel 0 or interior interfaces 1:$(Nz - 1)"))
+    length(unique(sensor_levels)) == length(sensor_levels) ||
+        throw(ArgumentError("sensor_levels must be unique"))
+    InelasticScattering.normalize_raman_weights!(RS_type, model, iBand)
 
     (; obs_alt, sza, vza, vaz) = model.obs_geom   # Observational geometry properties
     (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad) = model.quad_points # All quadrature points
@@ -27,8 +43,8 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
     dτ_max_threshold = model.numerics.dτ_max_threshold
     dτ_min_floor     = model.numerics.dτ_min_floor
 
-    # Also to be changed!!
-    brdf = get_surface(model, iBand[1])
+    brdf = _resolve_spectral_surface(common_band_surface(model, iBand),
+                                     _band_wavenumbers(model, iBand))
     (; ϖ_Cabannes) = RS_type
 
 
@@ -49,8 +65,9 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
     arr_type = CoreRT.array_type(model) # Type of array to use
     arch = CoreRT.architecture(model)
     if size(RS_type.F₀) != (pol_type.n, nSpec)
-        RS_type.F₀ = zeros(FT, pol_type.n, nSpec)
-        @views RS_type.F₀[1, :] .= one(FT)
+        F₀_unit = zeros(FT, pol_type.n, nSpec)
+        @views F₀_unit[1, :] .= one(FT)
+        _write_driver_F₀!(RS_type, F₀_unit)
     end
     surface_F₀ = arr_type(FT.(RS_type.F₀))
     SFI = true                          # SFI flag
@@ -60,6 +77,7 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
     # Output arrays for up/downwelling flux at each sensor level
     uwJ   = [zeros(FT, (length(vza), pol_type.n, nSpec)) for i=1:length(sensor_levels)]
     dwJ   = [zeros(FT, (length(vza), pol_type.n, nSpec)) for i=1:length(sensor_levels)]
+    direct_dwJ = [zeros(FT, (length(vza), pol_type.n, nSpec)) for i=1:length(sensor_levels)]
     uwieJ = [zeros(FT, (length(vza), pol_type.n, nSpec)) for i=1:length(sensor_levels)]
     dwieJ = [zeros(FT, (length(vza), pol_type.n, nSpec)) for i=1:length(sensor_levels)]
     # Notify user of processing parameters
@@ -87,6 +105,10 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
     # Note: Raman SS properties (ϖ_λ₁λ₀, Z matrices, etc.) are set up
     # in model_from_parameters when RS_type != noRS.
 
+    # BOA cumulative (δ-scaled) optical depth; m-independent, kept for the
+    # Cox–Munk glint correction after the Fourier loop.
+    τ_sum_surf = nothing
+
     # Loop over fourier moments
     for m = 0:m_max
 
@@ -100,6 +122,17 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
         # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all = 
             extractEffectiveProps(layer_opt_props, quad_points);
+        # Optics may be promoted (e.g. Float64 aerosol inputs in a Float32
+        # model); the correction works in the radiance precision FT.
+        τ_sum_surf === nothing && (τ_sum_surf = FT.(Array(τ_sum_all[:, end])))
+
+        # The unscattered solar beam is not part of the diffuse MOM field.
+        # Report it once, separately, using the m=0/BOA normalization.
+        if m == 0
+            _set_unscattered_downwelling!(direct_dwJ, sensor_levels, τ_sum_all,
+                                           RS_type.F₀, vza, qp_μ, iμ₀, μ₀,
+                                           pol_type)
+        end
 
         # Loop over vertical layers: 
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
@@ -160,7 +193,7 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
             #else
             @timeit "interaction_multisensor" interaction_bot!(
                     ims, RS_type, 
-                    scattering_interfaces_all[end], 
+                    surface_scattering_interface(scattering_interfaces_all[end]), 
                     SFI, 
                     composite_layer, 
                     added_layer_surface, 
@@ -186,10 +219,20 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
                     I_static, arr_type)
     end
 
+    # Exact direct-solar glint residual, as in the full-column path
+    # (`_rt_run_column`), applied to the TOA record (sentinel level 0). The
+    # Fourier loop above always runs to m_max. Interior upwelling records
+    # carry the Fourier-truncated glint only (as in the linearized driver).
+    i_toa = findfirst(==(0), sensor_levels)
+    if brdf isa CoxMunkSurface && SFI && i_toa !== nothing
+        @timeit "SS Correction" apply_ss_correction!(
+            uwJ[i_toa], brdf, pol_type, vza, vaz, μ₀, τ_sum_surf, m_max, nSpec;
+            F₀=Array(surface_F₀))
+    end
+
     # Show timing statistics (gated on numerics.verbose; default off).
     model.numerics.verbose && print_timer()
     reset_timer!()
 
-    # Return R_SFI or R, depending on the flag
-    return uwJ, dwJ, uwieJ, dwieJ #SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI) : (R, T)
+    return uwJ, dwJ, direct_dwJ, uwieJ, dwieJ
 end

@@ -1,0 +1,53 @@
+[[preparation_common_instrument_RT64]]
+instrument = "Float32"
+max_noise_sigma = 0.9970985146485071
+rms_noise_sigma = 0.16486475496961397
+state = "reference"
+[[preparation_common_instrument_RT64]]
+instrument = "Float64"
+max_noise_sigma = 0.9963444831263748
+rms_noise_sigma = 0.16482873469652015
+state = "reference"
+[[preparation_common_instrument_RT64]]
+instrument = "Float32"
+max_noise_sigma = 0.9970799504723004
+rms_noise_sigma = 0.1648629273234083
+state = "optimized"
+[[preparation_common_instrument_RT64]]
+instrument = "Float64"
+max_noise_sigma = 0.9963259213102746
+rms_noise_sigma = 0.16482690697929372
+state = "optimized"
+
+[[instrument_only]]
+max_noise_sigma = 0.43593993067059156
+file = "frozen-reference-prep32-rt32.jld2"
+rms_noise_sigma = 0.09912586840373584
+[[instrument_only]]
+max_noise_sigma = 0.4359334601653789
+file = "frozen-reference-prep32-rt64.jld2"
+rms_noise_sigma = 0.09912186164324073
+[[instrument_only]]
+max_noise_sigma = 0.4369425946973915
+file = "frozen-reference-prep64-rt64.jld2"
+rms_noise_sigma = 0.09912232999735966
+[[instrument_only]]
+max_noise_sigma = 0.4369408074571808
+file = "frozen-reference-prep64-rt32.jld2"
+rms_noise_sigma = 0.09912640815173168
+[[instrument_only]]
+max_noise_sigma = 0.4359404432420965
+file = "frozen-optimized-prep32-rt32.jld2"
+rms_noise_sigma = 0.09912560166566156
+[[instrument_only]]
+max_noise_sigma = 0.43593367591217747
+file = "frozen-optimized-prep32-rt64.jld2"
+rms_noise_sigma = 0.09912190595369172
+[[instrument_only]]
+max_noise_sigma = 0.43694282669217743
+file = "frozen-optimized-prep64-rt64.jld2"
+rms_noise_sigma = 0.09912237861656585
+[[instrument_only]]
+max_noise_sigma = 0.4369477974574027
+file = "frozen-optimized-prep64-rt32.jld2"
+rms_noise_sigma = 0.09912671917459746

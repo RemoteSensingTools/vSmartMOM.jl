@@ -1,5 +1,10 @@
 # Configuration Guide — Building a Scene, Step by Step
 
+**For:** users building up a scene one capability at a time (Rayleigh-only →
+polarization → gases → aerosols → surfaces), in file and in-script forms.
+
+**Next:** [Input Schema](Schema.md), [IO API](Overview.md), [Compute Jacobians](../jacobians.md).
+
 This guide builds a vSmartMOM scene up from the simplest possible setup,
 adding one capability at a time. **Every example is shown in two equivalent
 forms** — a config file (TOML or YAML) and the equivalent pure-Julia
@@ -57,7 +62,7 @@ surface           = ["LambertianSurfaceScalar(0.15)"]
 nstreams          = 3                          # ≥3 (Rayleigh reaches m=2)
 polarization_type = "Stokes_I()"
 truncation        = "NoTruncation()"
-depol             = -1                          # -1 ⇒ standard Rayleigh depol
+depol             = -1                          # -1 ⇒ depol from N₂/O₂ molecular constants
 float_type        = "Float64"
 architecture      = "CPU()"
 
@@ -65,7 +70,7 @@ architecture      = "CPU()"
 sza     = 60.0
 vza     = [60.0]
 vaz     = [180.0]
-obs_alt = 1000.0                                # Pa
+obs_alt = [0.0]                                 # TOA + BOA radiances
 
 [atmospheric_profile]
 T = [250.0, 275.0]                              # K, full levels (layer centers)
@@ -86,7 +91,7 @@ cfg = Dict(
     "float_type"        => "Float64",
     "architecture"      => "CPU()"),
   "geometry" => Dict(
-    "sza" => 60.0, "vza" => [60.0], "vaz" => [180.0], "obs_alt" => 1000.0),
+    "sza" => 60.0, "vza" => [60.0], "vaz" => [180.0], "obs_alt" => [0.0]),
   "atmospheric_profile" => Dict(
     "T" => [250.0, 275.0], "p" => [100.0, 500.0, 1000.0],
     "profile_reduction" => -1))
@@ -101,13 +106,19 @@ R, T   = rt_run(model)
 - `spec_bands` — one entry per band. Two syntaxes: a single point/list
   `"[12987.0]"`, or a range `"(1e7/775):0.05:(1e7/755)"` (start:step:stop, in
   cm⁻¹). Wavelength↔wavenumber: `ν[cm⁻¹] = 1e7 / λ[nm]`. See the
-  [`radiative_transfer` schema](Schema/radiative_transfer.md) (the `spec_bands` field).
-- `surface` — **one BRDF per band**. `length(surface) == length(spec_bands)`.
+  [`spec_bands` schema](Schema/spec_bands.md).
+- `surface` — **one BRDF per band**. Fewer surfaces than bands is an error at
+  model construction; surplus entries are ignored with a warning.
 - `nstreams` — angular resolution. Public contract: `stream_l_cap =
   2·nstreams − 1`. Minimum 3.
 - `T` has length `#layers`; `p` (half levels) has length `#layers + 1`. They
   define the layering — get this off-by-one right.
-- `obs_alt` is in **Pa** (the profile `p` is in **hPa**). TOA→BOA ordering.
+- `obs_alt` is a height selection in **km above BOA**. `[0]` requests the
+  standard TOA-upwelling and BOA-downwelling pair. Scalar `0` requests BOA
+  only; a scalar interior `H` requests both directions at `H`; `[0, H]`
+  requests TOA, BOA, and `H`. See the
+  [`geometry` schema](Schema/geometry.md) for the complete scalar/vector
+  convention and the named `ObserverRTResult` output.
 
 ---
 
@@ -136,7 +147,7 @@ optical depth enters.
 
 ```toml
 [absorption]
-fixed_molecules    = [["O2"]]          # one list per band; no Jacobian
+fixed_molecules    = [["O2"]]          # one list per band; no abundance Jacobian
 variable_molecules = [[]]              # one list per band; Jacobian computed
 vmr                = { O2 = 0.21 }     # volume mixing ratio per molecule
 broadening         = "Voigt()"
@@ -159,7 +170,8 @@ cfg["absorption"] = Dict(
 `variable_molecules[ib]` each hold the molecules active in band `ib`. There is
 **one list per spectral band** — band 1 might carry `O2`, band 2 `CO2`, etc.
 
-- **fixed** — abundance held constant, *no* Jacobian computed.
+- **fixed** — abundance held constant, so no gas-abundance Jacobian is
+  computed (other configured state derivatives remain available).
 - **variable** — abundance is a state-vector element, Jacobian computed (the
   linearized path differentiates these).
 
@@ -170,10 +182,15 @@ cfg["absorption"] = Dict(
 - Each molecule must actually have lines inside its band's wavenumber range —
   a molecule with no lines in-band contributes nothing.
 
-**VMR sources.** A `vmr` value is either
+**VMR sources.** For every non-H₂O gas, `vmr` means moles of species per
+mole of **dry air**. A value is either
 - a **scalar** (e.g. `O2 = 0.21`) — constant with height, or
-- a **vector** — a per-layer profile; its length must match the atmospheric
-  profile layers (it is interpolated in pressure with a warning if it does not).
+- a **vector** with either one value per layer (`N`) or one value per pressure
+  interface (`N+1`). Interface values are mapped to layer centers in log
+  pressure before any observer-height interfaces are inserted.
+
+H₂O is derived from `q` and stored internally as the dry-air molar ratio
+``N_\mathrm{H2O}/N_\mathrm{dry}``, not as a moist-air mole fraction.
 
 **Line shape.** `broadening` ∈ `Voigt()` (default; Doppler+pressure, the right
 choice through the troposphere/stratosphere), `Lorentz()` (pressure limit),
@@ -187,9 +204,26 @@ molecule lists) the precomputed look-up tables are used instead — much faster,
 and the production pipeline path. `cia_files` / `mtckd_file` add
 collision-induced and continuum absorption.
 
-> **Legacy form.** Older configs use a single `molecules = [[O2], [H2O,CO2]]`
+For a CIA file containing more than one HITRAN reference family, select the
+source explicitly:
+
+```yaml
+cia_files:
+  - path: "/data/HITRAN_CIA/O2-O2_2024.cia"
+    reference_codes: ["54"]
+    negative_policy: error
+  - "/data/HITRAN_CIA/O2-N2_2024.cia"
+```
+
+`reference_codes` accepts one string or a nonempty list. A bare path remains
+valid when its reference families do not overlap on the requested spectral
+grid; overlapping families without an explicit selection are rejected.
+`negative_policy` is `error` by default. Use `clamp_zero` only as an explicit,
+documented decision to replace negative tabulated cross sections by zero.
+
+> **Legacy form.** Older configs use a single `molecules = [[O2], [CO2]]`
 > list (all treated as fixed) instead of `fixed_molecules`/`variable_molecules`.
-> It still parses; prefer the explicit split for new work.
+> It still parses for non-H₂O species; prefer the explicit split for new work.
 
 ---
 
@@ -216,14 +250,13 @@ vmr_h2o = q / (1 − q) · (M_dry / M_H₂O)
 ```
 
 and adds the H₂O line absorption automatically (HITRAN on the fly, or the H₂O
-LUT if supplied). `q` has length `#layers` (same as `T`); all-zero `q` (the
-default) means a dry atmosphere.
+LUT if supplied). `q` may contain `N` layer-center values (same as `T`) or
+`N+1` pressure-interface values; interface values are mapped to layer centers
+in log pressure. All-zero `q` (the default) means a dry atmosphere.
 
-> **q vs. an explicit H₂O molecule.** The legacy `molecules` form *can* list
-> `H2O` with its own `vmr` (constant), which bypasses `q`. Mixing both —
-> setting `q` *and* listing `H2O` — double-specifies water. Prefer `q` for the
-> modern path. (If you set `q` where a profile source already provided one, a
-> warning is emitted; a full config-level override is not yet wired.)
+> **H₂O is driven only by `q`.** Do not list `H2O` in `fixed_molecules`,
+> `variable_molecules`, or the legacy `molecules` form; the parser rejects it
+> to prevent double-specifying water vapor.
 
 ---
 
@@ -254,6 +287,9 @@ cfg["absorption"]["vmr"]                = Dict("O2" => 0.21, "CO2" => 400e-6)
 
 **What must match:** every per-band list — `surface`, `fixed_molecules`,
 `variable_molecules`, and (if used) `LUTfiles` — must have one entry per band.
+A single solve over several bands together (e.g. a combined-band Raman call)
+uses one lower boundary and therefore requires the same surface in each of
+those bands; see the [`surface` schema](Schema/surface.md).
 
 ---
 
@@ -263,22 +299,37 @@ Add a `scattering` block. Each aerosol is a size distribution + refractive
 index + a vertical placement + a reference optical depth.
 
 ```toml
+[radiative_transfer]
+greek_beta_cutoff = 1.0e-5   # beta-only Fourier-support cutoff; see below
+
 [scattering]
-r_max        = 50.0       # µm, max radius for the size-distribution quadrature
-nquad_radius = 1000       # radius quadrature points
-λ_ref        = 0.770      # µm, wavelength at which τ_ref is defined
-decomp_type  = "NAI2()"
+r_max          = 50.0     # µm, max radius for the size-distribution quadrature
+nquad_radius   = 1000     # radius quadrature points
+"λ_ref"        = 0.770    # µm, wavelength at which τ_ref is defined
+decomp_type    = "NAI2()"
 
 [[scattering.aerosols]]
-τ_ref = 0.001             # aerosol optical depth at λ_ref
-μ     = 1.0               # geometric mean radius (µm), lognormal
-σ     = 1.5               # geometric std dev (≥ 1)
-nᵣ    = 1.3               # real refractive index
-nᵢ    = 1.0e-8            # imaginary (absorbing) part
-p₀    = 700.0             # vertical peak pressure (hPa)
-σp    = 50.0              # vertical width (hPa)
+"τ_ref" = 0.001           # aerosol optical depth at λ_ref
+"μ"     = 1.0             # geometric mean radius (µm), lognormal
+"σ"     = 1.5             # geometric std dev (≥ 1)
+"nᵣ"    = 1.3             # real refractive index
+"nᵢ"    = 1.0e-8          # imaginary (absorbing) part
+"p₀"    = 700.0           # vertical peak pressure (hPa)
+"σp"    = 50.0            # vertical width (hPa)
 ```
+
+TOML bare keys are ASCII-only, so the Unicode keys (`λ_ref`, `τ_ref`, `μ`,
+`σ`, `nᵣ`, `nᵢ`, `p₀`, `σp`, `z₀`, `σ₀`, `ϖ`, `Δ_angle`) must be quoted in
+TOML; YAML and Julia `Dict`s use them as is.
+
+With aerosols present, also state `radiative_transfer.greek_beta_cutoff`: a
+positive threshold such as `1.0e-5` drops insignificant high-degree β tails,
+and in YAML `greek_beta_cutoff: null` keeps the full Mie series. Omitting the
+key behaves as `null` but the parser warns (see the
+[`radiative_transfer` schema](Schema/radiative_transfer.md)).
+
 ```julia
+cfg["radiative_transfer"]["greek_beta_cutoff"] = 1.0e-5
 cfg["scattering"] = Dict(
   "r_max" => 50.0, "nquad_radius" => 1000, "λ_ref" => 0.770,
   "decomp_type" => "NAI2()",
@@ -307,7 +358,10 @@ into a per-layer optical depth.
 **Band-level scattering knobs**
 
 - `r_max`, `nquad_radius` — the radius quadrature `Mie` integrates over. Larger
-  `nquad_radius` resolves the size distribution better at more cost.
+  `nquad_radius` resolves the size distribution better at more cost. The
+  optional `r_min` (default `1e-3` µm) is the lower bound; the nodes on
+  `[r_min, r_max]` do not move with the aerosol `μ`, `σ`, so the analytic size
+  Jacobians are exact for the chosen `nquad_radius`.
 - `λ_ref` — the wavelength `τ_ref` is anchored to.
 - `decomp_type` — phase-matrix Fourier decomposition: `NAI2()` (cheaper, GPU-
   capable, the default) or `PCW()` (precomputed Wigner; faster for very large
@@ -329,9 +383,9 @@ linearized paths are **consistent** here:
 |----------|-----------------------------------|
 | Gas absorption `τ_abs(ν)` | **per wavelength** (line-by-line) |
 | Rayleigh `τ_rayl(ν)` (σ ∝ ν⁴) | **per wavelength** |
-| Aerosol extinction `k` & AOD `τ_aer` | **per wavelength** (endpoint interpolation, see below) |
-| Aerosol single-scattering albedo `ω̃` | **per wavelength** (endpoint interpolation) |
-| Aerosol phase matrix `Z⁺⁺/Z⁻⁺` (Greek coefs) | **per band** (endpoint average — *not* per wavelength) |
+| Aerosol extinction `k` & AOD `τ_aer` | **per wavelength** (interpolated between Mie nodes, see below) |
+| Aerosol single-scattering albedo `ω̃` | **per wavelength** (interpolated between Mie nodes) |
+| Aerosol phase matrix `Z⁺⁺/Z⁻⁺` (Greek coefs) | **per wavelength** (interpolated between Mie nodes — *no* Mie calculation per wavelength) |
 
 **Absorption and Rayleigh are fully spectral** — each is stored as an
 `(nSpec × nLayers)` matrix, recomputed at every wavenumber.
@@ -343,20 +397,22 @@ the optical depth at `λ_ref`; the model rescales it by the Mie extinction ratio
 τ_aer(λ, z) = τ_ref · ( k(λ) / k(λ_ref) ) · vertical_profile(z)
 ```
 
-To get `k(λ)` and `ω̃(λ)` without a full Mie calculation at every spectral point,
-the aerosol Mie is evaluated at the two **band endpoints** and `k`/`ω̃` are
-**linearly interpolated** in wavenumber onto each spectral point — so AOD does
-vary across the band. The phase matrix (Greek coefficients) is the **average of
-the two endpoints** — a single phase matrix per band, *not* recomputed per
-wavelength. A single-wavelength band uses the band-center value directly.
+To get `k(λ)`, `ω̃(λ)` and the phase matrix without a full Mie calculation at
+every spectral point, the aerosol Mie is evaluated at the two **band endpoints**
+(the endpoints of the `aerosol_anchor_bands` grid when that keyword is passed to
+`model_from_parameters`). Each endpoint is truncated independently, and `k`,
+the scattering coefficient `k·ω̃` (hence `ω̃`), the truncation factor and the
+Greek coefficients are **linearly interpolated** in wavenumber onto each
+spectral point — so AOD and the phase matrix both vary across the band. When
+`λ_ref` lies strictly inside the band, a third Mie node at `λ_ref` is added and
+the interpolation is a natural cubic through the three nodes. A
+single-wavelength band uses a Mie calculation at that point directly.
 
-> **Approximation & future work.** Linear endpoint interpolation assumes the
-> aerosol optics vary smoothly and near-linearly across the band — true for
-> bands narrow compared to the aerosol's spectral structure, which is **a key
-> reason to keep spectral bands small**. A future refinement could add the
-> band-center Mie point and use **quadratic (3-point) interpolation**, and could
-> resolve the phase matrix per wavelength for wide bands. (See the code comment
-> at the aerosol Mie call site in `model_from_parameters.jl`.)
+> **Approximation.** Interpolating between Mie nodes assumes the aerosol
+> optics vary smoothly across the band — true for bands narrow compared to the
+> aerosol's spectral structure, which is **a key reason to keep spectral bands
+> small**. (See the code comment at the aerosol Mie call site in
+> `model_from_parameters.jl`.)
 
 ### Refractive index: in-band `nᵣ/nᵢ` vs. reference `n_ref`
 
@@ -367,7 +423,7 @@ Two refractive-index roles exist in the aerosol block:
 | `nᵣ − i·nᵢ` | per-aerosol `nᵣ`, `nᵢ` | **In-band index** — used for all Mie calculations within the spectral band (`k(λ)`, `ω̃(λ)`, Greek coefs). |
 | `n_ref` | `[scattering].n_ref` (optional) | **Reference index** — used *only* to compute `k_ref = k(λ_ref, n_ref)`, the extinction at the normalisation wavelength that anchors `τ_ref`. |
 
-**If `n_ref` is not set, it defaults to the aerosol's own `nᵣ/nᵢ`**, so in-band n == reference n and the distinction is irrelevant. Setting `n_ref` is only needed when you want `τ_ref` to be normalised at a refractive index different from the aerosol's spectral value (e.g. a standard atmospheric convention).
+**If `n_ref` is not set, it defaults to the first aerosol's `nᵣ/nᵢ`** and is shared by every aerosol, so for a single aerosol in-band n == reference n and the distinction is irrelevant. Setting `n_ref` is only needed when you want `τ_ref` to be normalised at a refractive index different from the aerosol's spectral value (e.g. a standard atmospheric convention), and it matters for every aerosol after the first. See the [`scattering` schema](Schema/aerosols.md) for how `n_ref` enters the Jacobians.
 
 > **No in-band n(λ) dispersion.** The refractive index `nᵣ/nᵢ` is constant
 > across the band — wavelength-dependent dispersion of the refractive index is
@@ -383,15 +439,16 @@ and quick sensitivity tests.
 
 ```toml
 [[scattering.aerosols]]
-τ_ref          = 0.1
+"τ_ref"        = 0.1
 phase_function = "HenyeyGreensteinPhaseFunction(g=0.7)"
 ssa            = 0.95
-p₀ = 700.0
-σp = 50.0
+"p₀"           = 700.0
+"σp"           = 50.0
 ```
 
-`ssa` (single-scattering albedo) is required here because there is no Mie
-computation to derive it from. **Caveat:** analytic phase-function aerosols are
+Set `ssa` (single-scattering albedo; alias `ϖ`) here, because there is no Mie
+computation to derive it from; if omitted it defaults to `1.0` (no
+absorption). **Caveat:** analytic phase-function aerosols are
 not supported in the linearized (Jacobian) path.
 
 ---
@@ -402,9 +459,9 @@ Swap the per-band `surface` string for any supported BRDF; the parser builds
 the matching surface type.
 
 ```toml
-surface = ["rpvSurfaceScalar(0.1, 0.05, 0.6, -0.1)"]   # RPV land
-# "RossLiSurfaceScalar(fiso, fvol, fgeo)"               — Ross-Li (MODIS-style)
-# "CoxMunkSurface(wind_speed, n_water)"                 — ocean glint
+surface = ["rpvSurfaceScalar(0.1, 0.05, 0.6, -0.1)"]   # RPV land (ρ₀, ρ_c, k, Θ)
+# "RossLiSurfaceScalar(fvol, fgeo, fiso)"               — Ross-Li (MODIS-style)
+# "CoxMunkSurface(wind_speed=7.0)"                      — ocean glint
 ```
 
 Each BRDF has its own parameters (see [surface](Schema/surface.md)). They are
@@ -433,8 +490,8 @@ cfg["canopy"] = Dict(
 ```
 
 The canopy wraps each band's BRDF in a `CanopySurface`; the soil below is the
-true lower boundary. See the [`surface` schema](Schema/surface.md) (the
-"Composite (canopy + soil)" section) for `CanopySurface` configuration.
+true lower boundary. See the [`canopy` schema](Schema/canopy.md) for every
+`canopy` field and its default.
 
 ---
 
@@ -464,6 +521,20 @@ R, T, dR, dT = rt_run(model, lin_model, NAer, NGas, NSurf)
 
 (Note: the linearized path is pure-elastic — Raman is not linearized.)
 
+Gas-abundance columns are the partial `∂τ/∂VMR = σ·N_dry` with cross sections,
+CIA and MT_CKD held fixed. The exception is an ABSCO table with an H₂O-broadener
+axis: its exact response to the H₂O abundance is included in the `q`-driven H₂O
+columns. When the forward absorption responds to an abundance in another way
+(for the `q`-driven H₂O of Level 3: line-by-line self broadening, plus MT_CKD and
+CIA when configured), a solve requesting that column raises an
+`ArgumentError` under the default `abundance_jacobians=:complete`. Hold the
+abundance fixed (`compute_h2o_jacobians=false`, or list the gas in
+`fixed_molecules`), or accept the partial with
+`model_from_parameters(LinMode(), params; abundance_jacobians=:frozen_cross_section)`.
+The `vertical_grid` keyword (`FixedPressureGrid()` by default, or
+`FixedAltitudeGrid()`) selects the surface-pressure Jacobian convention. See
+[Compute Jacobians](../jacobians.md) for both.
+
 ---
 
 ## Level 11 — Precision, GPU, and solver knobs
@@ -486,14 +557,16 @@ cfg["radiative_transfer"]["numerics"] =
 
 `Float32` roughly halves memory and speeds the kernels at the cost of per-pixel
 precision; `GPU()` dispatches the adding-doubling kernels to CUDA when
-available. `numerics.blas_threads` caps BLAS threads (4–8, or 1 for large
-spectral batches).
+available. `numerics.blas_threads` sets the process-wide BLAS thread count
+(often 4–8, or 1 for large spectral batches). The value persists after the
+solve, so select it consistently at application startup rather than varying it
+between concurrently executed models.
 
 ---
 
 ## Where to go next
 
 - Per-block field reference: [Input Schema](Schema.md).
-- Editor autocomplete + validation for TOML/YAML: [Schema editor support](Schema.md#editor-support--autocomplete--inline-validation).
+- Editor autocomplete + validation for TOML/YAML: [Schema editor support](Schema.md#Editor-support-—-autocomplete-inline-validation).
 - Worked end-to-end runs: [IO Examples](Examples.md) and the
   [Tutorials](../tutorials/Tutorial_IO.md).

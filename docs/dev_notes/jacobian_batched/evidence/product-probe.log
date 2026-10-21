@@ -1,0 +1,18 @@
+PRODUCT n=6 ns=64 cols=1 portable=2.7648e-5 vendor=0.000482304 ratio=0.05732484
+PRODUCT n=6 ns=64 cols=6 portable=2.3552e-5 vendor=0.000483328 ratio=0.048728812
+PRODUCT n=6 ns=512 cols=1 portable=3.072e-5 vendor=0.000478208 ratio=0.06423982
+PRODUCT n=6 ns=512 cols=6 portable=3.9936e-5 vendor=0.00053248 ratio=0.074999996
+PRODUCT n=6 ns=10000 cols=1 portable=0.000104448 vendor=0.0010250241 ratio=0.1018981
+PRODUCT n=6 ns=10000 cols=6 portable=0.000411648 vendor=0.005192704 ratio=0.079274304
+PRODUCT n=18 ns=64 cols=1 portable=2.7648e-5 vendor=0.000468992 ratio=0.058951966
+PRODUCT n=18 ns=64 cols=18 portable=6.0416e-5 vendor=0.000497664 ratio=0.12139919
+PRODUCT n=18 ns=512 cols=1 portable=3.7888003e-5 vendor=0.000473088 ratio=0.08008659
+PRODUCT n=18 ns=512 cols=18 portable=0.00039014398 vendor=0.000717824 ratio=0.54350924
+PRODUCT n=18 ns=10000 cols=1 portable=0.00067993597 vendor=0.001973248 ratio=0.34457704
+PRODUCT n=18 ns=10000 cols=18 portable=0.007479296 vendor=0.006193152 ratio=1.2076719
+Precompiling packages...
+    vSmartMOM Being precompiled by another process (pid: 2390833, pidfile: /home/cfranken/.julia/compiled/v1.12/vSmartMOM/bplNx_BLbwW.ji.pidfile)
+  24519.9 ms  ✓ vSmartMOM
+    vSmartMOM → vSmartMOMCUDAExt Being precompiled by another process (pid: 2390833, pidfile: /home/cfranken/.julia/compiled/v1.12/vSmartMOMCUDAExt/55o5k_BLbwW.ji.pidfile)
+  11415.5 ms  ✓ vSmartMOM → vSmartMOMCUDAExt
+  2 dependencies successfully precompiled in 38 seconds. 274 already precompiled.

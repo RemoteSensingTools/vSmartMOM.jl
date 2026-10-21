@@ -1,0 +1,16 @@
+RESPONSE_METHOD source
+RESPONSE_SCENE streams=16 operator_size=57 layers=20 wavelengths=512
+RESPONSE_PARITY nparams=1 field=R error=1.3877787807814457e-17
+RESPONSE_PARITY nparams=1 field=T error=4.336808689942018e-19
+RESPONSE_PARITY nparams=1 field=dR error=5.551115123125783e-16
+RESPONSE_PARITY nparams=1 field=dT error=1.1102230246251565e-16
+RESPONSE_TIME nSpec=512 layers=20 nparams=1 combined=(median = 4.534262941, samples = [4.528045732, 4.534262941, 4.540425238]) ratio=2.292145827534677
+CORE_LOCAL nSpec=512 layers=20 pol=3 nparams=1 local_directions=3 combined=(median = 4.157387986, samples = [4.152337791, 4.161253655, 4.157387986]) ratio=2.1016292282888793 speedup=0.7330444796739257
+CORE_MEASURE nSpec=512 pol=3 nparams=1 forward=(median = 1.978173852, samples = [1.979433319, 1.97038137, 1.978173852]) combined=(median = 3.047550313, samples = [3.046759377, 3.047550313, 3.051939816]) ratio=1.5405877041185356
+RESPONSE_PARITY nparams=18 field=R error=1.3877787807814457e-17
+RESPONSE_PARITY nparams=18 field=T error=4.336808689942018e-19
+RESPONSE_PARITY nparams=18 field=dR error=6.591949208711867e-17
+RESPONSE_PARITY nparams=18 field=dT error=2.7755575615628914e-17
+RESPONSE_TIME nSpec=512 layers=20 nparams=18 combined=(median = 4.567231576, samples = [4.572609507, 4.561668065, 4.567231576]) ratio=2.316495022649339
+CORE_LOCAL nSpec=512 layers=20 pol=3 nparams=18 local_directions=3 combined=(median = 5.583868995, samples = [5.584399101, 5.578328917, 5.583868995]) ratio=2.8321324458375714 speedup=2.4976326990278896
+CORE_MEASURE nSpec=512 pol=3 nparams=18 forward=(median = 1.971612946, samples = [1.975356273, 1.971612946, 1.969163209]) combined=(median = 13.946453789, samples = [13.934222281, 13.946453789, 13.970910344]) ratio=7.073626604701753

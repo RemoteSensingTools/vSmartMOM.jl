@@ -64,7 +64,7 @@ function canopy_only_phase_params()
             "sza" => sza_deg,
             "vza" => vza_all,
             "vaz" => vaz_all,
-            "obs_alt" => 1000.0,
+            "obs_alt" => [0.0],
         ),
         "atmospheric_profile" => Dict{String,Any}(
             # One valid layer is still needed by the generic RT driver. Its

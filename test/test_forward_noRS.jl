@@ -21,7 +21,8 @@ println("CUDA available for GPU tests: $CAN_USE_GPU")
 
 function run_forward_noRS_smoke(params)
     Nbands = length(params.spec_bands)
-    model = model_from_parameters(params)
+    # This smoke test exercises the full-column rt_run return contract.
+    model = model_from_parameters(params; external_solar=false)
     @test !isnothing(model)
     @test length(model.atmosphere.spec_bands) == Nbands
     @test all(isfinite.(model.profile.T))
@@ -36,7 +37,7 @@ function run_forward_noRS_smoke(params)
     nVza = length(model.obs_geom.vza)
     for ib in 1:Nbands
         result = rt_run(model; i_band=ib)
-        R = result isa Tuple ? result[1] : result
+        R = result[1]
         nSpec = length(model.atmosphere.spec_bands[ib])
         @test ndims(R) == 3
         @test size(R, 1) == nVza
@@ -67,7 +68,7 @@ println("Configuration loaded: $(Nbands) band(s)")
 
 # Build model once for CPU test (forward-only, no linearization)
 println("\nBuilding forward model (CPU)...")
-@time model = model_from_parameters(params_default)
+@time model = model_from_parameters(params_default; external_solar=false)
 println("Model built successfully.")
 println("  Layers: $(length(model.profile.T))")
 println("  Quadrature points: $(model.quad_points.Nquad)")
@@ -93,7 +94,7 @@ println("  Quadrature points: $(model.quad_points.Nquad)")
         println("\n  Running RT for band $ib...")
         @time result = rt_run(model; i_band=ib)
         # rt_run returns a tuple: (R, T, ieR, ieT, ...) — extract reflectance
-        R = result isa Tuple ? result[1] : result
+        R = result[1]
 
         nStokes = CoreRT.polarization_type(model).n
         nVza = length(model.obs_geom.vza)

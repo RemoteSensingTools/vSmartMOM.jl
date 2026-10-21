@@ -26,6 +26,7 @@ using ..vSmartMOM: RT_Mode, FwdMode, LinMode
 
 include("types.jl")                       # All types used in this module
 include("types_lin.jl")                   # Derivative types for linearization
+include("molecular_rayleigh.jl")          # Pure-gas Rayleigh dispersion + depolarization
 include("gpu_precision.jl")              # DS arithmetic, Neumaier accumulators (GPU-compatible)
 include("mie_helper_functions.jl")        # Mie file-related functions
 include("analytic_phase_functions.jl")    # Analytic phase functions -> Greek coefficients
@@ -39,15 +40,24 @@ include("compute_NAI2.jl")                # Compute phase function w/ NAI2
 include("compute_NAI2_lin.jl")            # Linearized NAI2 computation
 include("gpu_mie_kernels.jl")            # KernelAbstractions Mie kernels (CPU+GPU)
 include("compute_NAI2_gpu.jl")           # GPU-accelerated NAI2 entry point
+include("compute_NAI2_nodes.jl")         # Caller-defined-node bulk Mie API (CPU+GPU)
+include("compute_NAI2_nodes_batched.jl") # Batched caller-node Mie seam (exact-nmax grouping + workspace)
 include("compute_PCW.jl")                 # Compute phase function w/ PCW
 include("phase_function_autodiff.jl")     # Auto-differentiation
 include("show_utils.jl")                  # Pretty-print
 include("compute_Z_matrices.jl")
+include("compute_Z_matrices_lin.jl")
 
 # Export make functions/types
 export make_mie_model, reconstruct_phase, greek_coefficients,
        greek_coefficients_from_scattering_matrix, analytic_aerosol_optics,
-       phase_matrix_first_column, scattering_matrix
+       phase_matrix_first_column, scattering_matrix,
+       AbstractMolecularRayleighMethod, UsingRefInd, UsingPolTen,
+       RefractiveIndexRayleigh,
+       AbstractPolarizabilityDispersion, ConstantAnisotropy,
+       DispersiveAnisotropy,
+       molecular_rayleigh_properties, molecular_rayleigh_cross_section_ratio,
+       molecular_rayleigh_provenance
 
 # Export types
 export NAI2, PCW, Aerosol, MieModel, Stokes_IQUV, Stokes_I, Stokes_IQ,
@@ -60,7 +70,7 @@ export NAI2, PCW, Aerosol, MieModel, Stokes_IQUV, Stokes_I, Stokes_IQ,
 # Export linearized types
 export linGreekCoefs, linAerosolOptics
 
-export GreekCoefs, compute_mie_π_τ,
+export GreekCoefs, compute_Z_moments, compute_Z_source_moments, compute_mie_π_τ,
        compute_wigner_values, save_wigner_values, load_wigner_values,
        compute_Sl, gausslegendre, compute_aerosol_optical_properties,
        compute_ref_aerosol_extinction, truncate_phase,
@@ -70,8 +80,29 @@ export GreekCoefs, compute_mie_π_τ,
 
 # GPU Mie exports
 export compute_aerosol_optical_properties_gpu,
-       MiePrecisionPolicy, NativeFloat64, DSEmulated,
+       MiePrecisionPolicy, NativeFloat64, DSEmulated, NativeFloat32,
        DoubleSingle, ComplexDS, NeumaierAccum,
        neumaier_add, neumaier_sum
+
+# Caller-defined-node bulk Mie API (Sol plan phase 1) — the seam for
+# sectional/tabulated size distributions (GCHPIO TOMAS is the first consumer).
+export compute_aerosol_optical_properties_nodes,
+       compute_aerosol_optical_properties_nodes_gpu
+
+# Extinction-only fast path on the caller-node seam (no amplitude/Greek work) —
+# for hybrid consumers (e.g. GCHPIO :parametric_exact_tau) that need only the
+# number-mean extinction cross-section from one node set.
+export compute_aerosol_extinction_nodes,
+       compute_aerosol_extinction_nodes_gpu
+
+# Batched caller-node Mie seam (docs/dev_notes/proposals/batched_mie_nodes_seam.md v2) —
+# exact-nmax grouped GPU batching + reusable single-owner workspace, for
+# many-ensemble columns (e.g. GCHPIO's per-layer TOMAS inventory).
+export prepare_mie_node_geometry, MieNodeGeometry,
+       compute_aerosol_optical_properties_nodes_batched,
+       compute_aerosol_optical_properties_nodes_batched_gpu,
+       compute_aerosol_extinction_nodes_batched,
+       compute_aerosol_extinction_nodes_batched_gpu,
+       MieBatchWorkspace
 
 end

@@ -1,0 +1,120 @@
+ERROR: LoadError: Some tests did not pass: 0 passed, 0 failed, 5 errored, 0 broken.
+in expression starting at /tmp/vsmartmom-release-review/test/local/gpu/runtests.jl:30
+Mie GPU kernels: Error During Test at /tmp/vsmartmom-release-review/test/local/gpu/runtests.jl:33
+  Got exception outside of a @test
+  SystemError: opening file "/tmp/vsmartmom-release-review/test/local/gpu/local/gpu/test_mie_gpu.jl": No such file or directory
+  Stacktrace:
+   [1] include(mapexpr::Function, mod::Module, _path::String)
+     @ Base ./Base.jl:307
+   [2] top-level scope
+     @ /tmp/vsmartmom-release-review/test/local/gpu/runtests.jl:33
+   [3] macro expansion
+     @ ~/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/share/julia/stdlib/v1.12/Test/src/Test.jl:1777 [inlined]
+   [4] macro expansion
+     @ /tmp/vsmartmom-release-review/test/local/gpu/runtests.jl:33 [inlined]
+   [5] macro expansion
+     @ ~/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/share/julia/stdlib/v1.12/Test/src/Test.jl:1777 [inlined]
+   [6] macro expansion
+     @ /tmp/vsmartmom-release-review/test/local/gpu/runtests.jl:33 [inlined]
+   [7] include(mod::Module, _path::String)
+     @ Base ./Base.jl:306
+   [8] exec_options(opts::Base.JLOptions)
+     @ Base ./client.jl:317
+   [9] _start()
+     @ Base ./client.jl:550
+Raman fused kernels: Error During Test at /tmp/vsmartmom-release-review/test/local/gpu/runtests.jl:37
+  Got exception outside of a @test
+  SystemError: opening file "/tmp/vsmartmom-release-review/test/local/gpu/local/gpu/test_raman_fused_kernels.jl": No such file or directory
+  Stacktrace:
+   [1] include(mapexpr::Function, mod::Module, _path::String)
+     @ Base ./Base.jl:307
+   [2] top-level scope
+     @ /tmp/vsmartmom-release-review/test/local/gpu/runtests.jl:33
+   [3] macro expansion
+     @ ~/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/share/julia/stdlib/v1.12/Test/src/Test.jl:1777 [inlined]
+   [4] macro expansion
+     @ /tmp/vsmartmom-release-review/test/local/gpu/runtests.jl:37 [inlined]
+   [5] macro expansion
+     @ ~/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/share/julia/stdlib/v1.12/Test/src/Test.jl:1777 [inlined]
+   [6] macro expansion
+     @ /tmp/vsmartmom-release-review/test/local/gpu/runtests.jl:37 [inlined]
+   [7] include(mod::Module, _path::String)
+     @ Base ./Base.jl:306
+   [8] exec_options(opts::Base.JLOptions)
+     @ Base ./client.jl:317
+   [9] _start()
+     @ Base ./client.jl:550
+Multisensor GPU: Error During Test at /tmp/vsmartmom-release-review/test/local/gpu/runtests.jl:47
+  Got exception outside of a @test
+  SystemError: opening file "/tmp/vsmartmom-release-review/test/local/gpu/local/gpu/test_multisensor_heights_gpu.jl": No such file or directory
+  Stacktrace:
+   [1] include(mapexpr::Function, mod::Module, _path::String)
+     @ Base ./Base.jl:307
+   [2] top-level scope
+     @ /tmp/vsmartmom-release-review/test/local/gpu/runtests.jl:33
+   [3] macro expansion
+     @ ~/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/share/julia/stdlib/v1.12/Test/src/Test.jl:1777 [inlined]
+   [4] macro expansion
+     @ /tmp/vsmartmom-release-review/test/local/gpu/runtests.jl:47 [inlined]
+   [5] macro expansion
+     @ ~/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/share/julia/stdlib/v1.12/Test/src/Test.jl:1777 [inlined]
+   [6] macro expansion
+     @ /tmp/vsmartmom-release-review/test/local/gpu/runtests.jl:47 [inlined]
+   [7] include(mod::Module, _path::String)
+     @ Base ./Base.jl:306
+   [8] exec_options(opts::Base.JLOptions)
+     @ Base ./client.jl:317
+   [9] _start()
+     @ Base ./client.jl:550
+Raman GPU: Error During Test at /tmp/vsmartmom-release-review/test/local/gpu/runtests.jl:48
+  Got exception outside of a @test
+  SystemError: opening file "/tmp/vsmartmom-release-review/test/local/gpu/local/gpu/test_forward_raman_gpu.jl": No such file or directory
+  Stacktrace:
+   [1] include(mapexpr::Function, mod::Module, _path::String)
+     @ Base ./Base.jl:307
+   [2] top-level scope
+     @ /tmp/vsmartmom-release-review/test/local/gpu/runtests.jl:33
+   [3] macro expansion
+     @ ~/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/share/julia/stdlib/v1.12/Test/src/Test.jl:1777 [inlined]
+   [4] macro expansion
+     @ /tmp/vsmartmom-release-review/test/local/gpu/runtests.jl:48 [inlined]
+   [5] macro expansion
+     @ ~/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/share/julia/stdlib/v1.12/Test/src/Test.jl:1777 [inlined]
+   [6] macro expansion
+     @ /tmp/vsmartmom-release-review/test/local/gpu/runtests.jl:48 [inlined]
+   [7] include(mod::Module, _path::String)
+     @ Base ./Base.jl:306
+   [8] exec_options(opts::Base.JLOptions)
+     @ Base ./client.jl:317
+   [9] _start()
+     @ Base ./client.jl:550
+Jacobians GPU: Error During Test at /tmp/vsmartmom-release-review/test/local/gpu/runtests.jl:49
+  Got exception outside of a @test
+  SystemError: opening file "/tmp/vsmartmom-release-review/test/local/gpu/local/gpu/test_jacobians_GPU.jl": No such file or directory
+  Stacktrace:
+   [1] include(mapexpr::Function, mod::Module, _path::String)
+     @ Base ./Base.jl:307
+   [2] top-level scope
+     @ /tmp/vsmartmom-release-review/test/local/gpu/runtests.jl:33
+   [3] macro expansion
+     @ ~/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/share/julia/stdlib/v1.12/Test/src/Test.jl:1777 [inlined]
+   [4] macro expansion
+     @ /tmp/vsmartmom-release-review/test/local/gpu/runtests.jl:49 [inlined]
+   [5] macro expansion
+     @ ~/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/share/julia/stdlib/v1.12/Test/src/Test.jl:1777 [inlined]
+   [6] macro expansion
+     @ /tmp/vsmartmom-release-review/test/local/gpu/runtests.jl:49 [inlined]
+   [7] include(mod::Module, _path::String)
+     @ Base ./Base.jl:306
+   [8] exec_options(opts::Base.JLOptions)
+     @ Base ./client.jl:317
+   [9] _start()
+     @ Base ./client.jl:550
+Test Summary:         | Error  Total  Time
+GPU / Metal           |     5      5  1.4s
+  Mie GPU kernels     |     1      1  1.3s
+  Raman fused kernels |     1      1  0.0s
+  Multisensor GPU     |     1      1  0.0s
+  Raman GPU           |     1      1  0.0s
+  Jacobians GPU       |     1      1  0.0s
+RNG of the outermost testset: Random.Xoshiro(0x2d84790701d4bed4, 0xcb50969adf7a104f, 0x5a5cfc216d4e047c, 0x2e825d62511974da, 0x98d7b72efa7b3823)

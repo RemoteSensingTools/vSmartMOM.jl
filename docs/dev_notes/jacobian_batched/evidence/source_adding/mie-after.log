@@ -1,0 +1,104 @@
+MIE_CPU mode=forward median=0.000860467 bytes=1.245424e6 λ=1.6260162601626016 nquad=100
+MIE_PROFILE mode=forward
+ Count  Overhead File                    Line Function
+ =====  ======== ====                    ==== ========
+    10         0 @vSmartMOM/…e_helper_functions.jl   97 compute_mie_ab!(size_param::Float…
+    10         0 @vSmartMOM/…ering/compute_NAI2.jl  208 _nai2_bulk_optics(r::Vector{Float…
+    10         0 @vSmartMOM/…ering/compute_NAI2.jl  307 _nai2_bulk_optics(r::Vector{Float…
+    11         0 @Base/array.jl          595 zeros
+    11         0 @Base/boot.jl           661 Array
+    11         0 @Base/boot.jl           651 Array
+    11         0 @Base/boot.jl           604 new_as_memoryref
+    11        11 @Base/boot.jl           588 GenericMemory
+    12         0 @Base/array.jl          591 zeros
+    13         0 @vSmartMOM/…ering/compute_NAI2.jl  244 _nai2_bulk_optics(r::Vector{Float…
+    15         0 @vSmartMOM/…ering/compute_NAI2.jl  241 _nai2_bulk_optics(r::Vector{Float…
+    15         0 @vSmartMOM/…ering/compute_NAI2.jl  350 _mie_node_ab_and_C_ext!
+    15         0 @Base/broadcast.jl      227 similar
+    15         0 @Base/broadcast.jl      228 similar
+    15         0 @Base/abstractarray.jl  866 similar
+    15         0 @Base/abstractarray.jl  867 similar
+    16         0 @Base/boot.jl           660 Array
+    16        16 @Base/boot.jl           648 Array
+    18         0 @Base/broadcast.jl      894 materialize
+    18         0 @Base/broadcast.jl      919 copy
+    66         0 @vSmartMOM/…ering/compute_NAI2.jl  127 compute_aerosol_optical_propertie…
+    68         0 …derivative_profile.jl   10 (::var"#46#47")()
+    71         0 @Base/client.jl         550 _start()
+    71         0 @Base/client.jl         317 exec_options(opts::Base.JLOptions)
+    71         0 @Base/Base.jl           306 include(mod::Module, _path::Strin…
+    71         0 @Base/loading.jl       2934 _include(mapexpr::Function, mod::…
+    71         0 @Base/loading.jl       2874 include_string(mapexpr::typeof(id…
+    71         3 @Base/boot.jl           489 eval(m::Module, e::Any)
+    72         0 @Base/Base.jl           352 (::Base.var"#start_profile_listen…
+    72         0 @Base/Base.jl           332 profile_printing_listener(cond::B…
+    72         0 @Base/asyncevent.jl     185 _trywait(t::Base.AsyncCondition)
+    72         0 @Base/condition.jl      136 wait
+    72         0 @Base/condition.jl      141 wait(c::Base.GenericCondition{Bas…
+   216         0 @Base/task.jl           868 task_done_hook(t::Task)
+   288         0 @Base/task.jl          1228 wait()
+   288       287 @Base/task.jl          1216 poptask(W::Base.IntrusiveLinkedLi…
+Total snapshots: 576. Utilization: 50% across all threads and tasks. Use the `groupby` kwarg to break down by thread and/or task.
+MIE_CPU mode=linearized median=0.002009287 bytes=2.970872e6 λ=1.6260162601626016 nquad=100
+MIE_PROFILE mode=linearized
+ Count  Overhead File                    Line Function
+ =====  ======== ====                    ==== ========
+    10         0 @vSmartMOM/…lper_functions_lin.jl   45 compute_mie_ab!(size_param::Float…
+    10         1 @Base/complex.jl        354 /
+    10         0 @Base/subarray.jl       316 getindex
+    10        10 @Base/essentials.jl     920 getindex
+    10         0 @Base/complex.jl        343 *
+    10         0 @vSmartMOM/…g/compute_NAI2_lin.jl   90 _nai2_bulk_optics_lin(model::MieM…
+    11        11 @Base/boot.jl           648 Array
+    11         0 @Base/simdloop.jl        77 macro expansion
+    11         0 @Base/broadcast.jl      995 macro expansion
+    11         0 @Base/array.jl          596 zeros(::Type{Float64}, dims::Tupl…
+    12         0 @vSmartMOM/…lper_functions_lin.jl  171 compute_mie_S₁S₂!(an::SubArray{Co…
+    12         0 @Base/array.jl          929 getindex
+    12         0 @Base/complex.jl        297 +
+    13         0 @Base/range.jl          921 iterate
+    13        13 @Base/promotion.jl      637 ==
+    14         0 @vSmartMOM/…g/compute_NAI2_lin.jl  270 _nai2_bulk_optics_lin(model::MieM…
+    15         0 @Base/broadcast.jl      227 similar
+    15         0 @Base/broadcast.jl      228 similar
+    15         0 @Base/abstractarray.jl  866 similar
+    15         0 @Base/abstractarray.jl  867 similar
+    15         0 @Base/boot.jl           660 Array
+    16         0 @vSmartMOM/…lper_functions_lin.jl  166 compute_mie_S₁S₂!(an::SubArray{Co…
+    16        16 @Base/float.jl          495 +
+    17         0 @vSmartMOM/…lper_functions_lin.jl  169 compute_mie_S₁S₂!(an::SubArray{Co…
+    17         0 @Base/array.jl          333 _fill!
+    18         0 @Base/array.jl          329 fill!
+    19         0 @Base/broadcast.jl      947 copyto!
+    19         0 @Base/broadcast.jl      994 copyto!
+    25         0 @Base/array.jl          595 zeros
+    25         0 @Base/boot.jl           661 Array
+    25         0 @Base/boot.jl           651 Array
+    26        26 @Base/float.jl          497 *
+    26         0 @vSmartMOM/…g/compute_NAI2_lin.jl   79 _nai2_bulk_optics_lin(model::MieM…
+    29         0 @Base/array.jl          986 setindex!
+    29        29 @Base/array.jl          991 _setindex!
+    30         0 @Base/boot.jl           604 new_as_memoryref
+    34         0 @Base/broadcast.jl      894 materialize
+    34         0 @Base/broadcast.jl      919 copy
+    34        34 @Base/boot.jl           588 GenericMemory
+    38         0 @vSmartMOM/…g/compute_NAI2_lin.jl  136 _nai2_bulk_optics_lin(model::MieM…
+    47         0 @Base/array.jl          591 zeros
+    61         0 @vSmartMOM/…g/compute_NAI2_lin.jl  137 _nai2_bulk_optics_lin(model::MieM…
+   193         0 @vSmartMOM/…g/compute_NAI2_lin.jl   32 compute_aerosol_optical_propertie…
+   194         0 @Base/client.jl         550 _start()
+   194         0 @Base/client.jl         317 exec_options(opts::Base.JLOptions)
+   194         0 @Base/Base.jl           306 include(mod::Module, _path::Strin…
+   194         0 @Base/loading.jl       2934 _include(mapexpr::Function, mod::…
+   194         0 @Base/loading.jl       2874 include_string(mapexpr::typeof(id…
+   194         0 @Base/boot.jl           489 eval(m::Module, e::Any)
+   194         0 …derivative_profile.jl   11 (::var"#48#49")()
+   779         0 @Base/task.jl           868 task_done_hook(t::Task)
+   779         0 @Base/task.jl          1228 wait()
+   779       778 @Base/task.jl          1216 poptask(W::Base.IntrusiveLinkedLi…
+Total snapshots: 1556. Utilization: 50% across all threads and tasks. Use the `groupby` kwarg to break down by thread and/or task.
+Precompiling packages...
+  23712.1 ms  ✓ vSmartMOM
+  12110.9 ms  ✓ vSmartMOM → vSmartMOMCUDAExt
+  2 dependencies successfully precompiled in 37 seconds. 274 already precompiled.
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)

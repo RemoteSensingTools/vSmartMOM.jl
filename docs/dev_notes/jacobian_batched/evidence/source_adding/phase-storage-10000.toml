@@ -1,0 +1,32 @@
+all_layer_mixture_bytes = 1036800000
+aerosol_nodes = 2
+fourier_order = 1
+shared_phase_basis_bytes = 362880000
+layers = 20
+spectral_points = 10000
+external_solar = false
+
+[stages.complete_phase_assembly]
+median_seconds = 0.013670451
+allocated_device_bytes = [1866617024, 1866617024, 1866617024, 1866617024, 1866617024]
+seconds = [0.080260753, 0.013708242, 0.013670451, 0.013649452, 0.013638591]
+
+[stages.angular_nodes_and_spectral_expansion]
+median_seconds = 0.001390935
+allocated_device_bytes = [259571840, 259571840, 259571840, 259571840, 259571840]
+seconds = [0.001404461, 0.001376287, 0.001370456, 0.001390935, 0.017470775]
+
+[stages.local_basis]
+median_seconds = 0.002639963
+allocated_device_bytes = [570240000, 570240000, 570240000, 570240000, 570240000]
+seconds = [0.002649221, 0.002633722, 0.002641476, 0.002633031, 0.002639963]
+
+[stages.all_layer_mixtures]
+median_seconds = 0.00947845
+allocated_device_bytes = [1036800000, 1036800000, 1036800000, 1036800000, 1036800000]
+seconds = [0.009483699, 0.00947845, 0.009473842, 0.009470445, 0.009479933]
+
+[stages.angular_nodes]
+median_seconds = 0.00049433
+allocated_device_bytes = [51840, 51840, 51840, 51840, 51840]
+seconds = [0.000526169, 0.00049433, 0.000496724, 0.000488709, 0.000484712]

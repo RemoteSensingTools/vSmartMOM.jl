@@ -1,6 +1,21 @@
-# Scattering in inhomogeneous composite layer.
-# Scattering in homogeneous layer which is added to the bottom of the composite layer.
-# Produces a new, scattering composite layer.
+"""
+    interaction_hdrf!(SFI, composite_layer, added_layer, m, pol_type, quad_points,
+                      hdr_J₀⁻, bhr_J₀⁻, bhr_J₀⁺)
+
+Surface diagnostics, evaluated after the final surface interaction:
+`hdr_J₀⁻` is the Fourier moment of the upwelling field just above the surface
+(the reflected diffuse sky plus the reflected direct beam `j₀⁻`, later
+azimuth-weighted into the HDR output), and at m = 0 `bhr_J₀⁻` / `bhr_J₀⁺` are
+the hemispherical upwelling / downwelling fluxes at the surface (diffuse plus
+direct). After that interaction the composite `J₀⁺` also carries the surface
+layer's `j₀⁺`, the attenuated direct beam at the μ₀ rows (zero for
+`CanopySurface`, whose layer folds the beam into `j₀⁻`). The direct beam
+already enters through `j₀⁻` and through the explicit `μ₀` term of the
+downwelling flux, so it is removed from the diffuse field used here.
+Otherwise it would be counted twice whenever μ₀ is a weighted quadrature node
+(Gauss with the SZA on a node, every Radau run). At a zero-weight μ₀ node the
+removal does not change any weighted product.
+"""
 function interaction_hdrf!(SFI,
     composite_layer::AbstractLayer, 
     added_layer::AbstractLayer, 
@@ -13,7 +28,8 @@ function interaction_hdrf!(SFI,
     (; J₀⁺, J₀⁻) = composite_layer 
     (; Nquad, wt_μN, iμ₀, iμ₀Nstart, qp_μN) = quad_points
     NquadN =  Nquad * pol_type.n
-    hdr_J₀⁻ .= r⁻⁺ ⊠ J₀⁺ .+ j₀⁻
+    J₀⁺_diffuse = J₀⁺ .- j₀⁺
+    hdr_J₀⁻ .= r⁻⁺ ⊠ J₀⁺_diffuse .+ j₀⁻
     # @show hdr_J₀⁻./ J₀⁺
     #@show hdr_J₀⁻[1,1,:]
     #@show J₀⁺[1,1,:]
@@ -28,7 +44,7 @@ function interaction_hdrf!(SFI,
             #for j=i:pol_type.n:NquadN
             j=i:pol_type.n:NquadN
             bhr_J₀⁻[i,:] .= collect(sum(hdr_J₀⁻[j,1,:].*wt_μN[j].*qp_μN[j], dims=1)')
-            bhr_J₀⁺[i,:] .= collect(sum(J₀⁺[j,1,:].*wt_μN[j].*qp_μN[j], dims=1)' .+ j₀⁺[iμ₀Nstart,1,:] .* qp[iμ₀Nstart]) 
+            bhr_J₀⁺[i,:] .= collect(sum(J₀⁺_diffuse[j,1,:].*wt_μN[j].*qp_μN[j], dims=1)' .+ j₀⁺[iμ₀Nstart,1,:] .* qp[iμ₀Nstart])
             #if i==1
             #    @show bhr_J₀⁻[i,:], bhr_J₀⁺[i,:]
             #end

@@ -39,8 +39,22 @@ function register_format(ext::AbstractString, parser::Function)
     return nothing
 end
 
-# Built-in YAML registration
-register_format(".toml", TOML.parsefile)
+# TOML parses a mixed integer/float array such as `[60, 45.5]` as
+# `Vector{Any}`; YAML gives `Vector{Real}`. Normalize all-numeric arrays the
+# same way so that both formats pass the parser's `Array{<:Real}` checks.
+_normalize_toml(x) = x
+_normalize_toml(d::AbstractDict) = Dict{String,Any}(String(k) => _normalize_toml(v) for (k, v) in d)
+# Homogeneous arrays keep their type; arrays of tables are normalized inside.
+_normalize_toml(v::AbstractVector) =
+    eltype(v) <: AbstractDict ? [_normalize_toml(x) for x in v] : v
+function _normalize_toml(v::Vector{Any})
+    w = Any[_normalize_toml(x) for x in v]
+    return !isempty(w) && all(x -> x isa Real && !(x isa Bool), w) ? Real[w...] : w
+end
+_parse_toml_file(path) = _normalize_toml(TOML.parsefile(path))
+
+# Built-in format registration
+register_format(".toml", _parse_toml_file)
 register_format(".yaml", YAML.load_file)
 register_format(".yml", YAML.load_file)
 

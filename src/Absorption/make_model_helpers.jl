@@ -11,6 +11,33 @@ There are also some save/load convenience functions for the interpolation model.
 
 =#
 
+# The standalone line-by-line engine is deprecated in favour of AtmosphericAbsorption.jl,
+# which the RT pipeline already uses. Kept through vSmartMOM 2.x; removal planned for 3.0.
+const _LEGACY_LINE_ENGINE_MIGRATION = """
+vSmartMOM's standalone line-by-line model (`make_hitran_model`, `HitranModel`) is
+deprecated and will be removed in vSmartMOM 3.0. The RT pipeline already computes
+line absorption with AtmosphericAbsorption.jl (add it with
+`Pkg.add(name="AtmosphericAbsorption", version="0.1.2")`). The corresponding calls:
+
+    import AtmosphericAbsorption as AA
+    lines = AA.load_lines(AA.HitranPort(artifact("CO2")); mol=2, iso=1,
+                          ν_min=6000, ν_max=6400)
+    model = AA.LineByLineModel(lines; profile=AA.Voigt(), wing_cutoff=40, vmr=0,
+                               cpf=AA.HumlicekWeideman32(), architecture=AA.CPU())
+    σ     = AA.compute_cross_section(model, ν_grid, p_hPa, T_K)
+
+The two engines agree closely for vmr = 0. For vmr > 0 the differences grow with
+vmr and can reach the percent level: AtmosphericAbsorption mixes the pressure shift,
+(1 - vmr) δ_air + vmr δ_self, whereas this engine applies δ_air unchanged. Partition
+sums are TIPS-2021 there and TIPS-2017 here. Validate migrated results. Tables for YAML `LUTfiles` are still built
+with `make_interpolation_model` in vSmartMOM 2.x. If you publish results computed
+from HITRAN data, please cite the HITRAN edition you used (see the vSmartMOM
+References page).
+"""
+
+"Emit the legacy line-engine deprecation notice once per session."
+_warn_legacy_line_engine() = @warn _LEGACY_LINE_ENGINE_MIGRATION maxlog = 1
+
 """
     make_hitran_model(hitran::HitranTable, 
                       broadening::AbstractBroadeningFunction; 
@@ -21,6 +48,11 @@ There are also some save/load convenience functions for the interpolation model.
 
 Convenience function to make a HitranModel out of the parameters (Matches make_interpolation_model)
 
+!!! warning "Deprecated"
+    The standalone line-by-line model is deprecated and will be removed in vSmartMOM 3.0;
+    use `AtmosphericAbsorption.LineByLineModel` (see `load_lines`, `compute_cross_section`).
+    A one-time notice with the corresponding calls and their convention differences is
+    logged on first use.
 """
 function make_hitran_model(hitran::HitranTable, 
                            broadening::AbstractBroadeningFunction; 
@@ -29,11 +61,24 @@ function make_hitran_model(hitran::HitranTable,
                            CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(), 
                            architecture::AbstractArchitecture = default_architecture())
 
+    _warn_legacy_line_engine()
     if architecture isa GPU && !(CEF isa HumlicekWeidemann32SDErrorFunction)
         @warn "Cross-section calculations on GPU may or may not work with this CEF (use HumlicekWeidemann32SDErrorFunction if you encounter issues)"
     end
 
     return HitranModel(hitran=hitran, broadening=broadening , wing_cutoff=wing_cutoff , vmr=vmr, CEF=CEF, architecture=architecture)
+end
+
+# The interpolation table stores its spectral axis as an `AbstractRange`, which only a
+# uniform wavenumber grid satisfies; wavelength input is converted at query time instead.
+function _require_wavenumber_lut_grid(wavelength_flag::Bool)
+    wavelength_flag && throw(ArgumentError(
+        "make_interpolation_model builds tables on a uniform wavenumber grid (cm⁻¹); " *
+        "wavelength_flag=true is not supported. Pass a uniform wavenumber grid whose ends " *
+        "lie outside the band, e.g. range(floor(1e7/λ_max_nm/Δν)*Δν, " *
+        "ceil(1e7/λ_min_nm/Δν)*Δν; step=Δν), and query the table in wavelength " *
+        "with absorption_cross_section(model, λ_nm, p, T; wavelength_flag=true)."))
+    return nothing
 end
 
 """
@@ -49,8 +94,24 @@ end
                     architecture::AbstractArchitecture = default_architecture())
 
 Using a HitranModel, create an InterpolationModel by interpolating the lineshape function 
-at the given pressure and temperature grids
+at the given pressure and temperature grids. `vmr` is the absorber's volume mixing
+ratio passed to the underlying line model; in this engine it mixes only the Lorentz
+widths (self vs. air), while the pressure shift and temperature exponent stay air-only.
+The resulting table is specific to that value.
 
+The table is built on a uniform **wavenumber** grid (cm⁻¹). `wavelength_flag=true` is
+rejected: a uniform wavelength grid maps to a non-uniform wavenumber grid, which the
+interpolation table cannot store. Build the table on a uniform wavenumber grid whose ends
+lie outside the band, e.g.
+`wave_grid = range(floor(1e7/λ_max_nm/Δν)*Δν, ceil(1e7/λ_min_nm/Δν)*Δν; step=Δν)`, and
+query it in wavelength with `absorption_cross_section(model, λ_nm, p, T;
+wavelength_flag=true)`, which remains supported.
+
+!!! note "Line engine"
+    The tables are computed with the deprecated standalone line-by-line model. They remain
+    a supported format for YAML `LUTfiles` throughout vSmartMOM 2.x. Tables saved with
+    AtmosphericAbsorption's `save_interpolation_model` use a different format that this
+    loader does not read; AtmosphericAbsorption `.absco` tables (`save_absco_lut`) are read.
 """
 function make_interpolation_model(
                                   # Required
@@ -79,17 +140,18 @@ function make_interpolation_model(
         @warn "Cross-section calculations on GPU may or may not work with this CEF (use HumlicekWeidemann32SDErrorFunction if you encounter issues)"
     end
 
-    # Convert from wavelength to wavenumber if necessary
-    ν_grid = wavelength_flag ? reverse(nm_per_m ./ wave_grid) : wave_grid
+    _require_wavenumber_lut_grid(wavelength_flag)
+    ν_grid = wave_grid
 
     # Empty matrix to store the calculated cross-sections
     cs_matrix = zeros(storage_type, length(ν_grid), length(p_grid), length(t_grid))
 
-    # Calculate all the cross-sections at the pressure and temperature grids
+    # One line model (with the requested self-broadening vmr) for all (p, T) nodes
+    model = HitranModel(hitran=hitran, broadening=broadening, wing_cutoff=wing_cutoff,
+                        vmr=vmr, CEF=CEF, architecture=architecture)
     @showprogress 1 "Computing Cross Sections for Interpolation..." for i in 1:length(p_grid)
         for j in 1:length(t_grid)
-            model = make_hitran_model(hitran, broadening, wing_cutoff=wing_cutoff, CEF=CEF, architecture=architecture)
-            cs_matrix[:,i,j] = storage_type.(collect(compute_absorption_cross_section(model, collect(ν_grid), p_grid[i], t_grid[j], wavelength_flag=wavelength_flag)))
+            cs_matrix[:,i,j] = storage_type.(collect(compute_absorption_cross_section(model, collect(ν_grid), p_grid[i], t_grid[j])))
         end
     end
 
@@ -128,11 +190,15 @@ end
 Create an InterpolationModel from ABSCO tabulated cross-section data.
 
 Linearly interpolates the pre-computed cross-sections onto the specified pressure and
-temperature grids. Uses the ABSCO format (ν, p, T) for the lookup table.
+temperature grids. Uses the ABSCO table layout σ(ν, broadener VMR, T, p).
+Only the first broadener slice (`σ[:, 1, :, :]`, H₂O VMR = 0 in OCO-2 ABSCO
+tables) is used, so the result has no H₂O broadening. Listing the original
+`.hdf` file in `absorption.LUTfiles` keeps the H₂O-broadener axis instead.
 
 # Arguments
-- `absco::AbscoTable`: ABSCO table with cross-sections σ(ν, p, T)
-- `wave_grid`: Wavenumber [cm⁻¹] or wavelength [nm] grid (see wavelength_flag)
+- `absco::AbscoTable`: ABSCO table with cross-sections σ(ν, broadener VMR, T, p)
+- `wave_grid`: uniform wavenumber grid in cm⁻¹; `wavelength_flag=true` is rejected
+  (see the HITRAN method)
 - `p_grid`: Pressure grid (hPa)
 - `t_grid`: Temperature grid (K)
 
@@ -150,8 +216,8 @@ function make_interpolation_model(
         architecture::AbstractArchitecture = default_architecture()     # Computer `Architecture` on which `Model` is run
     )
 
-    # Convert from wavelength to wavenumber if necessary
-    ν_grid = wavelength_flag ? reverse(nm_per_m ./ wave_grid) : wave_grid
+    _require_wavenumber_lut_grid(wavelength_flag)
+    ν_grid = wave_grid
 
     # Empty matrix to store the calculated cross-sections
     cs_matrix = zeros(length(ν_grid),length(p_grid), length(t_grid));
@@ -162,13 +228,13 @@ function make_interpolation_model(
     xs = absco.σ
     index_p = 1:length(p)
     index_t = 1:size(T,1)
-    inter_p = LinearInterpolation(p, collect(index_p), extrapolation_bc = Flat())
+    inter_p = linear_interpolation(p, collect(index_p), extrapolation_bc = Flat())
     # Calculate all the cross-sections at the pressure and temperature grids
     @showprogress 1 "Computing Cross Sections for Interpolation..." for i in 1:length(p_grid)
         p_ref = p_grid[i]
         fractional_index_p = inter_p(p_ref)
-        inter_T_top    = LinearInterpolation(T[:,Int(ceil(fractional_index_p))] , collect(index_t), extrapolation_bc = Flat())
-        inter_T_bottom = LinearInterpolation(T[:,Int(floor(fractional_index_p))], collect(index_t), extrapolation_bc = Flat())
+        inter_T_top    = linear_interpolation(T[:,Int(ceil(fractional_index_p))] , collect(index_t), extrapolation_bc = Flat())
+        inter_T_bottom = linear_interpolation(T[:,Int(floor(fractional_index_p))], collect(index_t), extrapolation_bc = Flat())
       
         for j in 1:length(t_grid)
             
@@ -184,7 +250,7 @@ function make_interpolation_model(
             xs_interp_p2 = (1-a1)*xs[:,1, Int(ceil(fractional_index_T_bottom)), Int(floor(fractional_index_p))] + a1 * xs[:,1,Int(floor(fractional_index_T_bottom)), Int(floor(fractional_index_p))]
             a1 = ceil(fractional_index_p)-fractional_index_p
             xs_interp = a1*xs_interp_p2+(1-a1)*xs_interp_p1 
-            interp_xs = LinearInterpolation(absco.ν, xs_interp, extrapolation_bc = Flat())
+            interp_xs = linear_interpolation(absco.ν, xs_interp, extrapolation_bc = Flat())
             cs_matrix[:,i,j] = collect(interp_xs(ν_grid))
         end
     end
@@ -230,8 +296,8 @@ function make_interpolation_model_test(
         architecture::AbstractArchitecture = default_architecture()     # Computer `Architecture` on which `Model` is run
     )
 
-    # Convert from wavelength to wavenumber if necessary
-    ν_grid = wavelength_flag ? reverse(nm_per_m ./ wave_grid) : wave_grid
+    _require_wavenumber_lut_grid(wavelength_flag)
+    ν_grid = wave_grid
 
     # Empty matrix to store the calculated cross-sections
     cs_matrix = zeros(length(ν_grid),length(p_grid), length(t_grid));
@@ -258,7 +324,7 @@ function make_interpolation_model_test(
     # final interpolation routine on equidistant grid
     #full_interp = CubicSplineInterpolation((absco_grid,p, t_grid),cs_matrix_temp, extrapolation_bc = Flat());
     # This only works in Linear interpolation so far for irregular grids, need to update at a certain point:
-    full_interp = LinearInterpolation((absco_grid,p, t_grid),cs_matrix_temp, extrapolation_bc = Flat());
+    full_interp = linear_interpolation((absco_grid,p, t_grid),cs_matrix_temp, extrapolation_bc = Flat());
     cs_matrix[:,:,:] = full_interp(ν_grid, p_grid, t_grid);
     
     # Perform the interpolation (can add a switch whether quadratic or cubic later, ideally in the setup file)

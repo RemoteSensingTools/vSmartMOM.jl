@@ -33,15 +33,15 @@ R, T = rt_run(model)
 
 ## 4) Interpret results
 
-- **R** = reflectance at top-of-atmosphere (TOA) `[nVZA × nStokes × nSpec]`
-- **T** = transmittance at bottom-of-atmosphere (BOA)
+- **R** = upwelling radiance at top-of-atmosphere (TOA) `[nVZA × nStokes × nSpec]`
+- **T** = downwelling radiance at bottom-of-atmosphere (BOA)
 
 Dimensions: view zenith angles × Stokes components (I,Q,U,V) × spectral points.
 
 ```julia
 println("R shape: ", size(R))
 println("T shape: ", size(T))
-println("R(nadir, I, λ₁) = ", R[1, 1, 1])
+println("R(VZA 60°, I, ν₁) = ", R[1, 1, 1])
 ```
 
 The documentation build renders the same two arrays as an interactive Plotly

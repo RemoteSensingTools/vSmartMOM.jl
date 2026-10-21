@@ -1,0 +1,10 @@
+RESPONSE_METHOD sweep
+RESPONSE_SCENE streams=3 operator_size=18 layers=20 wavelengths=10000
+RESPONSE_TIME nSpec=10000 layers=20 nparams=1 combined=(median = 3.707823054, samples = [3.701098652, 3.707823054, 3.713845656]) forward=(median = 0.793773388, samples = [0.803065697, 0.791957955, 0.793773388]) ratio=4.671135502970528 dense_comparison=false
+RESPONSE_TIME nSpec=10000 layers=20 nparams=60 combined=(median = 4.116288277, samples = [4.124436914, 4.116288277, 4.115765699]) forward=(median = 0.814910596, samples = [0.814910596, 0.817416357, 0.811513739]) ratio=5.051214571518468 dense_comparison=false
+Precompiling packages...
+    vSmartMOM Being precompiled by another process (pid: 2589635, pidfile: /home/cfranken/.julia/compiled/v1.12/vSmartMOM/bplNx_BLbwW.ji.pidfile)
+  11699.4 ms  ✓ vSmartMOM
+    vSmartMOM → vSmartMOMCUDAExt Being precompiled by another process (pid: 2589635, pidfile: /home/cfranken/.julia/compiled/v1.12/vSmartMOMCUDAExt/55o5k_BLbwW.ji.pidfile)
+  14167.5 ms  ✓ vSmartMOM → vSmartMOMCUDAExt
+  2 dependencies successfully precompiled in 28 seconds. 274 already precompiled.

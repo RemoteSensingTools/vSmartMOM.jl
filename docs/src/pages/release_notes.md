@@ -1,11 +1,370 @@
 # Release Notes and Migration
 
-**For:** users moving to the registration-ready vSmartMOM 2.0 interface.
+**For:** users upgrading from registered vSmartMOM 1.1.0 or the public 2.1.0
+tag to 2.2.0.
 
-**Next:** [Quick Start](quickstart.md), [Configure a Scene](IO/Overview.md), [Compute Jacobians](jacobians.md).
+**Next:** [Quick Start](quickstart.md), [Configure a Scene (step by step)](IO/ConfigurationGuide.md), [Compute Jacobians](jacobians.md).
 
-This page summarizes the user-visible changes in the 2.0 line. It is written as
-a migration guide, not as a complete git history.
+This page summarizes the user-visible changes in 2.2.0.
+
+## Scientific development and contributions
+
+**Scientific authorship for the linearization and Raman work is credited to
+Suniti Sanghavi**, including the radiative-transfer formulations, analytic
+derivatives, and retrieval methodology. This release builds on her development
+of the vector matrix-operator radiative-transfer method and atmospheric Raman
+modeling. Her implementation contributions to this release include
+height-resolved observer radiances and their Jacobians, surface-pressure and
+gas-profile Jacobians, Lambertian Legendre surface Jacobians, the external-solar
+TOA path, retrieval-selected Jacobian plans, Fourier convergence, and the OCO
+retrieval workflow.
+
+Christian Frankenberg assists Suniti with performance optimization, backend
+engineering, integration, packaging, and release tooling. These supporting
+contributions receive separate implementation credit. Git author records
+provide implementation provenance; commit counts do not measure the scientific
+contribution. The published software and method references remain listed in
+the repository's `CITATION.bib`, with their original publication author order.
+
+## Upgrade checklist
+
+- Use Julia 1.10 or newer. CPU execution needs no CUDA device, although CUDA
+  is currently installed as a direct dependency. Metal remains optional.
+- Load bundled examples with `joinpath(pkgdir(vSmartMOM), "config", ...)`.
+  Both `quickstart.yaml` and `quickstart.toml` are portable installed-package
+  examples.
+- Forward results are `ObserverRTResult`; Jacobian results are
+  `ObserverRTResultLin`. Tuple iteration/indexing remains available. Prefer
+  `.toa`, `.boa`, `.levels`, `.toa_jacobian`, and `.layout` for new code.
+- Use `nstreams` and explicit truncation/convergence settings for new scenes.
+  Legacy field access and solver defaults should be reviewed against the
+  configuration guide when reproducing an older retrieval.
+- External-solar geometry is opt-in: build with `external_solar=true` before
+  calling `rt_run_toa`. The normal constructor defaults to embedded solar.
+- Nonzero δBGE `Δ_angle` is retired and coerced to zero with a warning.
+  Forward and linearized truncation now share the same domain.
+- Revalidate ocean results: Cox–Munk normalization and direct-glint attenuation
+  were corrected, the per-axis slope variance is now half the Cox–Munk total
+  mean-square slope (glint narrower and brighter), Smith shadowing uses
+  its correct normalization, and the polarized Cox–Munk Mueller matrix
+  (reference planes, argument order, Fourier storage sign, V terms) was
+  corrected against VLIDORT 2.8.3. The incident spectrum scales the correction, and full
+  Jacobians include its wind/optical-depth derivatives. The direct-glint
+  correction requires unpolarized incident illumination. Without an explicit
+  `n_water` (default `nothing`) the water refractive index is now the
+  Segelstein (1981) pure-water index at every spectral point instead of a
+  fixed 550 nm value,
+  which changes the SWIR glint most (TOA glint −9 % at 1.6 µm, −17 % at
+  2.06 µm in a 5 m/s test case).
+- Ross–Li caps both kernel zenith angles at 80° by default (new since v2.1.0;
+  up to ~1 % in I in the VLIDORT comparison);
+  `RossLiSurfaceScalar(fvol, fgeo, fiso; zenith_cap_deg = nothing)` gives the
+  uncapped MODIS/VLIDORT kernels.
+- Surface-pressure Jacobians include pressure-induced line-shape and LUT
+  changes at fixed final-grid temperature/composition. By default
+  (`FixedPressureGrid()`) only the bottom pressure interface moves; the opt-in
+  `model_from_parameters(LinMode(), params; vertical_grid=FixedAltitudeGrid())`
+  keeps every interface at its geometric altitude, so every interface pressure
+  scales with p_surf. A retrieval that varies p_surf must rebuild `params.p`
+  with the same convention (`surface_pressure_interfaces(grid, p_half, p_surf)`).
+  Profile regridding needs a separate chain rule.
+- **Breaking for some linearized callers:** gas-abundance Jacobian columns are
+  the native partial ∂τ/∂VMR = σ·N_dry, with cross sections, CIA and MT_CKD
+  held fixed. A solve or Jacobian plan that requests a column whose forward
+  absorption also responds to that abundance (for H₂O: line-by-line self
+  broadening, MT_CKD and CIA; for a variable gas: CIA pairs with it as a
+  collider) now raises an `ArgumentError` naming the omitted terms. Pass
+  `abundance_jacobians=:frozen_cross_section` to the linearized constructor to
+  accept the partial; fixed humidity (`compute_h2o_jacobians=false`),
+  `fixed_molecules` and fixed-broadener tables need no change.
+- The q-driven H₂O Jacobian columns include the exact response of ABSCO
+  tables with a multi-node H₂O-broadener axis (linear VMR interpolation),
+  under both `abundance_jacobians` settings.
+- `model_from_parameters(LinMode(), params)` no longer adds water-vapour line
+  absorption when the configuration has no `absorption` block: as in the
+  forward constructor, omitting the block means no gas absorption.
+- The Mie radius quadrature no longer depends on the size distribution: its
+  nodes lie on the fixed interval `[r_min, r_max]`, with the new optional
+  `scattering.r_min` (default `1e-3` µm; `make_mie_model(...; r_min)`) in place
+  of each distribution's `1e-8` quantile. Analytic aerosol size Jacobians
+  (`μ_logr`, `σ_logr`) are now the exact derivatives of the forward model at
+  any `nquad_radius`; with nodes that moved with the size parameters they
+  could differ from finite differences at under-resolved node counts by up to
+  18–26 % of the TOA Jacobian (max |analytic − FD| / max |FD| in the tested
+  scenes; larger pointwise). Forward aerosol optics change by the
+  radius-quadrature error at the configured `nquad_radius` (e.g. ≤ 1e-5
+  relative in TOA radiance for an OCO-like three-mode scene with 300 nodes).
+  At a given `nquad_radius` the nodes now span a wider range of `ln r`
+  (1.2–1.6× for the tested modes); check convergence, in particular for coarse modes at ~100 nodes.
+  To reproduce a single-mode result
+  of an earlier version exactly, set `r_min` to that distribution's `1e-8`
+  quantile (or to `1e-6 r_max` if that is larger).
+- `default_parameters()` gives the aerosol pressure peak and width in hPa
+  (`p₀: 900`, `σp: 50`), the unit of the profile; they were given in Pa.
+  Aerosol results of `default_parameters()` and of GEOS-Chem-generated
+  configurations change.
+- Give one `radiative_transfer.surface` entry per band: fewer surfaces than
+  bands raise an `ArgumentError` at model construction, and surplus entries
+  are reported once and ignored. The parser also warns, once per key, about
+  keys it does not read at the top level and in the `radiative_transfer` and
+  `geometry` blocks (e.g. a misspelled `nstream`); such keys remain non-fatal.
+  TOML arrays may mix integers and floats (e.g. `vza = [60, 45.5]`).
+- Under a downloaded HITRAN edition, `artifact(molecule)` uses a cached file
+  only if it is a verified full dataset (full range, all isotopologues,
+  SHA-256 matching its metadata); otherwise it downloads the full dataset, and
+  raises an error if that fails (e.g. offline) instead of using a narrower or
+  unverified file. `hitran_is_cached(molecule[, edition])` reports exactly
+  this condition.
+- Revalidate columns with non-scattering layers (τϖ ≤ 2eps, common in Float32
+  and wherever Rayleigh is zeroed), `RadauQuad` runs at SZA = 0, and runs with
+  a non-unit or spectral solar `F₀` (Lambertian, analytic-BRDF and canopy
+  surfaces): these radiances were wrong and change.
+- **Breaking for positional indexing:** Jacobian columns are `[p_surf,
+  7 per aerosol, gas columns per layer, surface, optional SIF, canopy]` (use
+  `ParameterLayout` or `result.layout`), and `model.τ_aer[iBand]` is
+  `[iAer, nSpec, iZ]` (it was `[iAer, iZ]`).
+- Retrievals with fixed pressure can disable its upstream derivatives with
+  `requires_pressure_jacobians(::MyFlavor) = false` or the constructor keyword
+  `compute_pressure_jacobians=false`. Such plans must omit pressure; full-layout
+  solves reject unavailable pressure tangents. Unsupported absorbers still fail
+  explicitly when a pressure derivative is requested.
+- A source-specific `SolarBeam(sza=...)` must match model geometry at the
+  narrower floating-point precision. Change geometry through model construction
+  or `remake_geometry`. Multiple beams are rejected; for a common geometry,
+  sum their irradiance spectra into one `SolarBeam`.
+- A solve over several bands at once applies one surface to all of them. Bands
+  with different surfaces now raise an `ArgumentError` instead of silently
+  using the first band's surface. A shared spectral or spline albedo must cover
+  the spectral points of all selected bands; Legendre albedos and canopies are
+  not supported across bands. Run independent bands separately; coupled
+  (Raman) solves need one supported common surface.
+- Nonzero or retrievable `SurfaceSIF` requires a supported Lambertian surface.
+  Unsupported source/surface combinations now throw instead of ignoring SIF.
+- The legacy HITRAN reader rejects malformed required fields and non-ASCII or
+  short records. Isotopologue characters `0`, `A`, `B` map to IDs 10, 11, 12;
+  replace an old `iso=0` selection with `iso=10`.
+- Raman Jacobians, linearized thermal sources, and linearized aerosol
+  `TMSCorrection` are explicitly unsupported. Forward Raman and forward
+  atmospheric thermal emission remain separate supported paths.
+- The OCO campaign sources include updated SIF normalization and prior/restart
+  checks. Full campaign execution requires separately supplied spectroscopy,
+  solar spectra, covariance tables, and truth products. Package installation
+  does not supply or publish those research datasets.
+
+## Solver and workflow additions
+
+Per-component support traits
+([`component_m_max`](@ref vSmartMOM.CoreRT.component_m_max)) set the Fourier
+ceiling at model construction. Runtime intensity or Stokes convergence may
+exit below that ceiling using the configured guard and consecutive-pass count.
+
+### AtmosphericAbsorption is the supported absorption dependency
+
+[AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl)
+is the supported absorption dependency going forward, and the RT pipeline already uses it
+for line-by-line absorption. CIA and MT_CKD continuum readers and the 2.x lookup-table
+loader remain in `vSmartMOM.Absorption`. YAML `LUTfiles` accept OCO-2 ABSCO HDF files and AtmosphericAbsorption `.absco` tables (`save_absco_lut`), as well as vSmartMOM JLD2 tables from `make_interpolation_model`; AtmosphericAbsorption's own interpolation tables (`build_interpolation_model`/`save_interpolation_model`) are not read by the 2.x loader.
+
+The standalone line-by-line model (`make_hitran_model`, `HitranModel`) is
+formally deprecated in 2.2, kept through 2.x, and scheduled for removal in 3.0.
+The first `make_hitran_model` call in a session logs the corresponding
+AtmosphericAbsorption calls (`load_lines`, `LineByLineModel`,
+`compute_cross_section`) and how the two engines differ: they agree closely for
+vmr = 0, but for vmr > 0 AtmosphericAbsorption also mixes the pressure shift
+between air and self, so differences grow with vmr and can reach the percent
+level. Tables for YAML `LUTfiles` are still built
+with `make_interpolation_model`, and saved tables load as before. That builder
+now passes `vmr` to the line model (it was silently ignored) and rejects
+wavelength grids with a uniform-wavenumber recipe instead of failing during
+construction.
+
+If you publish results computed from HITRAN line data, please cite the HITRAN
+edition you used — HITRAN2016 for the default artifacts, the current edition
+(HITRAN2024 at the time of writing) for data downloaded from hitran.org. See
+[References](vSmartMOM/References.md) and `CITATION.bib`.
+
+Version 2.2.0 pins AtmosphericAbsorption to 0.1.2 because
+line-pressure tangents use its internal prepared-line interface. Updating this
+dependency requires pressure regressions until an upstream public derivative
+API replaces that coupling. Development checkouts must also record their exact
+revision; a version string alone does not identify a modified source tree.
+
+### Atmosphere/surface split
+
+Three opt-in `rt_run` keywords — `atm_snapshot_callback`,
+`stop_after_atmosphere`, `m_max_override` — let the atmosphere phase
+(elemental → doubling → interaction over all `Nz` layers) run once and the
+surface phase (surface layer + one final interaction, per Fourier moment)
+replay cheaply against many BRDFs. Built on top of them:
+
+- `rt_run_atmosphere` runs the atmosphere phase once and returns an
+  `AtmosphereRTCache` — a device-resident, per-Fourier-moment snapshot of
+  the pre-surface composite layer (stays on GPU when built on GPU).
+- `rt_run_surface` / `rt_run_multi_surface` replay the surface phase
+  against one or many target BRDFs from that cache; bit-exact vs. the
+  monolithic `rt_run`.
+- Scope: `noRS` (elastic only), single band, Lambertian / RPV / RossLi /
+  Cox-Munk surfaces (Canopy and Raman are rejected with `ArgumentError`).
+
+### Analytic Lambertian albedo closure
+
+`lambertian_closure` builds a `LambertianClosure` from an
+`AtmosphereRTCache` that maps a scalar/spectral Lambertian albedo directly
+to `(R, T)` via a closed-form adding-method expression — no additional RT
+solve per albedo. `albedo_jacobian` gives the analytic `dR/dalbedo`, and
+`invert_albedo` solves for the albedo that reproduces a target TOA
+reflectance. Uses a slimmer `:slim`-mode atmosphere cache (six R/T/J blocks
+at `m=0` only) whenever every target BRDF is Lambertian-family.
+
+### Scenario sweeps
+
+`ScenarioSweep` + `run_sweep` compose the atmosphere/surface split and the
+albedo closure over an SZA/geometry × surface grid, reusing the shared
+optics across the sweep. `remake_geometry` rebuilds just the
+geometry-dependent `ObsGeometry`/`QuadPoints` pair without re-running
+HITRAN absorption or Mie — bit-exact with a fresh `model_from_parameters`
+call at the new geometry. It keeps the resolved observer heights, the TOA/BOA
+output selection, and the model's embedded or external-solar representation.
+
+### Molecular Rayleigh API
+
+`molecular_rayleigh_properties` and `molecular_rayleigh_cross_section_ratio`
+(in `Scattering`, also exported from `vSmartMOM`) compute pure-gas Rayleigh
+properties by method: `UsingRefInd()` (refractive index plus King factor; He,
+Ar, N₂, O₂, CO₂; `RefractiveIndexRayleigh` is an alias, and the forms without
+a method argument use it) or
+`UsingPolTen()` (polarizability tensors; N₂, O₂, H₂).
+`molecular_rayleigh_provenance(UsingRefInd(), species)` covers Ar and CO₂.
+
+The N₂ and O₂ refractive-index fits now extend through the NIR: Peck and
+Khanna (1966) for N₂ beyond 436 nm and Egan (2026) for O₂ beyond 467 nm, joined
+to the previous fits where they agree. Beyond those wavelengths σ(N₂) rises by
+up to 0.21 % and σ(O₂) falls by up to 0.89 % at 2 µm; air changes by less than
+0.03 %. The O₂ King factor keeps the He et al. (2021) constant 1.09.
+
+The N₂/O₂ polarizability anisotropy now disperses with wavelength
+(`DispersiveAnisotropy()`, from the refractive-index fits and King factors).
+It is the default of `UsingPolTen()` and of the automatic `depol: -1` Rayleigh
+depolarization, which now falls with wavelength as the King factors do: for
+air it is 0.0277 at 400 nm and 0.0254 at 1.6 µm. v2.1.0 gave about 0.0281
+from 400 nm to 2 µm, because it evaluated the molecular constants at 300 K and
+left 2π out of the Buldakov dispersion pole of the mean polarizability; with the
+column-weighted temperature and the 2π, but a constant anisotropy, the v2.2
+pre-releases gave 0.0263 and 0.0280. Against v2.1.0 the Rayleigh optical depth
+changes by −0.06 % at 400 nm and −0.46 % at 1.6 µm. Set
+`radiative_transfer.rayleigh_anisotropy: ConstantAnisotropy()` for the
+constant anisotropy (the v2.2 pre-release depolarization, bit for bit), and
+`UsingPolTen(ConstantAnisotropy())` for the pre-release `UsingPolTen()`
+values; neither restores v2.1.0, and the new N₂/O₂ fits of `UsingRefInd()`
+have no switch. Raman and Cabannes cross sections keep the constant
+Raman-module tensor.
+
+### New guide
+
+[Fast Re-runs & Batch Processing](batch_processing.md) is a decision table
+for which of the above (or the existing `BatchContext` / `update_model!` /
+`update_aerosol_loading!` / `update_aerosol_microphysics!` family) to reach
+for, keyed by what changes between runs.
+## Retrieval-selected analytic Jacobians
+
+Retrievals can now define a zero-field subtype of `AbstractJacobianFlavor`
+and compile named, band-local derivative layouts through `JacobianPlan`.
+Calling `model_from_parameters(flavor, params)` returns a
+`PlannedRTModelLin`; `rt_run_lin` then allocates and propagates only the
+selected physical columns. `globalize_jacobian` scatters each band result into
+the plan's common cross-band order and fills inactive parameters with exact
+zeros.
+
+Selection occurs during the Fourier-invariant aerosol/gas cache build, before
+combined phase tangents and MOM operator workspaces are allocated. Retrieval
+traits may also suppress q-H2O and aerosol-microphysics tangent generation
+while retaining their complete forward absorption/scattering physics.
+
+`OCO_RRS_synth` is the first built-in flavor. For the current 16-layer
+three-band experiment it propagates 12 columns in O2 A and 22 in each CO2
+band, mapping them into a shared 30-column physical basis. The four CO2 layers
+above 10 km, H2O, aerosol microphysics, and aerosol profile widths are fixed.
+Native `tau_ref`/`z0` derivatives are deliberately not mislabeled as
+`log(AOD760)`/`log(z0)` derivatives; those reference-wavelength, unit, and
+log-coordinate chain rules remain explicit at the retrieval boundary.
+
+Every selected parameter family is regression-tested against two-sided finite
+differences, in addition to exact comparison with corresponding full native
+Jacobian columns. See [Compute Jacobians](jacobians.md) for usage.
+
+## Observer height selection and multi-level radiances
+
+Note on defaults: `model_from_parameters` builds the
+embedded-μ₀ representation (`external_solar=false`) by default, so
+`R, T = rt_run(model)`, observer heights, and the atmosphere/surface split
+all work out of the box. The external-solar SFI representation
+(`external_solar=true`) is an opt-in TOA-only fast path consumed through
+`rt_run_toa`.
+
+`geometry.obs_alt` is now a geometric height selection in **km above BOA**,
+not a pressure. Scalar and vector forms distinguish a single observing level
+from the historical full-column output:
+
+- `0` returns BOA downwelling only; an interior scalar `H` returns both
+  directions at `H`; a scalar at or above the model TOA returns TOA
+  upwelling only.
+- `[0]` returns TOA upwelling and BOA downwelling.
+- `[H1, H2]` returns both directions at each strict-interior height, and
+  `[0, H]` adds the TOA and BOA endpoints.
+
+Existing full-column scenes that used scalar `0` or a pressure-like value such
+as `1000.0` should migrate to `obs_alt: [0]`; those scalars now mean BOA-only
+and a height above TOA, respectively.
+
+An interior height becomes an exact atmospheric interface. vSmartMOM
+interpolates layer-centred input profiles in log pressure, recomputes derived
+vertical fields, and builds the optical state on the reframed grid. Profile
+reduction preserves all requested interfaces; if `K` distinct interior
+heights require more than the requested reduced layering, the solver raises
+the count to `K + 1` and warns.
+
+Humidity and vector VMR inputs may now use either `N` layer-center values or
+`N+1` pressure-interface values; interface fields are normalized in log
+pressure before height insertion. The GEOS-Chem reader also converts
+`Met_SPHU` from its declared g/kg units to the internal kg/kg mass fraction.
+
+Forward `rt_run` now returns an `ObserverRTResult` with named `toa`, `boa`, and
+`levels` fields. Historical tuple iteration remains available, so scenes with
+`obs_alt: [0]` continue to support `R, T = rt_run(model)`. See the
+[`geometry` schema](IO/Schema/geometry.md) for the complete convention and
+output fields.
+
+Analytic-linearized runs now return `ObserverRTResultLin`, with named
+`toa_jacobian` and `boa_jacobian` endpoints plus one `LevelRadianceLin` per
+strict-interior height. Interior records contain diffuse up/down radiances,
+their Jacobians, and separate unscattered-solar radiance/Jacobian fields.
+`total_downwelling_jacobian(level)` combines the diffuse and direct tangents.
+The result remains iterable as `(R, T, dR, dT)` for compatibility.
+
+The direct-beam tangent uses the cumulative optical depth above the requested
+interface,
+`dL_direct/dx = -L_direct (dτ_above/dx) / μ₀`; surface-parameter columns
+are zero. The top and bottom subcolumns reuse the production analytic
+elemental, doubling, and interaction kernels, and the interlayer coupling uses
+the closed-form tangent of the batched matrix inverse.
+
+Forward and linearized model construction now use the same normalized aerosol
+profile discretization: for pressure-form profiles the layer-centre
+probability density weighted by geometric layer thickness, for altitude-form
+profiles the log-normal integrated over the layer interfaces. This keeps
+aerosol optical depths identical on height-anchored grids and makes interior
+direct-beam and diffuse-radiance Jacobians agree with independently rebuilt
+finite differences. Profile-shape columns are `(p₀, σp)` for `Normal` and
+`(z₀, σ₀)` for `LogNormal` profiles.
+
+Forward strict-interior outputs retain their existing `SolarBeam`/`NoSource`
+source restriction and continue to reject `CanopySurface`. Linearized
+interior output remains elastic-only; Raman/inelastic linearization is
+unsupported. Linearized interior runs likewise reject thermal and
+surface-emission sources and `CanopySurface` rather than silently omitting
+unsupported contributions. The single-scatter driver still rejects
+strict-interior requests explicitly while continuing to honor endpoint-only
+choices.
 
 ## v2.1.0 — Fourier / stream resolution + source-term refactor
 
@@ -21,7 +380,7 @@ example uses `nstreams` + `truncation: auto` now.
 The new public input is **`nstreams`** (weighted streams per
 hemisphere). The schema-generation v0.7 label persists in some docs
 (`stream_l_cap = 2·nstreams - 1` and the per-band trait dispatch);
-the package version on the registry is v2.1.0.
+the public repository tag is v2.1.0; the registered upgrade baseline is v1.1.0.
 
 ### What changed for users
 
@@ -45,7 +404,7 @@ radiative_transfer:
 - **`nstreams ≥ 3`** is enforced — Rayleigh contributes through m=2.
 - **`truncation: auto`** mirrors VLIDORT's `DO_DELTAM_SCALING`: the
   resolver picks `NoTruncation()` when the phase function fits within
-  `stream_l_cap`, `δBGE(N, Δ_angle)` otherwise. Logs the choice via
+  `stream_l_cap`, `δBGE(N)` otherwise. Logs the choice via
   `@info` so the user always sees what was applied.
 - **`GaussLegQuad()`** is the default quadrature when `quadrature_type`
   is omitted. `RadauQuad()` remains an option but is documented as
@@ -57,7 +416,7 @@ radiative_transfer:
   describes the v0.7 schema. Wired to TOML via the repo's
   `.taplo.toml`; YAML editors honour it via
   `# yaml-language-server: $schema=...`. Setup recipe in
-  [`Schema.md`](IO/Schema.md#editor-support--autocomplete--inline-validation).
+  [`Schema.md`](IO/Schema.md#Editor-support-—-autocomplete-inline-validation).
 - **Per-block schema docs** under
   [`docs/src/pages/IO/Schema/`](IO/Schema.md) — one page per top-level
   YAML/TOML block.
@@ -100,8 +459,9 @@ for the design rationale.
 
 ## Platform Support
 
-vSmartMOM 2.0 supports Julia 1.10 and newer Julia 1.x releases listed in
-`Project.toml`. CUDA is an optional weak dependency, and the package includes
+vSmartMOM 2.2 supports Julia 1.10 and newer Julia 1.x releases listed in
+`Project.toml`. CUDA is a direct dependency that does not require a functional GPU for CPU
+execution. Metal is an optional weak dependency, and the package includes
 compatibility with CUDA.jl 6.
 
 CPU remains the default portable path:
@@ -122,7 +482,7 @@ load CUDA in the environment that runs the model.
 organizes solver state into named sub-objects:
 
 - `solver`: polarization, quadrature, truncation, and numerical settings.
-- `geometry`: solar/viewing geometry and observer altitude.
+- `geometry`: solar/viewing geometry and resolved observer-output interfaces.
 - `quad_points`: quadrature abscissae and weights.
 - `atmosphere`: atmospheric profile and spectral bands.
 - `optics`: Rayleigh, aerosol, gas, and linearized optical-property state.
@@ -155,7 +515,7 @@ R, T = rt_run(model; sources = SolarBeam() + SurfaceSIF(SIF₀ = sif_spec))
 
 # Thermal-IR / Carbon-I-style scene (1500 K blackbody at 2-2.4 µm):
 spec_band = collect(model.atmosphere.spec_bands[1])
-R, T = rt_run(model; sources = BlackbodySource(1500, spec_band))
+R, T = rt_run(model; sources = BlackbodySource(1500, spec_band; pol_n=params.polarization_type.n))
 ```
 
 Highlights:
@@ -174,7 +534,8 @@ Highlights:
   across the elastic linearized path. Surfaces use a parallel
   `surface_source_contribute!(prepared_sources, surface, …)` double-
   dispatch table for surface-side contributions (SIF on Lambertian
-  surfaces today; non-Lambertian dispatches to a no-op).
+  surfaces today; nonzero or retrievable SIF on other surfaces is rejected
+  at solve time).
 - The Sanghavi 2014 App. C analytic tangents and the Bug-22 beam-
   attenuation chain-rule fix are unchanged inside
   `get_elem_rt_SFI_fused!`; they're now reached via
@@ -188,16 +549,14 @@ Highlights:
 - Source-unit convention adopted: `F₀` and `SIF₀` in
   **mW · m⁻² · cm⁻¹**, `rt_run` outputs in
   **mW · m⁻² · sr⁻¹ · cm⁻¹**. `BlackbodySource` defaults to
-  `factor = π` (Lambertian-disk → hemisphere irradiance) so its `F₀` is
-  comparable to a unit `SolarBeam(F₀ = 1)` baseline.
+  `factor = π` (the exitance πB of a Lambertian emitter) so its `F₀` is
+  comparable to a unit `SolarBeam(F₀ = 1)` baseline; for a distant disk of
+  radius R at distance d, also set `scale = (R/d)²`.
 
-Legacy compatibility: the `inject_surface_SIF!(brdf, …, SIF₀, arch)` path
-that consumes `RS_type.SIF₀` still runs in parallel for back-compat with
-existing `rs.SIF₀ = …; rt_run_test_ss(rs, model, 1)` test patterns. If a
-user supplies BOTH `model.sources` containing a `SurfaceSIF` AND sets
-`RS_type.SIF₀`, the surface SIF is double-counted; choose one API at a
-time. A future PR will retire `RS_type.F₀` / `RS_type.SIF₀` ownership in
-favour of the dispatch system.
+Legacy compatibility: the main `rt_run` path ignores `RS_type.SIF₀` and
+uses `SurfaceSIF` through `sources=`. Migrate old callers to that API.
+Historical diagnostic entry points may still consume the legacy field;
+do not infer their behavior from the main driver's contract.
 
 Full architecture writeup: [Sources](extending/sources.md). Test coverage
 is in `test/test_sources.jl` (Phase 1 → 5b regression, 86/86 pass).
@@ -233,13 +592,17 @@ model, lin_model = model_from_parameters_lin(params)
 NAer  = length(params.scattering_params.rt_aerosols)
 NGas  = size(lin_model.τ̇_abs[1], 1)
 NSurf = 1
-R, T, R_jac, T_jac = rt_run_lin(model, lin_model, NAer, NGas, NSurf)
+result = rt_run_lin(model, lin_model, NAer, NGas, NSurf)
+R, T, R_jac, T_jac = result
 ```
 
 Use `ParameterLayout` to map Jacobian columns to aerosol, gas, surface, and
-canopy parameter blocks. Raman/inelastic linearization is not complete in this
-release line; keep linearized scenes on the elastic path unless a feature branch
-or later release states otherwise.
+canopy parameter blocks; the exact layout is also available as
+`result.layout`. With strict-interior `obs_alt` values, use `result.levels` for
+co-located radiance/Jacobian records and `total_downwelling_jacobian(level)`
+for the diffuse-plus-unscattered downwelling derivative. Raman/inelastic
+linearization is not complete in this release line; keep linearized scenes on
+the elastic path unless a later release states otherwise.
 
 ## Test and Data Policy
 
@@ -263,23 +626,20 @@ The manual has been reorganized around task pages first and a module-grouped
 `checkdocs = :exports` and without `warnonly`, so exported public symbols and
 cross references are checked as part of the release gate.
 
-The repository now ships a root `CITATION.bib` with the JOSS software paper and
-the core method references. See [References](vSmartMOM/References.md) for the
-human-readable citation guide.
+The repository now ships a root `CITATION.bib` with the vSmartMOM model paper,
+the JOSS software paper, the rotational Raman and exoplanet/brown-dwarf papers,
+and the core method references. See [References](vSmartMOM/References.md) for
+the human-readable citation guide.
 
 ## Correctness Fixes
 
 The following bugs were silently wrong in earlier releases; all are fixed in
 the current codebase.
 
-- **δBGE forward-cone exclusion (`Δ_angle`) now applied in production.**
-  The `Δ_angle` parameter of `δBGE(N, Δ_angle)` controls how much of the
-  forward-scattering peak is excluded before fitting the truncation coefficient.
-  Previously, `Δ_angle` was accepted in the constructor but silently ignored
-  during the production truncation fit inside `model_from_parameters`.
-  It is now applied correctly.  The **default `Δ_angle = 0` is unchanged**,
-  so most users see no numerical change.  Users who explicitly set `Δ_angle > 0`
-  in their configs should re-validate their results against this release.
+- **δBGE forward-cone exclusion (`Δ_angle`) retired.** Nonzero values warn
+  and are forced to zero. This resolves the inconsistent forward/linearized
+  fitting domains; workflows that previously requested a nonzero angle must
+  revalidate their results.
 
 - **`LambertianSurfaceSpectrum` surface layer now works.**
   Calling `rt_run` on a model with a `LambertianSurfaceSpectrum` surface
@@ -304,12 +664,14 @@ the current codebase.
   will produce numerically different VS Raman spectra.  Rotational Raman (RRS)
   is unaffected.
 
-- **Mie Dₙ recurrence: Dual-number-safe initialization.**
-  The downward Dₙ recurrence used in Mie coefficient computation started from
-  a hard-coded `Float64` initial value, causing a type-promotion error when
-  the refractive index was a `ForwardDiff.Dual` number (AD path).  The
-  initializer is now type-generic, restoring correct analytic derivatives for
-  Mie-sensitive parameters via `compute_aerosol_optical_properties(LinMode(), …)`.
+- **Mie Dₙ recurrence: Dual-number-safe recursion.**
+  The downward Dₙ recurrence used in Mie coefficient computation was cast to
+  `Complex{Float64}`, which failed when the refractive index was a
+  `ForwardDiff.Dual` number. Dual inputs now use native arithmetic; plain
+  complex inputs keep the Float64-stabilized recursion. The `autodiff=true`
+  keyword of `compute_aerosol_optical_properties` is retired and raises an
+  error; analytic aerosol Jacobians come from
+  `compute_aerosol_optical_properties(LinMode(), …)`.
 
 ## Dependencies
 
@@ -323,9 +685,12 @@ the current codebase.
 - **GPU Mie dispatch** — CUDA architecture now runs Mie coefficient computation
   on-GPU via `make_mie_model(...; architecture = GPU())`.  Measured speedup:
   **10.7–12.9×** vs CPU for typical aerosol grids (1 500 quadrature points,
-  NAI2 decomposition).  `NativeFloat64` is the default precision policy;
-  `DSEmulated` is available for extended-precision Float32 accumulation.
-  Metal and other architectures fall back to CPU Mie automatically.
+  NAI2 decomposition).  The default precision policy follows the model float
+  type: `NativeFloat64` for Float64 and `DSEmulated` (double-single Dₙ
+  recursion) for Float32.
+  Metal also implements NAI2 Mie for Float32 with `NativeFloat32`; other
+  architectures without a Mie pipeline fall back to CPU. Metal hardware was
+  not available for this release's validation.
 
 - **Flat-Z zero-copy path** — Rayleigh-only and analytic-phase-function layers
   share a single pre-computed Z matrix across all Fourier moments rather than
@@ -344,7 +709,7 @@ the current codebase.
   `update_aerosol_loading!` / `update_aerosol_microphysics!` API enables
   efficient multi-scene loops (ensemble retrievals, parameter sweeps) by
   caching Mie, Fourier decomposition, and HITRAN parsing across calls.
-  See the [CoreRT API](api/core_rt.md#batch-scene-processing) for details.
+  See the [CoreRT API](api/core_rt.md#Batch-Scene-Processing) for details.
 
 ## Known WIP Areas
 
@@ -352,14 +717,19 @@ the current codebase.
   stabilized.
 - Internal export cleanup is intentionally deferred; this release does not
   tighten public API surface area at the same time as the registration cutover.
-- Unified offline source-function integration and thermal emission are design
-  topics, not implemented user-facing features in this release line.
+- Forward `ThermalEmission` is implemented. Its end-to-end analytic
+  Jacobians and additional diffuse/lidar source types remain future work.
 
 ## Future Developments
 
-- Mixed automatic differentiation and hand-coded linearization.
+- Broader source and observer support across the existing hybrid
+  upstream-AD / analytic-RT linearization boundary.
 - Coupled ocean-atmosphere radiative transfer.
 - More line-shape and line-mixing functionality, including expansion to more
   spectral databases.
 - Raman performance and memory-pressure improvements.
 - Correlated-k and other spectral dimension-reduction methods.
+
+### Experimental aerosol ingestion
+
+`Aerosols.compute_optical_properties` now rejects calls instead of returning placeholder optical properties. Aerosol readers and refractive-index lookup remain available; production Mie and RT aerosol calculations use `Scattering` and CoreRT. The separate GCHP sectional-AOD branch remains an experimental integration workstream.

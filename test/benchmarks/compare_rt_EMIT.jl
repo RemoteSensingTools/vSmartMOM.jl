@@ -109,7 +109,7 @@ function interp_to_grid(src_wl, src_spec, dst_wl)
         src_wl   = reverse(src_wl)
         src_spec = reverse(src_spec)
     end
-    itp = LinearInterpolation(src_wl, src_spec; extrapolation_bc = NaN)
+    itp = linear_interpolation(src_wl, src_spec; extrapolation_bc = NaN)
     return itp.(dst_wl)
 end
 

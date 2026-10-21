@@ -1,5 +1,9 @@
 # `scattering` block (optional)
 
+> **Note:** the YAML/TOML key for this block is `scattering` (this page's
+> filename, `aerosols.md`, is historical — kept for stable links; it is not
+> renamed here).
+
 Mie aerosol configuration: per-aerosol size distribution, refractive
 index, vertical distribution, and the Fourier decomposition method.
 Skip this block entirely for clear-sky / Rayleigh-only / canopy-only
@@ -8,11 +12,14 @@ runs.
 ## Required when present
 
 - **`aerosols`** — `Vector{Dict}`. One dictionary per aerosol species
-  (see [Per-aerosol fields](#per-aerosol-fields) below).
+  (see [Per-aerosol fields](#Per-aerosol-fields) below).
 - **`r_max`** — `Real` [µm]. Maximum particle radius for the size
   distribution quadrature. 30 µm covers most tropospheric Mie cases.
-- **`nquad_radius`** — `Integer`. Number of radius quadrature points.
-  Typical: 250–500.
+- **`nquad_radius`** — `Integer`. Number of radius quadrature points,
+  Gauss–Legendre in `ln r` on `[r_min, r_max]`. Typical: 250–500. The
+  nodes span the whole interval whatever the size distribution, so check
+  convergence of the optics (and of size Jacobians) for the narrowest or
+  largest-particle mode in the run.
 - **`λ_ref`** — `Real` [µm]. Reference wavelength for the aerosol
   optical depth normalization.
 - **`decomp_type`** — `String`. Fourier decomposition algorithm:
@@ -22,9 +29,32 @@ runs.
 
 ## Optional fields
 
+- **`r_min`** — `Real` [µm], default `1e-3` (1 nm). Lower radius bound of the
+  size-distribution quadrature; requires `0 < r_min < r_max`. Like `r_max` it
+  is fixed for the run and shared by all aerosol modes: the radius nodes depend
+  only on `r_min`, `r_max` and `nquad_radius`, never on any mode's `μ` or `σ`.
+  A change of `μ` or `σ` therefore changes only the quadrature weights, and the
+  analytic size-parameter Jacobians are the exact derivatives of the
+  discretized optics at any `nquad_radius` (finite differences that rebuild
+  the model with perturbed `μ`/`σ` reproduce them). How closely those optics
+  and derivatives approach the continuous size integral depends on
+  `nquad_radius`. Below 1 nm the configured distributions hold at most `1e-14`
+  of their particle number and a negligible part of their extinction; raise
+  `r_min` only for distributions without such small particles, to concentrate
+  the nodes. (Before v2.2 the lower bound was each distribution's `1e-8`
+  quantile, so the nodes moved with `μ` and `σ`.)
 - **`n_ref`** — `Complex`. Reference refractive index for the AOD
   normalization. Defaults to the first aerosol's `(nᵣ, nᵢ)` if
-  omitted.
+  omitted. Once parsed, this is fixed configuration shared by all aerosol
+  modes; changing a mode's refractive index does not change `n_ref`.
+  Forward and analytic runs use the same reference extinction, evaluated
+  with each mode's size distribution and the common `n_ref`. Size derivatives
+  therefore include the reference-extinction derivative; refractive-index
+  derivatives hold `n_ref` fixed. When rebuilding a configuration for finite
+  differences, set `n_ref` explicitly to its baseline value.
+  The AOD scale is `k(λ)/k_ref` throughout the band, including at `λ_ref`.
+  If a mode's actual refractive index differs from `n_ref`, that scale need
+  not equal one at `λ_ref`; no separate unity interpolation anchor is imposed.
 
 ## Per-aerosol fields
 
@@ -57,10 +87,15 @@ Mie/lognormal aerosols (analytic phase functions throw in `LinMode`).
 
 | Form | Fields | Use case |
 |------|--------|----------|
-| Altitude-form (Sanghavi convention, **preferred**) | `z₀`, `σ₀` | Log-normal in altitude. Generalizes cleanly across atmospheric profiles. |
-| Pressure-form (legacy unified convention) | `p₀`, `σp` | Normal in pressure. The historical default before the sanghavi-unified merge. |
+| Altitude-form (Sanghavi convention, **preferred**) | `z₀` [km above BOA], `σ₀` (width of `log z`) | Log-normal in altitude, `LogNormal(log(z₀), σ₀)`, integrated exactly between geometric layer interfaces. Generalizes cleanly across atmospheric profiles. |
+| Pressure-form (legacy unified convention) | `p₀`, `σp` [hPa, the unit of `atmospheric_profile.p`] | Normal in pressure, `Normal(p₀, σp)`. The historical default before the sanghavi-unified merge; `DefaultParameters.yaml` uses `p₀: 900`, `σp: 50`. |
 
 Both forms with both pairs is rejected.
+
+A configuration with aerosols should also set
+`radiative_transfer.greek_beta_cutoff` (a positive threshold or `null`);
+omitting it behaves as `null` but triggers a migration warning (see
+[`radiative_transfer.md`](radiative_transfer.md)).
 
 ## Examples
 
@@ -129,7 +164,7 @@ When `radiative_transfer.truncation = auto` (the v0.7 default):
 
 - No `scattering` block ⇒ `NoTruncation()` (Rayleigh only fits any
   `stream_l_cap`).
-- `scattering` block present ⇒ `δBGE(stream_l_cap, Δ_angle)` (Mie
+- `scattering` block present ⇒ `δBGE(stream_l_cap)` (Mie
   phase functions typically have hundreds of Greek moments).
 
 The choice is logged at `@info` level so you always see what was

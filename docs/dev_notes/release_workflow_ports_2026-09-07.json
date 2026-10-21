@@ -1,0 +1,41 @@
+[
+  {
+    "original": "6f1cba9b",
+    "ported": "96a0b10d90e813b84436014aa4f930e1f176a86f",
+    "resolution": "Preserve RRS_XCO2_DATA_ROOT relocation with new output overrides; retain synthetic output test independent of private truth data."
+  },
+  {
+    "original": "a2968e26",
+    "ported": "160c50497b395cb5e6f450d5d38b476eb368336f",
+    "path_mapping": "RRS_XCO2/ -> sandbox/workflows/RRS_XCO2/"
+  },
+  {
+    "original": "829a2f10",
+    "ported": "73cfaa3d924da35f1efd6b4d9d93062290177da5",
+    "path_mapping": "RRS_XCO2/ -> sandbox/workflows/RRS_XCO2/"
+  },
+  {
+    "original": "82965f8c",
+    "ported": "50daeb10e8b25e2c0198e95ed0a7a01544f5b824",
+    "path_mapping": "RRS_XCO2/ -> sandbox/workflows/RRS_XCO2/"
+  },
+  {
+    "original": "bb0babab",
+    "ported": "40df13ce568b0d30bbb16922cefd995623e96688",
+    "path_mapping": "RRS_XCO2/ -> sandbox/workflows/RRS_XCO2/"
+  },
+  {
+    "original": "cb90b83b",
+    "ported": "4bc50382872c9996252cef10cc97ddadb315bc9f",
+    "path_mapping": "RRS_XCO2/ -> sandbox/workflows/RRS_XCO2/"
+  },
+  {
+    "original": "77c50e29",
+    "ported": "fa2f82a7e9fb2f8b4034622996519e20b12f14ab",
+    "resolution": "Retain synthetic output-schema test independent of campaign data."
+  },
+  {
+    "original": "630c9190",
+    "ported": "f5275b9868c8c896d8f6b3ae81d7a7ded49e39b0"
+  }
+]

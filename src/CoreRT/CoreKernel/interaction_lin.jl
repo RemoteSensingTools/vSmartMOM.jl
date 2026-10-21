@@ -21,14 +21,17 @@ case (see also `interaction.jl` for the forward methods):
 **Forward adding equations (`ScatteringInterface_11`):**
 
 ```math
-\\mathbf{G} = (\\mathbf{E} - \\mathbf{R}^{-+}_\\text{add} \\, \\mathbf{R}^{+-}_\\text{comp})^{-1}
+\\mathbf{G}_\\uparrow = (\\mathbf{E} - \\mathbf{R}^{-+}_\\text{add} \\, \\mathbf{R}^{+-}_\\text{comp})^{-1}
 ```
 ```math
-\\mathbf{T}^{++}_\\text{new} = \\mathbf{T}^{++}_\\text{add} \\, \\mathbf{G} \\, \\mathbf{T}^{++}_\\text{comp}
+\\mathbf{G}_\\downarrow = (\\mathbf{E} - \\mathbf{R}^{+-}_\\text{comp} \\, \\mathbf{R}^{-+}_\\text{add})^{-1}
+```
+```math
+\\mathbf{T}^{++}_\\text{new} = \\mathbf{T}^{++}_\\text{add} \\, \\mathbf{G}_\\downarrow \\, \\mathbf{T}^{++}_\\text{comp}
 ```
 ```math
 \\mathbf{R}^{-+}_\\text{new} = \\mathbf{R}^{-+}_\\text{comp} +
-  \\mathbf{T}^{--}_\\text{comp} \\, \\mathbf{G} \\, \\mathbf{R}^{-+}_\\text{add} \\, \\mathbf{T}^{++}_\\text{comp}
+  \\mathbf{T}^{--}_\\text{comp} \\, \\mathbf{G}_\\uparrow \\, \\mathbf{R}^{-+}_\\text{add} \\, \\mathbf{T}^{++}_\\text{comp}
 ```
 
 **Linearized versions (Sanghavi 2014 Eqs. C.11–C.16):** propagate the full
@@ -37,14 +40,15 @@ using the product rule, with the closed-form
 ``\\dot{\\mathbf{G}} = \\mathbf{G}\\,\\dot{(\\mathbf{R}\\mathbf{R})}\\,\\mathbf{G}``
 identity. No AD through the batched matrix inversion; the chain rule on
 ``(\\mathbf{E} - \\mathbf{R}\\mathbf{R})^{-1}`` is closed-form, which keeps
-the Jacobian numerically stable and roughly forward-cost.
+the inverse derivative analytic while reusing the forward factorization.
 
 The ``\\mathbf{ap\\_*}`` fields on `AddedLayerLin` carry the chain-rule
 expansion to the **physical state vector** ``\\mathbf{x}`` — written
-directly by the fused elemental kernels `get_elem_rt_fused!` and
-`get_elem_rt_SFI_fused!` before this interaction kernel runs; the
-``\\dot{\\mathbf{*}}`` fields carry the three-core derivatives w.r.t.
-``(\\tau, \\varpi, \\mathbf{Z})``.
+by direct elemental/doubling propagation or by contraction of complete
+local-basis tangents before this interaction kernel runs; the
+`AddedLayerLin` fields without `ap_` retain elemental core partials.
+The dotted fields on `CompositeLayerLin` already carry the full supplied
+parameter axis, just like the added layer's `ap_` fields.
 
 See [`Concepts/06 — Linearization`](../../docs/src/pages/concepts/06_linearization.md)
 for the three-tier Jacobian diagram, the parameter-strategy table, and the
@@ -221,6 +225,11 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
                                 added_layer::AddedLayer{FT},
                                 added_layer_lin::AddedLayerLin{FT},
                                 I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
+
+    if _use_batched_jacobians(added_layer_lin)
+        return interaction_batched_lin!(composite_layer, composite_layer_lin,
+            added_layer, added_layer_lin, I_static)
+    end
 
     (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺) = added_layer #these are aliases to the respective struct elements
     (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻) = composite_layer #these are aliases to the respective struct elements

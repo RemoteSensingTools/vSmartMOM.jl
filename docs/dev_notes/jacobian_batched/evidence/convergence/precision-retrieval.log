@@ -1,0 +1,31 @@
+PREPARE precision-retrieval evaluators
+PROJECTION RT_only_O2 xco2_ppm=4.272649224336488e-5
+PROJECTION full_O2_matched_grid xco2_ppm=-0.000738558417564681
+PROJECTION full_O2_native_grid xco2_ppm=0.005538590841394692
+FIXED STATE Float32
+Looping over layers ...  12%|███▌                        |  ETA: 0:02:21[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:20[K
+START PRECISION RETRIEVAL Float32
+TRIAL Float32 n=1 accepted=true cost=197468.29038099287 step=6460.248699864328
+TRIAL Float32 n=2 accepted=false cost=348958.04019437643 step=11526.797619947167
+TRIAL Float32 n=3 accepted=true cost=5157.036511388519 step=65.6575167616077
+TRIAL Float32 n=4 accepted=true cost=4550.340088460805 step=56.21050696214047
+TRIAL Float32 n=5 accepted=true cost=2887.7727883230414 step=1.4855922938285877
+DONE Float32 xco2_shift=0.0 converged=true
+FIXED STATE Float64_native_grid
+Looping over layers ...  12%|███▌                        |  ETA: 0:01:50[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:16[K
+START PRECISION RETRIEVAL Float64_native_grid
+TRIAL Float64_native_grid n=1 accepted=true cost=197025.32728406036 step=6444.645579328394
+TRIAL Float64_native_grid n=2 accepted=false cost=355195.42956154665 step=11733.588633517416
+TRIAL Float64_native_grid n=3 accepted=true cost=5201.450934141097 step=66.39435964971247
+TRIAL Float64_native_grid n=4 accepted=true cost=4583.267755193523 step=56.52800721587349
+TRIAL Float64_native_grid n=5 accepted=true cost=2909.5492378664994 step=1.4646356693603717
+DONE Float64_native_grid xco2_shift=-0.018395881778474177 converged=true
+FIXED STATE Float64_matched_grid
+START PRECISION RETRIEVAL Float64_matched_grid
+TRIAL Float64_matched_grid n=1 accepted=true cost=197478.24553947602 step=6460.616471547136
+TRIAL Float64_matched_grid n=2 accepted=false cost=348954.8287499473 step=11526.756781609254
+TRIAL Float64_matched_grid n=3 accepted=true cost=5162.758625040111 step=65.9164996594919
+TRIAL Float64_matched_grid n=4 accepted=true cost=4543.742847667109 step=56.02320449613249
+TRIAL Float64_matched_grid n=5 accepted=true cost=2885.121921970148 step=1.4652351124456038
+DONE Float64_matched_grid xco2_shift=0.002494493814310772 converged=true
+PRECISION RETRIEVAL COMPLETE

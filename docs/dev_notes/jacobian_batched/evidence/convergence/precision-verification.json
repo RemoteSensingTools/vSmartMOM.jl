@@ -1,0 +1,22 @@
+{
+  "configuration": "precision64",
+  "Float32": {
+    "max_noise_sigma": 0.017233658615559626,
+    "prediction_max_noise_sigma": 0.000424400976104465,
+    "remainder_max_noise_sigma": 0.01727668783072165
+  },
+  "Float64": {
+    "max_noise_sigma": 0.0004265702092822119,
+    "prediction_max_noise_sigma": 0.0004248860922328702,
+    "remainder_max_noise_sigma": 4.795782027697051e-06
+  },
+  "fixed_state_precision_difference": {
+    "reference": 0.8816424926832209,
+    "optimized": 0.8798766414041553
+  },
+  "n_measurements": 934,
+  "output_sha256": {
+    "precision64-reference.jld2": "6bbff94103eeaa559311d735db1c661fa697bbc431d1288d82f11787022488da",
+    "precision64-optimized.jld2": "87f261756a350fe74124301dfcfe39dccf657cf5134420b603f6a75d05e7bd52"
+  }
+}

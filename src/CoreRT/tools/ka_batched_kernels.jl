@@ -35,7 +35,12 @@ function ka_batched_mul!(C::AbstractArray{FT,3},
     @assert size(C) == (size(A, 1), size(B, 2), size(A, 3))
     kernel! = _batched_mul_kernel!(backend)
     kernel!(C, A, B, Val(size(A, 2)); ndrange=size(C))
-    KernelAbstractions.synchronize(backend)
+    # Host-side sync only where it is semantically needed: KA's CPU backend
+    # runs kernels as async tasks, so consumers need the barrier. On GPU the
+    # pipeline is single-stream — stream ordering already sequences every
+    # consumer — and the eager sync both wastes a full-stream round trip per
+    # call AND invalidates CUDA stream capture (graph replay). Phase-0 fix.
+    backend isa KernelAbstractions.CPU && KernelAbstractions.synchronize(backend)
     return C
 end
 
@@ -79,7 +84,12 @@ function ka_batch_inv_lu!(X::AbstractArray{FT,3},
     batch = size(A, 3)
     kernel! = _batched_inv_lu_par_kernel!(backend, N)
     kernel!(X, A, Val(N); ndrange=(N * batch,))
-    KernelAbstractions.synchronize(backend)
+    # Host-side sync only where it is semantically needed: KA's CPU backend
+    # runs kernels as async tasks, so consumers need the barrier. On GPU the
+    # pipeline is single-stream — stream ordering already sequences every
+    # consumer — and the eager sync both wastes a full-stream round trip per
+    # call AND invalidates CUDA stream capture (graph replay). Phase-0 fix.
+    backend isa KernelAbstractions.CPU && KernelAbstractions.synchronize(backend)
     return X
 end
 
@@ -300,7 +310,12 @@ function ka_fused_gp_solve!(X::AbstractArray{FT,3},
     batch = size(A, 3)
     kernel! = _fused_gp_solve_kernel!(backend, N)
     kernel!(X, A, B, Val(N); ndrange=(N * batch,))
-    KernelAbstractions.synchronize(backend)
+    # Host-side sync only where it is semantically needed: KA's CPU backend
+    # runs kernels as async tasks, so consumers need the barrier. On GPU the
+    # pipeline is single-stream — stream ordering already sequences every
+    # consumer — and the eager sync both wastes a full-stream round trip per
+    # call AND invalidates CUDA stream capture (graph replay). Phase-0 fix.
+    backend isa KernelAbstractions.CPU && KernelAbstractions.synchronize(backend)
     return X
 end
 
@@ -485,7 +500,12 @@ function ka_fused_solve!(X::AbstractArray{FT,3},
     batch = size(A1, 3)
     kernel! = _fused_solve_kernel!(backend, N)
     kernel!(X, A1, A2, B, Val(N); ndrange=(N * batch,))
-    KernelAbstractions.synchronize(backend)
+    # Host-side sync only where it is semantically needed: KA's CPU backend
+    # runs kernels as async tasks, so consumers need the barrier. On GPU the
+    # pipeline is single-stream — stream ordering already sequences every
+    # consumer — and the eager sync both wastes a full-stream round trip per
+    # call AND invalidates CUDA stream capture (graph replay). Phase-0 fix.
+    backend isa KernelAbstractions.CPU && KernelAbstractions.synchronize(backend)
     return X
 end
 
@@ -583,4 +603,482 @@ array `X`: same policy as [`_use_fused_gp`] but with the smaller `2N²` tile.
     backend = KernelAbstractions.get_backend(X)
     backend isa KernelAbstractions.CPU && return false
     return ka_fused_solve_localmem_bytes(FT, size(X, 1)) <= _gp_fused_localmem_limit(backend)
+end
+
+# ==============================================================================
+# Phase-1 fused doubling-step kernels (perf/fused-adding-kernels).
+#
+# The Phase-0 in-place doubling updates still cost ~12 (rt) and ~18 (source)
+# device events per call — each batched product is a cuBLAS pointer-array
+# gemm (3 pageable pointer-table HtoD uploads + 1 kernel for the tiny
+# Nstream×Nstokes tiles) plus separate broadcast kernels, and the cuBLAS
+# nodes make CUDA-graph replay impossible (single-shot graphs). These two
+# kernels collapse each update into ONE backend-agnostic KA launch:
+#
+#   rt:      R ← R + (A·R)·T ;  T ← A·T ;  expk ← expk²
+#   source:  j₁± = j₀±·e ;  j₀⁻ += A·(j₁⁻ + R·j₀⁺) ;  j₀⁺ = j₁⁺ + A·(j₀⁺ + R·j₁⁻)
+#
+# with A = tt_gp, R = r⁻⁺, T = t⁺⁺. The rt kernel uses the associativity
+# (A·R)·T[:,j] = A·(R·T[:,j]) so one workitem owns one output COLUMN via two
+# mat-vecs against shared tiles — same 3N² local-memory budget as the fused
+# GP solve, no fourth tile. The source kernel is row-parallel (vectors).
+#
+# EQUIVALENCE CONTRACT: same math, different reduction order than cuBLAS —
+# tolerance-equivalent (NOT bitwise) to the `_bmm!` path on every backend;
+# validated in test/test_fused_doubling.jl. Kill-switches restore the
+# `_bmm!` path exactly.
+# ==============================================================================
+
+"Local-memory bytes for [`ka_fused_doubling_rt!`]: three N×N tiles."
+ka_fused_doubling_rt_localmem_bytes(::Type{FT}, N::Integer) where {FT} =
+    3 * N * N * sizeof(FT)
+
+"Local-memory bytes for [`ka_fused_doubling_source!`]: two N×N tiles + six N-vectors."
+ka_fused_doubling_source_localmem_bytes(::Type{FT}, N::Integer) where {FT} =
+    (2 * N * N + 6 * N) * sizeof(FT)
+
+"Runtime kill-switch for the fused doubling-step kernels. Default `true`."
+const _FUSED_DOUBLING_ENABLED = Ref(true)
+
+"""
+    _use_fused_doubling_rt(X) / _use_fused_doubling_source(X) -> Bool
+
+Gate for the fused doubling kernels: GPU backends only (the CPU threaded
+BLAS path is already efficient), kill-switch on, and the local-memory tile
+fits the device budget. `X` is any of the update's matrix arguments.
+"""
+@inline function _use_fused_doubling_rt(X::AbstractArray{FT,3}) where {FT}
+    _FUSED_DOUBLING_ENABLED[] || return false
+    backend = KernelAbstractions.get_backend(X)
+    backend isa KernelAbstractions.CPU && return false
+    return ka_fused_doubling_rt_localmem_bytes(FT, size(X, 1)) <= _gp_fused_localmem_limit(backend)
+end
+@inline function _use_fused_doubling_source(X::AbstractArray{FT,3}) where {FT}
+    _FUSED_DOUBLING_ENABLED[] || return false
+    backend = KernelAbstractions.get_backend(X)
+    backend isa KernelAbstractions.CPU && return false
+    return ka_fused_doubling_source_localmem_bytes(FT, size(X, 1)) <= _gp_fused_localmem_limit(backend)
+end
+
+"""
+    ka_fused_doubling_rt!(r⁻⁺, t⁺⁺, tt_gp, expk, backend)
+
+One-launch doubling R/T update:
+
+    r⁻⁺[:,:,k] ← r⁻⁺[:,:,k] + (tt_gp·r⁻⁺)·t⁺⁺   (per spectral point k)
+    t⁺⁺[:,:,k] ← tt_gp[:,:,k]·t⁺⁺[:,:,k]
+    expk[k]    ← expk[k]²
+
+One workgroup per k, one workitem per output column; shared tiles carry
+the (pre-update) A/R/T so global writes never race the reads.
+"""
+function ka_fused_doubling_rt!(r⁻⁺::AbstractArray{FT,3}, t⁺⁺::AbstractArray{FT,3},
+                               tt_gp::AbstractArray{FT,3}, expk::AbstractArray{FT,1},
+                               backend) where {FT}
+    N = size(r⁻⁺, 1)
+    @assert size(r⁻⁺) == size(t⁺⁺) == size(tt_gp)
+    @assert size(r⁻⁺, 2) == N
+    batch = size(r⁻⁺, 3)
+    kernel! = _fused_doubling_rt_kernel!(backend, N)
+    kernel!(r⁻⁺, t⁺⁺, tt_gp, expk, Val(N); ndrange=(N * batch,))
+    backend isa KernelAbstractions.CPU && KernelAbstractions.synchronize(backend)
+    return nothing
+end
+
+@kernel function _fused_doubling_rt_kernel!(r⁻⁺, t⁺⁺, @Const(tt_gp), expk, ::Val{N}) where {N}
+    k   = @index(Group, Linear)
+    tid = @index(Local, Linear)
+
+    Ash = @localmem eltype(r⁻⁺) (N, N)
+    Rsh = @localmem eltype(r⁻⁺) (N, N)
+    Tsh = @localmem eltype(r⁻⁺) (N, N)
+    u   = @private eltype(r⁻⁺) (N,)
+
+    @inbounds for j in 1:N
+        Ash[tid, j] = tt_gp[tid, j, k]
+        Rsh[tid, j] = r⁻⁺[tid, j, k]
+        Tsh[tid, j] = t⁺⁺[tid, j, k]
+    end
+    @synchronize()
+
+    # Doubling R/T adding equations for two IDENTICAL sub-slabs
+    # (Sanghavi et al. 2014, Eqs. 23–24, collapsed; see doubling.jl header):
+    #
+    #     r⁻⁺ ← r⁻⁺ + tt_gp · r⁻⁺ · t⁺⁺        with tt_gp = t⁺⁺·(E − r⁻⁺r⁻⁺)⁻¹
+    #     t⁺⁺ ← tt_gp · t⁺⁺
+    #
+    # This workitem owns output COLUMN `tid`. Associativity turns the
+    # triple product into two mat-vecs:  (tt_gp·r⁻⁺)·t⁺⁺[:,tid] =
+    # tt_gp·(r⁻⁺·t⁺⁺[:,tid]), so no N×N intermediate is materialised.
+    @inbounds begin
+        # u = r⁻⁺ · t⁺⁺[:,tid]                  (first mat-vec)
+        for l in 1:N
+            acc = zero(eltype(r⁻⁺))
+            for m in 1:N
+                acc += Rsh[l, m] * Tsh[m, tid]
+            end
+            u[l] = acc
+        end
+        # r⁻⁺[:,tid] ← r⁻⁺[:,tid] + tt_gp·u    (second mat-vec, accumulate)
+        # t⁺⁺[:,tid] ← tt_gp · t⁺⁺[:,tid]      (independent mat-vec, fused loop)
+        for l in 1:N
+            acc_r = zero(eltype(r⁻⁺))
+            acc_t = zero(eltype(r⁻⁺))
+            for m in 1:N
+                acc_r += Ash[l, m] * u[m]
+                acc_t += Ash[l, m] * Tsh[m, tid]
+            end
+            r⁻⁺[l, tid, k] = Rsh[l, tid] + acc_r
+            t⁺⁺[l, tid, k] = acc_t
+        end
+        # expk ← expk² — the attenuation factor tracks the doubled optical
+        # thickness (exp(-2δτ/μ₀) = exp(-δτ/μ₀)²); one workitem per k.
+        if tid == 1
+            expk[k] = expk[k]^2
+        end
+    end
+end
+
+"""
+    ka_fused_doubling_source!(j₀⁺, j₀⁻, j₁⁺, j₁⁻, r⁻⁺, tt_gp, expk, backend)
+
+One-launch doubling source update (per spectral point k, e = expk[k]):
+
+    j₁± = j₀±·e
+    j₀⁻ ← j₀⁻ + tt_gp·(j₁⁻ + r⁻⁺·j₀⁺)
+    j₀⁺ ← j₁⁺ + tt_gp·(j₀⁺ + r⁻⁺·j₁⁻)     (pre-update j₀⁺ on the RHS)
+
+j₁± are also written to their global workspace buffers (same contract as
+the `_bmm!` path). One workgroup per k, one workitem per vector row.
+"""
+function ka_fused_doubling_source!(j₀⁺::AbstractArray{FT,3}, j₀⁻::AbstractArray{FT,3},
+                                   j₁⁺::AbstractArray{FT,3}, j₁⁻::AbstractArray{FT,3},
+                                   r⁻⁺::AbstractArray{FT,3}, tt_gp::AbstractArray{FT,3},
+                                   expk::AbstractArray{FT,1}, backend) where {FT}
+    N = size(r⁻⁺, 1)
+    batch = size(r⁻⁺, 3)
+    kernel! = _fused_doubling_source_kernel!(backend, N)
+    kernel!(j₀⁺, j₀⁻, j₁⁺, j₁⁻, r⁻⁺, tt_gp, expk, Val(N); ndrange=(N * batch,))
+    backend isa KernelAbstractions.CPU && KernelAbstractions.synchronize(backend)
+    return nothing
+end
+
+@kernel function _fused_doubling_source_kernel!(j₀⁺, j₀⁻, j₁⁺, j₁⁻,
+                                                @Const(r⁻⁺), @Const(tt_gp),
+                                                @Const(expk), ::Val{N}) where {N}
+    k   = @index(Group, Linear)
+    tid = @index(Local, Linear)
+
+    Ash = @localmem eltype(j₀⁺) (N, N)
+    Rsh = @localmem eltype(j₀⁺) (N, N)
+    xp  = @localmem eltype(j₀⁺) (N,)   # pre-update j₀⁺
+    xm  = @localmem eltype(j₀⁺) (N,)   # pre-update j₀⁻
+    w1  = @localmem eltype(j₀⁺) (N,)   # j₁⁻ + R·j₀⁺
+    w2  = @localmem eltype(j₀⁺) (N,)   # j₀⁺ + R·j₁⁻
+
+    @inbounds begin
+        for j in 1:N
+            Ash[tid, j] = tt_gp[tid, j, k]
+            Rsh[tid, j] = r⁻⁺[tid, j, k]
+        end
+        xp[tid] = j₀⁺[tid, 1, k]
+        xm[tid] = j₀⁻[tid, 1, k]
+    end
+    @synchronize()
+
+    # Doubling source-cascade equations (Sanghavi et al. 2014, Eqs. 27–28,
+    # restated for identical sub-slabs as Eqs. 8 of Sanghavi & Frankenberg
+    # 2023; see doubling_source_update!'s docstring):
+    #
+    #     j₁± = j₀± · expk            (beam-attenuated copies, expk = e^{-δτ/μ₀})
+    #     j₀⁻ ← j₀⁻ + tt_gp·(j₁⁻ + r⁻⁺·j₀⁺)
+    #     j₀⁺ ← j₁⁺ + tt_gp·(j₀⁺ + r⁻⁺·j₁⁻)    (pre-update j₀⁺ on the RHS)
+    #
+    # Stage 1 — workitem `tid` builds row `tid` of both inner vectors:
+    #     w1 = j₁⁻ + r⁻⁺·j₀⁺
+    #     w2 = j₀⁺ + r⁻⁺·j₁⁻
+    # (NOTE: the scalar e is re-read from expk[k] in each stage — scalar
+    # locals do not survive KA's @synchronize loop-splitting.)
+    @inbounds begin
+        e = expk[k]
+        rj0p = zero(eltype(j₀⁺))   # (r⁻⁺·j₀⁺)[tid]
+        rj1m = zero(eltype(j₀⁺))   # (r⁻⁺·j₁⁻)[tid], with j₁⁻[m] = xm[m]·e
+        for m in 1:N
+            rj0p += Rsh[tid, m] * xp[m]
+            rj1m += Rsh[tid, m] * (xm[m] * e)
+        end
+        w1[tid] = xm[tid] * e + rj0p     # j₁⁻[tid] + (r⁻⁺·j₀⁺)[tid]
+        w2[tid] = xp[tid] + rj1m         # j₀⁺[tid] + (r⁻⁺·j₁⁻)[tid]
+    end
+    @synchronize()
+
+    # Stage 2 — apply the geometric-progression factor and assemble:
+    #     j₀⁻[tid] = j₀⁻[tid] + (tt_gp·w1)[tid]
+    #     j₀⁺[tid] = j₁⁺[tid] + (tt_gp·w2)[tid]
+    @inbounds begin
+        e = expk[k]
+        tw1 = zero(eltype(j₀⁺))    # (tt_gp·w1)[tid]
+        tw2 = zero(eltype(j₀⁺))    # (tt_gp·w2)[tid]
+        for m in 1:N
+            tw1 += Ash[tid, m] * w1[m]
+            tw2 += Ash[tid, m] * w2[m]
+        end
+        j₁⁺[tid, 1, k] = xp[tid] * e     # persisted workspace, same contract
+        j₁⁻[tid, 1, k] = xm[tid] * e     # as the _bmm! path
+        j₀⁻[tid, 1, k] = xm[tid] + tw1
+        j₀⁺[tid, 1, k] = xp[tid] * e + tw2
+    end
+end
+
+# ==============================================================================
+# Phase-2 fused interaction kernels (perf/fused-adding-kernels).
+#
+# The MOM adding step for two scattering layers (interaction_helper!,
+# ScatteringInterface_11 — the interface EVERY Rayleigh-bearing layer takes)
+# applies Sanghavi et al. 2014 Eqs. 23–28 with the geometric-series factors
+#
+#     G₁ = T01_inv = T⁻⁻·(E − r⁻⁺·R⁺⁻)⁻¹      (fused solve, 1 launch)
+#     G₂ = T21_inv = t⁺⁺·(E − R⁺⁻·r⁻⁺)⁻¹      (fused solve, 1 launch)
+#
+# and six update equations. After Phase 0 those six lines still cost ~15
+# batched products (each a cuBLAS pointer-array gemm = 4 device events)
+# plus broadcasts. These two kernels collapse each half into ONE launch:
+#
+#   DOWN half (uses G₁; composite quantities are uppercase):
+#     J₀⁻ ← J₀⁻ + G₁·(r⁻⁺·J₀⁺ + j₀⁻)          Eq. 28  (J₀₂⁻)
+#     R⁻⁺ ← R⁻⁺ + G₁·r⁻⁺·T⁺⁺                  Eq. 24  (R₂₀)
+#     T⁻⁻ ← G₁·t⁻⁻                            Eq. 25  (T₀₂)
+#   UP half (uses G₂; pre-update J₀⁺/R⁺⁻/T⁺⁺ on the RHS):
+#     J₀⁺ ← j₀⁺ + G₂·(J₀⁺ + R⁺⁻·j₀⁻)          Eq. 27  (J₂₀⁺)
+#     T⁺⁺ ← G₂·T⁺⁺                            Eq. 23  (T₂₀)
+#     R⁺⁻ ← r⁺⁻ + G₂·R⁺⁻·t⁻⁻                  Eq. 26  (R₀₂)
+#
+# Triple products are evaluated column-wise via associativity, e.g.
+# (G₁·r⁻⁺)·T⁺⁺[:,j] = G₁·(r⁻⁺·T⁺⁺[:,j]) — two mat-vecs per column, no N×N
+# intermediate. One workgroup per spectral point; each workitem serves as
+# ROW tid for the source-vector update and COLUMN tid for the matrix
+# updates. Shared tiles hold the pre-update cross-thread inputs, so global
+# writes never race reads. Same tolerance (NOT bitwise) contract as the
+# Phase-1 doubling kernels; validated in test/test_fused_interaction.jl.
+# ==============================================================================
+
+"Local-memory bytes for either fused interaction half: two N×N tiles + O(N) vectors."
+ka_fused_interaction_localmem_bytes(::Type{FT}, N::Integer) where {FT} =
+    (2 * N * N + 4 * N) * sizeof(FT)
+
+"""
+    _fused_interaction_default(backend) -> Bool
+
+Backend policy for the fused interaction kernels, consulted when
+`_FUSED_INTERACTION_MODE[] === :auto`. The generic GPU default is `true`:
+on cuBLAS-free backends (Metal) the fused kernels are the only single-launch
+option and the `_bmm!` ladder has no vendor GEMM to lean on. The CUDA
+extension overrides this to `false`, from measurement: on the production
+satellite solve (801 pts, nstr=8, IQU, F32, A100) the fused path measured
+3.27 s vs 2.89 s for the `_bmm!` ladder (max rel radiance diff 9.3e-7).
+Unlike the launch-bound doubling ladder and the inverse-replacing fused
+solve, the interaction updates are plain batched GEMMs at N≈36 — exactly
+what cuBLAS is best at — so the one-workgroup-per-λ kernels lose there.
+"""
+_fused_interaction_default(::KernelAbstractions.Backend) = true
+
+"""
+Mode switch for the fused interaction kernels: `:auto` (backend policy via
+[`_fused_interaction_default`](@ref)) | `:on` (force, e.g. for CUDA-graph
+capture experiments, where a cuBLAS-free interaction step is a prerequisite)
+| `:off` (force the `_bmm!` ladder).
+"""
+const _FUSED_INTERACTION_MODE = Ref{Symbol}(:auto)
+
+"Gate: GPU backend, mode/backend policy allows it, and the 2N² tile fits."
+@inline function _use_fused_interaction(X::AbstractArray{FT,3}) where {FT}
+    mode = _FUSED_INTERACTION_MODE[]
+    # A typo like :of must not silently fall through as forced-on.
+    mode in (:auto, :on, :off) ||
+        throw(ArgumentError("invalid _FUSED_INTERACTION_MODE: $mode (use :auto | :on | :off)"))
+    mode === :off && return false
+    backend = KernelAbstractions.get_backend(X)
+    backend isa KernelAbstractions.CPU && return false
+    mode === :auto && !_fused_interaction_default(backend) && return false
+    return ka_fused_interaction_localmem_bytes(FT, size(X, 1)) <= _gp_fused_localmem_limit(backend)
+end
+
+"""
+    ka_fused_interaction_down!(J₀⁻, R⁻⁺, T⁻⁻, G₁, r⁻⁺, J₀⁺, j₀⁻, T⁺⁺, t⁻⁻, backend)
+
+DOWN half of the ScatteringInterface_11 adding step in one launch
+(Eqs. 28/24/25 above). Consumes the PRE-update `J₀⁺`/`T⁺⁺` and writes
+`J₀⁻` (accumulate), `R⁻⁺` (accumulate), and `T⁻⁻` (overwrite).
+"""
+function ka_fused_interaction_down!(J₀⁻, R⁻⁺, T⁻⁻, G₁, r⁻⁺, J₀⁺, j₀⁻, T⁺⁺, t⁻⁻, backend)
+    N = size(G₁, 1); batch = size(G₁, 3)
+    kernel! = _fused_interaction_down_kernel!(backend, N)
+    kernel!(J₀⁻, R⁻⁺, T⁻⁻, G₁, r⁻⁺, J₀⁺, j₀⁻, T⁺⁺, t⁻⁻, Val(N); ndrange=(N * batch,))
+    backend isa KernelAbstractions.CPU && KernelAbstractions.synchronize(backend)
+    return nothing
+end
+
+@kernel function _fused_interaction_down_kernel!(J₀⁻, R⁻⁺, T⁻⁻,
+                                                 @Const(G₁), @Const(r⁻⁺), @Const(J₀⁺),
+                                                 @Const(j₀⁻), @Const(T⁺⁺), @Const(t⁻⁻),
+                                                 ::Val{N}) where {N}
+    k   = @index(Group, Linear)
+    tid = @index(Local, Linear)
+
+    Gsh = @localmem eltype(G₁) (N, N)   # G₁ = T⁻⁻·(E − r⁻⁺R⁺⁻)⁻¹
+    Rsh = @localmem eltype(G₁) (N, N)   # r⁻⁺ (added layer, never mutated here)
+    Jp  = @localmem eltype(G₁) (N,)     # pre-update composite J₀⁺
+    w   = @localmem eltype(G₁) (N,)     # r⁻⁺·J₀⁺ + j₀⁻
+    u   = @private eltype(G₁) (N,)
+    c   = @private eltype(G₁) (N,)
+
+    @inbounds begin
+        for j in 1:N
+            Gsh[tid, j] = G₁[tid, j, k]
+            Rsh[tid, j] = r⁻⁺[tid, j, k]
+        end
+        Jp[tid] = J₀⁺[tid, 1, k]
+    end
+    @synchronize()
+
+    # Stage 1 — row tid of the source bracket:  w = r⁻⁺·J₀⁺ + j₀⁻   (Eq. 28 inner)
+    @inbounds begin
+        acc = zero(eltype(G₁))
+        for m in 1:N
+            acc += Rsh[tid, m] * Jp[m]
+        end
+        w[tid] = acc + j₀⁻[tid, 1, k]
+    end
+    @synchronize()
+
+    @inbounds begin
+        # J₀⁻[tid] ← J₀⁻[tid] + (G₁·w)[tid]                        (Eq. 28)
+        acc = zero(eltype(G₁))
+        for m in 1:N
+            acc += Gsh[tid, m] * w[m]
+        end
+        J₀⁻[tid, 1, k] += acc
+
+        # Column tid:  u = r⁻⁺·T⁺⁺[:,tid]  (pre-update T⁺⁺), then
+        # R⁻⁺[:,tid] ← R⁻⁺[:,tid] + G₁·u                            (Eq. 24)
+        for m in 1:N
+            c[m] = T⁺⁺[m, tid, k]
+        end
+        for l in 1:N
+            acc2 = zero(eltype(G₁))
+            for m in 1:N
+                acc2 += Rsh[l, m] * c[m]
+            end
+            u[l] = acc2
+        end
+        for m in 1:N
+            c[m] = t⁻⁻[m, tid, k]
+        end
+        for l in 1:N
+            acc_r = zero(eltype(G₁))
+            acc_t = zero(eltype(G₁))
+            for m in 1:N
+                acc_r += Gsh[l, m] * u[m]
+                acc_t += Gsh[l, m] * c[m]   # T⁻⁻[:,tid] = G₁·t⁻⁻[:,tid]  (Eq. 25)
+            end
+            R⁻⁺[l, tid, k] += acc_r
+            T⁻⁻[l, tid, k] = acc_t
+        end
+    end
+end
+
+"""
+    ka_fused_interaction_up!(J₀⁺, T⁺⁺, R⁺⁻, G₂, j₀⁺, j₀⁻, r⁺⁻, t⁻⁻, backend)
+
+UP half of the ScatteringInterface_11 adding step in one launch
+(Eqs. 27/23/26 above). Consumes the PRE-update `J₀⁺`/`R⁺⁻`/`T⁺⁺` and
+overwrites all three.
+"""
+function ka_fused_interaction_up!(J₀⁺, T⁺⁺, R⁺⁻, G₂, j₀⁺, j₀⁻, r⁺⁻, t⁻⁻, backend)
+    N = size(G₂, 1); batch = size(G₂, 3)
+    kernel! = _fused_interaction_up_kernel!(backend, N)
+    kernel!(J₀⁺, T⁺⁺, R⁺⁻, G₂, j₀⁺, j₀⁻, r⁺⁻, t⁻⁻, Val(N); ndrange=(N * batch,))
+    backend isa KernelAbstractions.CPU && KernelAbstractions.synchronize(backend)
+    return nothing
+end
+
+@kernel function _fused_interaction_up_kernel!(J₀⁺, T⁺⁺, R⁺⁻,
+                                               @Const(G₂), @Const(j₀⁺), @Const(j₀⁻),
+                                               @Const(r⁺⁻), @Const(t⁻⁻),
+                                               ::Val{N}) where {N}
+    k   = @index(Group, Linear)
+    tid = @index(Local, Linear)
+
+    Gsh = @localmem eltype(G₂) (N, N)   # G₂ = t⁺⁺·(E − R⁺⁻r⁻⁺)⁻¹
+    Psh = @localmem eltype(G₂) (N, N)   # PRE-update composite R⁺⁻
+    Jp  = @localmem eltype(G₂) (N,)     # pre-update composite J₀⁺
+    jm  = @localmem eltype(G₂) (N,)     # added-layer j₀⁻
+    w   = @localmem eltype(G₂) (N,)     # J₀⁺ + R⁺⁻·j₀⁻
+    u   = @private eltype(G₂) (N,)
+    c   = @private eltype(G₂) (N,)
+
+    @inbounds begin
+        for j in 1:N
+            Gsh[tid, j] = G₂[tid, j, k]
+            Psh[tid, j] = R⁺⁻[tid, j, k]
+        end
+        Jp[tid] = J₀⁺[tid, 1, k]
+        jm[tid] = j₀⁻[tid, 1, k]
+    end
+    @synchronize()
+
+    # Stage 1 — row tid of the source bracket:  w = J₀⁺ + R⁺⁻·j₀⁻  (Eq. 27 inner)
+    @inbounds begin
+        acc = zero(eltype(G₂))
+        for m in 1:N
+            acc += Psh[tid, m] * jm[m]
+        end
+        w[tid] = Jp[tid] + acc
+    end
+    @synchronize()
+
+    @inbounds begin
+        # J₀⁺[tid] ← j₀⁺[tid] + (G₂·w)[tid]                        (Eq. 27)
+        acc = zero(eltype(G₂))
+        for m in 1:N
+            acc += Gsh[tid, m] * w[m]
+        end
+        J₀⁺[tid, 1, k] = j₀⁺[tid, 1, k] + acc
+
+        # Column tid:  T⁺⁺[:,tid] ← G₂·T⁺⁺[:,tid]                  (Eq. 23)
+        # (own column read into a private buffer BEFORE overwrite)
+        for m in 1:N
+            c[m] = T⁺⁺[m, tid, k]
+        end
+        for l in 1:N
+            acc2 = zero(eltype(G₂))
+            for m in 1:N
+                acc2 += Gsh[l, m] * c[m]
+            end
+            u[l] = acc2
+        end
+        for l in 1:N
+            T⁺⁺[l, tid, k] = u[l]
+        end
+
+        # Column tid:  u = R⁺⁻·t⁻⁻[:,tid] (pre-update R⁺⁻ from the tile),
+        # then R⁺⁻[:,tid] ← r⁺⁻[:,tid] + G₂·u                       (Eq. 26)
+        for m in 1:N
+            c[m] = t⁻⁻[m, tid, k]
+        end
+        for l in 1:N
+            acc3 = zero(eltype(G₂))
+            for m in 1:N
+                acc3 += Psh[l, m] * c[m]
+            end
+            u[l] = acc3
+        end
+        for l in 1:N
+            acc4 = zero(eltype(G₂))
+            for m in 1:N
+                acc4 += Gsh[l, m] * u[m]
+            end
+            R⁺⁻[l, tid, k] = r⁺⁻[l, tid, k] + acc4
+        end
+    end
 end

@@ -22,7 +22,7 @@
 # (e.g. Case C) and produce sign-clashed Z[1,2]. We sign-flip on
 # import so all γ inside vSmartMOM is Hovenier; the price is that
 # truth Q/U/V from VLIDORT must also be sign-flipped at the comparison
-# stage. See dev_notes/case_c_q_u_conventions.md.
+# stage. See docs/dev_notes/case_c_q_u_conventions.md.
 
 const SIEWERT_PROBLEM_IIA = (
     row1 = [0.0, 0.0, 3.726079, 2.202868, 1.190694, 0.391203, 0.105556, 0.020484, 0.003097, 0.000366, 3.5e-5, 3.0e-6],

@@ -1,0 +1,37 @@
+BENCH_BEGIN cuda-n512-t4
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:23[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:15[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:19[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:12[K
+MODEL nSpec=512 nLayers=5 operator=6 full_columns=14 selected_columns=4
+PARITY forward=5.551115123125783e-17 selected_radiance=0.0 selected_jacobian=0.0
+MEASURE cuda-n512-t4 build_forward median_seconds=0.005581123 median_host_bytes=4.113704e6 median_gc_seconds=0.0 samples=[(time = 0.006968641, bytes = 4112776, gctime = 0.0), (time = 0.005581123, bytes = 4113752, gctime = 0.0), (time = 0.005251102, bytes = 4113704, gctime = 0.0)]
+MEASURE cuda-n512-t4 build_full median_seconds=0.105860723 median_host_bytes=9.0158704e7 median_gc_seconds=0.0 samples=[(time = 0.106436635, bytes = 90158880, gctime = 0.0), (time = 0.100389256, bytes = 90158704, gctime = 0.0), (time = 0.105860723, bytes = 90158704, gctime = 0.0)]
+MEASURE cuda-n512-t4 build_fixed_microphysics median_seconds=0.007324921 median_host_bytes=9.144488e6 median_gc_seconds=0.0 samples=[(time = 0.008376178, bytes = 9144488, gctime = 0.0), (time = 0.007324921, bytes = 9144488, gctime = 0.0), (time = 0.007084259, bytes = 9144488, gctime = 0.0)]
+MEASURE cuda-n512-t4 solve_forward median_seconds=3.119534441 median_host_bytes=2.532033288e9 median_gc_seconds=0.619309454 samples=[(time = 3.179181941, bytes = 2532033288, gctime = 0.636570575), (time = 3.082298985, bytes = 2532037816, gctime = 0.603508646), (time = 3.119534441, bytes = 2532012008, gctime = 0.619309454)]
+MEASURE cuda-n512-t4 solve_full median_seconds=3.377247857 median_host_bytes=4.258058e8 median_gc_seconds=0.0 samples=[(time = 3.711657271, bytes = 427745320, gctime = 0.087649477), (time = 3.377247857, bytes = 425805800, gctime = 0.0), (time = 3.217062757, bytes = 425668168, gctime = 0.0)]
+MEASURE cuda-n512-t4 solve_selected median_seconds=0.954757375 median_host_bytes=9.7906184e7 median_gc_seconds=0.0 samples=[(time = 0.954757375, bytes = 98709280, gctime = 0.0), (time = 0.946247005, bytes = 97896872, gctime = 0.0), (time = 0.963224725, bytes = 97906184, gctime = 0.0)]
+RATIO full_forward=1.0826127811294135 full_selected=3.5372838643953917
+TIMER_BREAKDOWN_FULL cuda-n512-t4
+───────────────────────────────────────────────────────────────────────────────────
+                                          Time                    Allocations
+                                 ───────────────────────   ────────────────────────
+        Tot / % measured:             5.76s /  50.9%            551MiB /  67.5%
+
+Section                  ncalls     time    %tot     avg     alloc    %tot      avg
+───────────────────────────────────────────────────────────────────────────────────
+doubling                     25    1.99s   68.0%  79.8ms    153MiB   41.2%  6.13MiB
+  getri_strided             165   5.08ms    0.2%  30.8μs    445KiB    0.1%  2.70KiB
+  getrf_strided             165   3.94ms    0.1%  23.9μs    289KiB    0.1%  1.75KiB
+interaction                  25    601ms   20.5%  24.0ms   47.0MiB   12.6%  1.88MiB
+  interaction inv1           25   2.75ms    0.1%   110μs    189KiB    0.0%  7.55KiB
+    getri_strided            25    762μs    0.0%  30.5μs   67.2KiB    0.0%  2.69KiB
+    getrf_strided            25    624μs    0.0%  25.0μs   43.8KiB    0.0%  1.75KiB
+  interaction inv2           25   2.52ms    0.1%   101μs    189KiB    0.0%  7.55KiB
+    getri_strided            25    789μs    0.0%  31.6μs   67.2KiB    0.0%  2.69KiB
+    getrf_strided            25    593μs    0.0%  23.7μs   43.8KiB    0.0%  1.75KiB
+OpticalProps                 30    311ms   10.6%  10.4ms    128MiB   34.3%  4.25MiB
+elemental                    25   16.0ms    0.5%   641μs   1.09MiB    0.3%  44.7KiB
+Creating layers               3   8.79ms    0.3%  2.93ms   42.0MiB   11.3%  14.0MiB
+OpticalProps invariant        1   2.11ms    0.1%  2.11ms   1.09MiB    0.3%  1.09MiB
+Creating arrays               1    235μs    0.0%   235μs   4.30KiB    0.0%  4.30KiB
+───────────────────────────────────────────────────────────────────────────────────
+BENCH_DONE cuda-n512-t4

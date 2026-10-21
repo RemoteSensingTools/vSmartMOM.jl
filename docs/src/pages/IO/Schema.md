@@ -11,12 +11,20 @@ top-level block has its own detail page.
 | Block                                         | Required | Purpose |
 |-----------------------------------------------|:--------:|---------|
 | [`radiative_transfer`](Schema/radiative_transfer.md) | ✓ | RT solver, quadrature, polarization, Fourier resolution (v0.7 `nstreams` knob), truncation |
-| [`geometry`](Schema/geometry.md)              | ✓        | SZA, VZA(s), VAZ(s), observer altitude |
+| [`geometry`](Schema/geometry.md)              | ✓        | SZA, VZA(s), VAZ(s), observer heights and output levels |
 | [`atmospheric_profile`](Schema/atmospheric_profile.md) | ✓ | T, p, q, profile reduction |
-| [`absorption`](Schema/absorption.md)          | ◯        | Gas absorption: VMRs, broadening, HITRAN edition pointer |
+| [`absorption`](Schema/absorption.md)          | ◯        | Gas absorption: molecules, VMRs, broadening, LUT/CIA/MT_CKD files (omit the block for no gas absorption) |
 | [`scattering`](Schema/aerosols.md)            | ◯        | Mie aerosol size distribution, phase-function, decomposition |
-| `canopy` *(forthcoming)*                      | ◯        | Vegetation canopy + soil composite surface — page not yet authored |
+| [`canopy`](Schema/canopy.md)                  | ◯        | Vegetation canopy + soil composite surface (wraps `surface:`) |
 | `sources` (programmatic only)                 | ◯        | See [`Schema/sources.md`](Schema/sources.md) — set via `model_from_parameters(...; sources=...)` for now |
+
+Other top-level keys, and keys inside `radiative_transfer` and `geometry`
+that the parser does not read (typically a misspelling such as `nstream`),
+are not errors: each triggers a one-time warning per session listing the
+known keys, and any default stays in effect. An optional `_metadata` mapping
+is accepted for provenance and ignored. Keys containing Unicode (`Δ_angle`,
+`λ_ref`, `τ_ref`, ...) must be quoted in TOML, and TOML arrays may mix
+integers and floats (`vza = [60, 45.5]`), as YAML arrays can.
 
 The `surface:` field inside `radiative_transfer` has its own
 detailed page at [`Schema/surface.md`](Schema/surface.md) covering
@@ -32,8 +40,15 @@ resolution knob:
 radiative_transfer:
   nstreams: 8           # weighted streams per hemisphere
                         # public contract: stream_l_cap = 2·nstreams - 1
+  greek_beta_cutoff: 1e-5 # optional beta-only effective aerosol support
   truncation: auto      # NoTruncation if phase fits, δBGE otherwise
 ```
+
+For aerosols, `greek_beta_cutoff` is evaluated after Mie integration over the
+size distribution. It selects the last order satisfying `abs(β_l) >= cutoff`
+at any wavelength in the band; it never tests the other Greek families. See
+[`radiative_transfer.md`](Schema/radiative_transfer.md) for the complete
+two-stage `m_max` evaluation and cap precedence.
 
 Legacy `max_m` / `l_trunc` configs **continue to work**; the parser
 detects the legacy schema by the presence of either field and applies
@@ -104,7 +119,6 @@ radiative_transfer:
   surface:
     - LambertianSurfaceScalar(0.0)
   polarization_type: Stokes_IQU()
-  Δ_angle: 2.0
   depol: 0.0
   float_type: Float64
   architecture: Architectures.CPU()
@@ -116,7 +130,7 @@ geometry:
   sza: 30
   vza: [10, 20, 40]
   vaz: [0, 0, 0]
-  obs_alt: 1000.0
+  obs_alt: [0]          # TOA upwelling + BOA downwelling
 
 atmospheric_profile:
   T: [260, 262, 264]

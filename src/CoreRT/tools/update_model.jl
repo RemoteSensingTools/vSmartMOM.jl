@@ -34,7 +34,7 @@ for scene in scenes
     update_model!(ctx;
         T      = scene.T,        # length-Nz temperature profile [K]
         p_half = scene.p_half,   # length-(Nz+1) half-level pressures [hPa]
-        q      = scene.q,        # length-Nz specific humidity [kg/kg]
+        q      = scene.q,        # length-Nz or -(Nz+1) specific humidity [kg/kg]
         vmr    = scene.vmr)      # Dict{String,Any} — same keys as params.absorption_params.vmr
     R, T = rt_run(ctx.model)
     # ... process R, T ...
@@ -70,11 +70,19 @@ shared arrays and must **not** be called concurrently on the same `ctx`. If you
 run parallel scenes, create one `BatchContext` per worker thread (each
 `BatchContext` owns its own `RTModel` with independent mutable arrays).
 
+!!! warning "Derived caches do not survive updates"
+    An [`AtmosphereRTCache`](@ref) built from `ctx.model` (via
+    [`rt_run_atmosphere`](@ref)) snapshots the optics at build time — every
+    `update_model!` / `update_aerosol_*!` call invalidates it (and any
+    [`LambertianClosure`](@ref) derived from it). Rebuild such caches after
+    each scene update, never reuse them across updates. See the
+    [Fast Re-runs & Batch Processing](@ref) guide.
+
 # Fields
 
 - `model`: the [`RTModel`](@ref) that is updated in place by `update_model!`
-- `params`: the original `vSmartMOM_Parameters` used for construction (kept for
-  meta-information such as molecule lists, YAML knobs, float type)
+- `params`: an owned parameter copy for molecule lists, configuration and
+  float type. Loaded LUT payloads are shared read-only with the caller.
 - `absorption_models`: cached `AtmosphericAbsorption.LineByLineModel` objects,
   one per `(band, species)` pair — eliminates HITRAN re-parsing per scene
 - `h2o_models`: cached H₂O `LineByLineModel` per band (`nothing` only when the
@@ -95,26 +103,35 @@ run parallel scenes, create one `BatchContext` per worker thread (each
   `params` and written by both `update_aerosol_loading!` and
   `update_aerosol_microphysics!`. `update_model!`'s τ_aer redistribution reads
   these so a prior loading update is not silently wiped.
+- `input_sources`: the user-supplied source tree on the unreframed input grid;
+  vertically resolved fields are re-interpolated from this stable copy on each
+  scene update (avoids cumulative interpolation drift).
+- `scratch_τ_abs`, `scratch_τ_rayl`, `scratch_τ_aer`: context-owned trial
+  optical-depth arrays. `update_model!` prepares a complete candidate scene in
+  these reusable buffers before committing it to the live model.
 - `n_bands`, `n_aerosols`, `Nz`: scene-invariant dimension bookmarks
-- `profile_reduction_n`: reduction target passed to `reduce_profile`; `-1` means
-  no reduction
+- `profile_reduction_n`: reduction target passed to the anchored
+  `prepare_observer_profile` path; `-1` means no reduction
 """
 mutable struct BatchContext
     "The RTModel updated in place by update_model!"
     model::RTModel
-    "Original parameters used to build this context"
+    "Owned construction parameters; loaded LUT payloads are shared read-only"
     params::vSmartMOM_Parameters
     "Cached LineByLineModel per (band, species index in all_species list)"
     absorption_models::Vector{Vector{Any}}      # [i_band][molec_i]
     "Cached H₂O LineByLineModel per band (nothing only when no absorption_params)"
     h2o_models::Vector{Any}                     # [i_band]
-    "Reference-wavelength extinction coefficient per aerosol species (Phase 2)"
+    """Reference-wavelength extinction coefficient per aerosol species.
+    Stored at Float64 (full Mie precision, independent of the model float
+    type); every consumer converts with `FT(...)` at the point of use so no
+    Float64 temporaries leak into FT arithmetic."""
     k_ref::Vector{Float64}
-    "Current unreduced temperature profile [K] (FT-converted)"
+    "Current unreduced temperature profile in K (FT-converted)"
     current_T::Vector
-    "Current unreduced half-level pressures [hPa] (FT-converted)"
+    "Current unreduced half-level pressures in hPa (FT-converted)"
     current_p_half::Vector
-    "Current unreduced specific humidity [kg/kg] (FT-converted)"
+    "Current unreduced specific humidity in kg/kg (FT-converted)"
     current_q::Vector
     "Current trace-gas VMR overrides (merged over params.absorption_params.vmr)"
     current_vmr::Dict{String, Any}
@@ -122,34 +139,58 @@ mutable struct BatchContext
     current_τ_ref::Vector
     "Current vertical pressure distribution per aerosol species"
     current_profile_dist::Vector{Any}
+    "Original source inputs on the unreframed atmospheric grid"
+    input_sources::AbstractSource
+    "Reusable trial absorption optical depths"
+    scratch_τ_abs::Vector
+    "Reusable trial Rayleigh optical depths"
+    scratch_τ_rayl::Vector
+    "Reusable trial aerosol optical depths"
+    scratch_τ_aer::Vector
     "Number of spectral bands (scene-invariant)"
     n_bands::Int
     "Number of aerosol species (scene-invariant)"
     n_aerosols::Int
-    "Number of atmospheric layers after profile reduction (scene-invariant)"
+    "Number of atmospheric layers after observer reframing/reduction (scene-invariant)"
     Nz::Int
     "Profile reduction target (-1 = no reduction)"
     profile_reduction_n::Int
 end
 
 """
-    BatchContext(params::vSmartMOM_Parameters; sources::AbstractSource = SolarBeam()) -> BatchContext
+    BatchContext(params::vSmartMOM_Parameters;
+                 sources::AbstractSource = SolarBeam(),
+                 external_solar::Bool = false) -> BatchContext
 
 Build a `BatchContext` from the given parameters.
 
-This is the **expensive** constructor: it calls `model_from_parameters(params)`
-(which runs Mie, builds the aerosol optics, and reads HITRAN files), then
-caches the `AtmosphericAbsorption.LineByLineModel` objects so that subsequent
-[`update_model!`](@ref) calls can skip HITRAN re-parsing entirely.
+Profiles and configuration containers are copied; large absorption LUT payloads
+are shared read-only via [`copy_parameters`](@ref). Do not mutate shared table
+coefficients, grids or metadata while the context is in use.
 
-Keyword argument `sources` is forwarded to `model_from_parameters`.
+This constructor calls `model_from_parameters(params)` to prepare Mie optics
+and absorption, then retains `AtmosphericAbsorption.LineByLineModel` objects
+for subsequent [`update_model!`](@ref) calls. Both steps share the process-local
+parsed HITRAN cache; only the first request for a file/type parses its data.
+
+Keyword arguments `sources` and `external_solar` are forwarded to
+`model_from_parameters`; pass `external_solar=true` when the batched scenes
+are consumed through the TOA-only fast path [`rt_run_toa`](@ref).
 """
 function BatchContext(params::vSmartMOM_Parameters;
-                      sources::AbstractSource = SolarBeam())
+                      sources::AbstractSource = SolarBeam(),
+                      external_solar::Bool = false)
+    params = copy_parameters(params; share_luts=true)
     FT = params.float_type
 
     # ── 1. Build the full RTModel (expensive; done once) ───────────────────
-    model = model_from_parameters(params; sources)
+    # With no reduction, profile preparation retains its input arrays. Build
+    # from an owned parameter copy so caller mutation cannot bypass
+    # `update_model!` and alter the live model. Large LUT payloads are shared
+    # read-only; profiles, configuration containers and source inputs are owned.
+    input_sources = deepcopy(sources)
+    model = model_from_parameters(params; sources=deepcopy(input_sources),
+                                  external_solar)
 
     n_bands    = length(params.spec_bands)
     n_aerosols = isnothing(params.scattering_params) ? 0 :
@@ -174,8 +215,7 @@ function BatchContext(params::vSmartMOM_Parameters;
 
         for (molec_i, mol_name) in enumerate(all_species)
             if isempty(ap.luts)
-                lines = AtmosphericAbsorption.load_lines(
-                    AtmosphericAbsorption.HitranPort(artifact(mol_name)); FT)
+                lines = _hitran_lines(mol_name, FT)
                 absorption_model = AtmosphericAbsorption.LineByLineModel(lines;
                     profile      = ap.broadening_function,
                     wing_cutoff  = ap.wing_cutoff,
@@ -200,11 +240,12 @@ function BatchContext(params::vSmartMOM_Parameters;
         # branch in model_from_parameters. We are already inside the
         # `isnothing(params.absorption_params) && continue` guard above, so
         # absorption is configured here.
-        if ap.h2o_lut[i_band] !== nothing
+        if ap.h2o_lut[i_band] === :disabled
+            h2o_models[i_band] = nothing
+        elseif ap.h2o_lut[i_band] !== nothing
             h2o_models[i_band] = ap.h2o_lut[i_band]
         else
-            lines_h2o = AtmosphericAbsorption.load_lines(
-                AtmosphericAbsorption.HitranPort(artifact("H2O")); FT)
+            lines_h2o = _hitran_lines("H2O", FT)
             h2o_models[i_band] = AtmosphericAbsorption.LineByLineModel(lines_h2o;
                 profile      = ap.broadening_function,
                 wing_cutoff  = ap.wing_cutoff,
@@ -241,7 +282,8 @@ function BatchContext(params::vSmartMOM_Parameters;
                                                 params.polarization_type,
                                                 truncation_type,
                                                 params.scattering_params.r_max,
-                                                params.scattering_params.nquad_radius)
+                                                params.scattering_params.nquad_radius;
+                                                r_min = params.scattering_params.r_min)
                 push!(k_ref_vec, Float64(compute_ref_aerosol_extinction(mie_model_ref, FT)))
             end
         end
@@ -252,12 +294,13 @@ function BatchContext(params::vSmartMOM_Parameters;
     # with. `nothing` keyword arguments fall back to these (never to params),
     # so successive partial updates compose. Store already FT-converted so
     # repeated updates do not re-convert or drift.
-    current_T      = convert(Vector{FT}, params.T)
-    current_p_half = convert(Vector{FT}, params.p)
-    current_q      = convert(Vector{FT}, params.q)
+    current_T      = collect(FT, params.T)
+    current_p_half = collect(FT, params.p)
+    current_q      = _layer_centered_input(
+        "specific humidity", collect(FT, params.q), current_p_half)
     current_vmr    = isnothing(params.absorption_params) ?
                      Dict{String, Any}() :
-                     Dict{String, Any}(params.absorption_params.vmr)
+                     _owned_scene_vmr(FT, params.absorption_params.vmr)
 
     # ── 5. Initialise current per-aerosol loading state from params (B4) ───
     # update_aerosol_loading! and update_aerosol_microphysics! write these;
@@ -277,7 +320,21 @@ function BatchContext(params::vSmartMOM_Parameters;
                         k_ref_vec,
                         current_T, current_p_half, current_q, current_vmr,
                         current_τ_ref, current_profile_dist,
+                        input_sources,
+                        map(similar, model.optics.τ_abs),
+                        map(similar, model.optics.τ_rayl),
+                        map(similar, model.optics.aerosols.τ_aer),
                         n_bands, n_aerosols, Nz, profile_reduction_n)
+end
+
+"Make an FT-converted, caller-independent copy of unreduced scene VMR inputs."
+function _owned_scene_vmr(::Type{FT}, vmr) where {FT}
+    owned = Dict{String, Any}()
+    for (name, value) in vmr
+        owned[string(name)] = value isa AbstractVector ? collect(FT, value) :
+                              value isa Real ? FT(value) : deepcopy(value)
+    end
+    return owned
 end
 
 # ============================================================================
@@ -320,8 +377,8 @@ function _compute_band_absorption!(τ_abs_band, absorption_models_band, h2o_mode
 
     # H₂O line absorption (driven by q / vmr_h2o)
     if q_nonzero && h2o_model !== nothing
-        compute_absorption_profile!(τ_abs_band, h2o_model, spec_band,
-                                    profile.vmr_h2o, profile)
+        compute_h2o_absorption_profile!(τ_abs_band, h2o_model, spec_band,
+                                        profile)
     end
 end
 
@@ -361,6 +418,11 @@ their last value. The merged overrides are then layered over the configured
 defaults exactly as `model_from_parameters` does.
 
 After this call `rt_run(ctx.model)` will produce radiances for the new scene.
+Candidate profiles and optical properties are prepared in detached storage. If
+validation, interpolation, spectroscopy, or continuum loading throws, the live
+model and remembered scene remain at the last successful state and are safe to
+use or retry. Caller-owned arrays are copied; mutating them after a successful
+call does not mutate the context.
 
 # Keyword arguments
 
@@ -370,11 +432,13 @@ After this call `rt_run(ctx.model)` will produce radiances for the new scene.
 - `p_half::AbstractVector`: Half-level pressures [hPa], length `Nz + 1` (or
   `N_orig + 1` before reduction). Must be strictly positive and monotonically
   increasing (TOA to BOA, i.e. `p_half[end]` is surface pressure).
-- `q::AbstractVector`: Specific humidity [kg/kg], length `Nz` (or `N_orig`).
+- `q::AbstractVector`: Specific humidity [kg/kg], with either `Nz` layer-center
+  values or `Nz + 1` interface values on the unreframed input grid.
 - `vmr::Dict{String,Any}`: Trace-gas volume mixing ratios. **Keys must be a
   subset of the configured molecules** — supplying an unknown species key raises
   an error (add it to `params.absorption_params.vmr` and rebuild the context
-  instead). Values may be scalars or length-`Nz` vectors.
+  instead). Values may be scalars, length-`Nz` layer vectors, or length-`Nz+1`
+  interface vectors.
 
 # Thread safety
 
@@ -412,7 +476,8 @@ function update_model!(ctx::BatchContext;
 
     # ── 0. Validate and merge inputs ────────────────────────────────────────
     # The public API always accepts **unreduced** profile inputs (i.e. the
-    # same length as params.T / params.p / params.q). This is necessary for
+    # same atmospheric grid as params.T / params.p; interface-defined q is
+    # normalized to layer centers). This is necessary for
     # partial updates: if the user supplies only T (no p_half), we fall back to
     # the CURRENT stored scene value (unreduced) — NOT the original params — so
     # that successive partial updates compose incrementally (true incremental
@@ -423,20 +488,21 @@ function update_model!(ctx::BatchContext;
     #
     # Rule: if a field is `nothing`, use the current stored value (unreduced);
     # otherwise convert the supplied value to FT.
-    T_new      = T      === nothing ? ctx.current_T      : convert(Vector{FT}, T)
-    q_new      = q      === nothing ? ctx.current_q      : convert(Vector{FT}, q)
-    p_half_new = p_half === nothing ? ctx.current_p_half : convert(Vector{FT}, p_half)
+    # Work on detached candidate arrays. This both supports the failure-state
+    # guarantee and prevents successful updates from retaining caller aliases.
+    p_half_new = p_half === nothing ? copy(ctx.current_p_half) : collect(FT, p_half)
+    T_new      = T      === nothing ? copy(ctx.current_T)      : collect(FT, T)
+    q_input    = q      === nothing ? copy(ctx.current_q)      : collect(FT, q)
+    q_new      = _layer_centered_input("specific humidity", q_input, p_half_new)
 
-    # Validate p_half length: it must be Nz+1 (post-reduction) or N_orig
-    # (params.p is already the half-level array; it has length Nz_orig + 1,
-    #  which equals length(params.T) + 1 — the same thing as length(params.p)).
-    n_half_ok = (length(p_half_new) == ctx.Nz + 1) ||
-                (ctx.profile_reduction_n != -1 && length(p_half_new) == length(params.p))
+    # Public scene inputs always live on the original, unreframed grid. The
+    # final model can have additional observer interfaces even when profile
+    # reduction is disabled, so validating against `ctx.Nz + 1` would reject
+    # exactly the interior-height case this API must support.
+    n_half_ok = length(p_half_new) == length(params.p)
     n_half_ok || error(
         "update_model!: p_half length $(length(p_half_new)) does not match " *
-        "expected Nz+1 = $(ctx.Nz + 1)" *
-        (ctx.profile_reduction_n != -1 ?
-            " or unreduced length $(length(params.p))" : ""))
+        "the unreframed input-grid length $(length(params.p))")
 
     # T and q must match p_half (they are full-level quantities: length(p_half) - 1)
     n_T_expect = length(p_half_new) - 1
@@ -475,60 +541,57 @@ function update_model!(ctx::BatchContext;
     vmr_merged = if isnothing(ap)
         Dict{String, Any}()
     else
-        d = Dict{String, Any}(ctx.current_vmr)
+        d = _owned_scene_vmr(FT, ctx.current_vmr)
         if vmr !== nothing
             for (k, v) in vmr
-                d[k] = v
+                d[k] = v isa AbstractVector ? collect(FT, v) :
+                       v isa Real ? FT(v) : deepcopy(v)
             end
         end
         d
     end
 
-    # compute_atmos_profile_fields: same call as in model_from_parameters
-    p_full_new, p_half_out, vmr_h2o_new, vcd_dry_new, vcd_h2o_new, new_vmr, Δz_new =
-        compute_atmos_profile_fields(T_new, p_half_new, q_new, vmr_merged)
+    # Use the same height-aware framing path as initial model construction.
+    # This inserts each strict-interior H as an exact interface, preserves it
+    # through profile reduction, and recomputes every derived vertical field.
+    obs_alt = params.obs_alt isa Real ? FT(params.obs_alt) :
+              convert(Vector{FT}, params.obs_alt)
+    new_profile, observation = prepare_observer_profile(
+        T_new, p_half_new, q_new, vmr_merged, obs_alt,
+        ctx.profile_reduction_n)
 
-    new_profile_unreduced = AtmosphericProfile(
-        T_new, p_full_new, q_new, p_half_out, vmr_h2o_new,
-        vcd_dry_new, vcd_h2o_new, new_vmr, Δz_new)
-
-    # Apply profile reduction if needed
-    new_profile = if ctx.profile_reduction_n != -1
-        reduce_profile(ctx.profile_reduction_n, new_profile_unreduced)
-    else
-        new_profile_unreduced
-    end
+    # Reframe per-layer source inputs from the current scene's input pressure
+    # coordinate. Always start from the stable original source values stored on
+    # the context, not the previously interpolated model copy.
+    input_p_full = (p_half_new[1:end-1] .+ p_half_new[2:end]) ./ FT(2)
+    new_sources = reframe_vertical_sources(
+        ctx.input_sources, input_p_full, new_profile.p_full)
 
     Nz_new = length(new_profile.p_full)
     Nz_new == ctx.Nz || error(
-        "update_model!: profile reduction produced Nz=$Nz_new layers but " *
+        "update_model!: observer-profile framing produced Nz=$Nz_new layers but " *
         "BatchContext was built with Nz=$(ctx.Nz). This should not happen; " *
         "check that p_half spans the same column.")
 
-    # Copy new profile into the existing profile arrays in-place.
-    # RTModel/Atmosphere structs are immutable but every leaf Array is mutable.
-    cur = profile_cur
-    cur.T       .= new_profile.T
-    cur.p_full  .= new_profile.p_full
-    cur.q       .= new_profile.q
-    cur.p_half  .= new_profile.p_half
-    cur.vmr_h2o .= new_profile.vmr_h2o
-    cur.vcd_dry .= new_profile.vcd_dry
-    cur.vcd_h2o .= new_profile.vcd_h2o
-    cur.Δz      .= new_profile.Δz
-    # VMR dict: scalar values or vectors are updated key-by-key
-    for (k, v) in new_profile.vmr
-        if haskey(cur.vmr, k)
-            if cur.vmr[k] isa AbstractArray && v isa AbstractArray
-                cur.vmr[k] .= v
-            else
-                # scalar or mixed: just replace (Dict is mutable)
-                cur.vmr[k] = v
-            end
-        else
-            cur.vmr[k] = v
-        end
-    end
+    length(observation.sensor_levels) == length(model.geometry.sensor_levels) ||
+        error("update_model!: observer-interface count changed; rebuild BatchContext")
+    observation.include_toa == model.geometry.include_toa ||
+        error("update_model!: TOA output selection changed; rebuild BatchContext")
+    observation.include_boa == model.geometry.include_boa ||
+        error("update_model!: BOA output selection changed; rebuild BatchContext")
+
+    # Validate the source-tree copy before any live state is changed. Every
+    # derived quantity below is then prepared in detached storage and committed
+    # only after all bands and optional continuum loaders succeed.
+    _validate_vertical_source_copy(model.sources, new_sources)
+    trial_τ_rayl = ctx.scratch_τ_rayl
+    trial_τ_aer = ctx.scratch_τ_aer
+    trial_τ_abs = ctx.scratch_τ_abs
+    trial_ϖ_Cabannes = copy(model.optics.rayleigh.ϖ_Cabannes)
+    trial_greek_cabannes = copy(model.optics.rayleigh.greek_cabannes)
+    trial_greek_rayleigh = model.optics.rayleigh.greek_rayleigh isa AbstractVector ?
+                           copy(model.optics.rayleigh.greek_rayleigh) :
+                           model.optics.rayleigh.greek_rayleigh
 
     # ── 2. Recompute τ_rayl in place per band ──────────────────────────────
     # Use the same depol logic as model_from_parameters — including the SAME
@@ -543,12 +606,8 @@ function update_model!(ctx::BatchContext;
 
         νₘ  = FT(0.5) * (params.spec_bands[i_band][1] + params.spec_bands[i_band][end])
         λₘ  = FT(1.0e7) / νₘ
-        _n2, _o2 = InelasticScattering.getRamanAtmoConstants(FT(1.0e7) / λₘ, FT(rayleigh_molecular_T))
-        ϖ_Cab         = InelasticScattering.compute_ϖ_Cabannes(λₘ, _n2, _o2)
-        γ_air_Cab, _  = InelasticScattering.compute_γ_air_Cabannes!(λₘ, _n2, _o2)
-        γ_air_Ray, _  = InelasticScattering.compute_γ_air_Rayleigh!(λₘ, _n2, _o2)
-        depol_air_Cab = 2γ_air_Cab / (1 + γ_air_Cab)
-        depol_air_Ray = 2γ_air_Ray / (1 + γ_air_Ray)
+        ϖ_Cab, depol_air_Cab, depol_air_Ray = _auto_molecular_depolarizations(
+            params.rayleigh_anisotropy, λₘ, FT(rayleigh_molecular_T))
         depol_use_Cab = params.depol < 0 ? FT(depol_air_Cab) : FT(params.depol)
         depol_use_Ray = params.depol < 0 ? FT(depol_air_Ray) : FT(params.depol)
 
@@ -559,13 +618,13 @@ function update_model!(ctx::BatchContext;
         # Mirrors model_from_parameters. greek_cabannes/ϖ_Cabannes are always
         # per-band vectors; greek_rayleigh is per-band when built via
         # model_from_parameters (always true for a BatchContext).
-        model.optics.rayleigh.ϖ_Cabannes[i_band]     = FT(ϖ_Cab)
-        model.optics.rayleigh.greek_cabannes[i_band] = Scattering.get_greek_rayleigh(depol_use_Cab)
-        if model.optics.rayleigh.greek_rayleigh isa AbstractVector
-            model.optics.rayleigh.greek_rayleigh[i_band] = Scattering.get_greek_rayleigh(depol_use_Ray)
+        trial_ϖ_Cabannes[i_band] = FT(ϖ_Cab)
+        trial_greek_cabannes[i_band] = Scattering.get_greek_rayleigh(depol_use_Cab)
+        if trial_greek_rayleigh isa AbstractVector
+            trial_greek_rayleigh[i_band] = Scattering.get_greek_rayleigh(depol_use_Ray)
         end
 
-        model.optics.τ_rayl[i_band] .= getRayleighLayerOptProp(
+        trial_τ_rayl[i_band] .= getRayleighLayerOptProp(
             new_profile.p_half[end],
             curr_band_λ,
             depol_use_Ray,
@@ -591,16 +650,18 @@ function update_model!(ctx::BatchContext;
                 for i_band in 1:ctx.n_bands
                     # τ_aer is now 3-D [iAer, nSpec, iLayer]; analytic aerosols
                     # have no k(λ) dependence — broadcast τ_eff * τ_profile across nSpec.
-                    model.optics.aerosols.τ_aer[i_band][i_aer, :, :] .= τ_eff .* τ_profile'
+                    trial_τ_aer[i_band][i_aer, :, :] .= τ_eff .* τ_profile'
                 end
             else
                 for i_band in 1:ctx.n_bands
                     # k_aer may be a scalar (single-λ band) or nSpec vector (multi-λ band).
                     k_aer = model.optics.aerosols.aerosol_optics[i_band][i_aer].k
                     τ_profile = getAerosolLayerOptProp(one(FT), dist, new_profile)
-                    # k_aer .* τ_profile' broadcasts to (nSpec × nLayers).
-                    model.optics.aerosols.τ_aer[i_band][i_aer, :, :] .=
-                        (τ_eff / k_ref_aer) .* k_aer .* τ_profile'
+                    # Shared with the fresh model build — bit-exact by construction.
+                    trial_τ_aer[i_band][i_aer, :, :] .=
+                        _aerosol_τ_slice(τ_eff, k_aer, FT(k_ref_aer), τ_profile,
+                                         FT.(params.spec_bands[i_band]),
+                                         FT(1e4) / params.scattering_params.λ_ref)
                 end
             end
         end
@@ -615,7 +676,7 @@ function update_model!(ctx::BatchContext;
         q_nonzero = any(!iszero, q_new)
         for i_band in 1:ctx.n_bands
             # Zero entire band τ_abs (gas lines + CIA + continuum all live here)
-            fill!(model.optics.τ_abs[i_band], zero(FT))
+            fill!(trial_τ_abs[i_band], zero(FT))
 
             all_species = vcat(ap.fixed_molecules[i_band], ap.variable_molecules[i_band])
 
@@ -623,7 +684,7 @@ function update_model!(ctx::BatchContext;
             # The helper iterates absorption_models_band (cached LineByLine/LUT
             # objects) in the same order as all_species.
             _compute_band_absorption!(
-                model.optics.τ_abs[i_band],
+                trial_τ_abs[i_band],
                 ctx.absorption_models[i_band],
                 ctx.h2o_models[i_band],
                 params.spec_bands[i_band],
@@ -638,11 +699,11 @@ function update_model!(ctx::BatchContext;
             # vmr changes exactly as a fresh model_from_parameters build with the
             # changed vmr would. compute_τ_cia! falls back to USS defaults for
             # any collider species absent from the dict.
-            for cia_path in ap.cia_files
-                cia_table = Absorption.load_cia_table(
-                    cia_path, params.spec_bands[i_band]; FT)
+            for (cia_i, cia_path) in enumerate(ap.cia_files)
+                cia_table = _load_configured_cia_table(
+                    ap, cia_i, params.spec_bands[i_band], FT)
                 Absorption.compute_τ_cia!(
-                    model.optics.τ_abs[i_band], cia_table, new_profile,
+                    trial_τ_abs[i_band], cia_table, new_profile,
                     new_profile.vmr)
             end
 
@@ -650,22 +711,62 @@ function update_model!(ctx::BatchContext;
             if !isempty(ap.mtckd_file)
                 mtckd_table = Absorption.load_mtckd(ap.mtckd_file)
                 Absorption.compute_τ_h2o_continuum!(
-                    model.optics.τ_abs[i_band], mtckd_table,
+                    trial_τ_abs[i_band], mtckd_table,
                     params.spec_bands[i_band], new_profile, new_profile.vmr_h2o)
             end
         end
     end
 
-    # ── 5. Persist the current scene state (B3) ─────────────────────────────
-    # Only reached after all validation passed and the model was updated, so a
-    # failed call leaves the stored state untouched. Store already FT-converted,
-    # unreduced vectors so the next partial update composes without re-converting
-    # or drifting. (T_new/q_new/p_half_new are either the FT-converted supplied
-    # values or the previously-stored current values — already FT.)
-    ctx.current_T      = T_new
-    ctx.current_q      = q_new
-    ctx.current_p_half = p_half_new
-    ctx.current_vmr    = vmr_merged
+    # ── 5. Commit the fully prepared scene ──────────────────────────────────
+    # Preserve the RTModel and leaf-array identities promised by the batch API.
+    # No fallible scientific preparation remains below this point.
+    cur = profile_cur
+    cur.T       .= new_profile.T
+    cur.p_full  .= new_profile.p_full
+    cur.q       .= new_profile.q
+    cur.p_half  .= new_profile.p_half
+    cur.vmr_h2o .= new_profile.vmr_h2o
+    cur.vcd_dry .= new_profile.vcd_dry
+    cur.vcd_h2o .= new_profile.vcd_h2o
+    cur.Δz      .= new_profile.Δz
+    for (k, v) in new_profile.vmr
+        if haskey(cur.vmr, k) && cur.vmr[k] isa AbstractArray && v isa AbstractArray
+            cur.vmr[k] .= v
+        else
+            cur.vmr[k] = v isa AbstractArray ? copy(v) : v
+        end
+    end
+
+    # The same geometric height can move to a different interface index when
+    # pressure/temperature changes. Commit its newly resolved metadata and any
+    # vertically reframed source values with the profile.
+    model.geometry.sensor_levels .= observation.sensor_levels
+    model.geometry.sensor_altitudes .= observation.interior_altitudes
+    model.geometry.include_toa = observation.include_toa
+    model.geometry.include_boa = observation.include_boa
+    model.geometry.toa_altitude = observation.toa_altitude
+    _copy_vertical_sources!(model.sources, new_sources)
+
+    model.optics.rayleigh.ϖ_Cabannes .= trial_ϖ_Cabannes
+    model.optics.rayleigh.greek_cabannes .= trial_greek_cabannes
+    if model.optics.rayleigh.greek_rayleigh isa AbstractVector
+        model.optics.rayleigh.greek_rayleigh .= trial_greek_rayleigh
+    end
+    foreach((destination, source) -> destination .= source,
+            model.optics.τ_rayl, trial_τ_rayl)
+    if !isnothing(params.scattering_params)
+        foreach((destination, source) -> destination .= source,
+                model.optics.aerosols.τ_aer, trial_τ_aer)
+    end
+    if !isnothing(ap)
+        foreach((destination, source) -> destination .= source,
+                model.optics.τ_abs, trial_τ_abs)
+    end
+
+    ctx.current_T      = copy(T_new)
+    ctx.current_q      = copy(q_new)
+    ctx.current_p_half = copy(p_half_new)
+    ctx.current_vmr    = _owned_scene_vmr(FT, vmr_merged)
 
     return nothing
 end
@@ -674,28 +775,15 @@ end
 # Phase 2: aerosol-specific update functions
 # ============================================================================
 
-# ── Internal helper: re-derive and write SolverConfig Fourier bounds ─────────
-#
-# SolverConfig is an immutable struct.  Its three per-band VECTOR fields
-# (m_max_bands, n_fourier_moments_bands, l_max) are mutable Julia Arrays and
-# can be updated with .=.  The SCALAR fields (l_trunc, Δ_angle, depol,
-# polarization_type, quadrature_type, use_component_traits) are bits-immutable
-# and cannot be changed in-place.
-#
-# For all Phase-2 aerosol updates those scalar fields are guaranteed not to
-# change (they derive from params, not from per-aerosol optics), so this helper
-# only needs to rewrite the three Vector fields.  If a future caller tries to
-# change l_trunc or Δ_angle they must rebuild the entire model — this function
-# will @error and throw if it detects the values would need to change.
-function _rewrite_solver_fourier_bounds!(ctx::BatchContext)
+# Derive candidate Fourier bounds without mutating the live solver. Scalar
+# solver settings remain fixed; changing them requires a new BatchContext.
+function _updated_solver_fourier_bounds(ctx::BatchContext, ae_optics)
     model  = ctx.model
     params = ctx.params
     FT     = params.float_type
 
     n_bands   = ctx.n_bands
-    solver    = model.solver
     n_aer     = ctx.n_aerosols
-    ae_optics = model.optics.aerosols.aerosol_optics  # [i_band][i_aer]
 
     # Recompute l_max_aer exactly as model_from_parameters does.
     l_max_aer = zeros(Int, max(n_aer, 1), n_bands)
@@ -708,11 +796,11 @@ function _rewrite_solver_fourier_bounds!(ctx::BatchContext)
             l_max_aer[i_aer, i_band] =
                 if _has_analytic_phase_function(c_aero)
                     # analytic path: length of the stored greek series
-                    length(ao.greek_coefs.β)
+                    size(ao.greek_coefs.β, 1)
                 elseif truncation_type isa Scattering.δBGE
-                    min(length(ao.greek_coefs.β), truncation_type.l_max)
+                    min(size(ao.greek_coefs.β, 1), truncation_type.l_max)
                 else
-                    length(ao.greek_coefs.β)
+                    size(ao.greek_coefs.β, 1)
                 end
         end
     end
@@ -725,18 +813,17 @@ function _rewrite_solver_fourier_bounds!(ctx::BatchContext)
     end
 
     # Re-derive m_max_bands via the same trait aggregator as model_from_parameters.
-    components_per_band = [_band_components(params, ae_optics, model.sources, i_band)
+    components_per_band = [_band_components(params, ae_optics, model.sources, i_band;
+                                rayleigh_active=_rayleigh_active(
+                                    model.optics.τ_rayl[i_band]))
                            for i_band in 1:n_bands]
     new_m_max_bands = _derive_m_max_bands_via_traits(
-        new_l_max, params.max_m, components_per_band, model.quad_points.Nstreams)
+        new_l_max, params.max_m, components_per_band, model.quad_points.Nstreams;
+        greek_beta_cutoff=params.greek_beta_cutoff)
     new_n_fourier   = new_m_max_bands .+ 1
 
-    # Write back into the mutable Vector fields in-place.
-    solver.m_max_bands          .= new_m_max_bands
-    solver.n_fourier_moments_bands .= new_n_fourier
-    solver.l_max                .= new_l_max
-
-    return nothing
+    return (; m_max_bands=new_m_max_bands,
+              n_fourier_moments_bands=new_n_fourier, l_max=new_l_max)
 end
 
 """
@@ -753,6 +840,9 @@ recomputation is performed.
 After this call `rt_run(ctx.model)` produces radiances for the new aerosol
 loading.  All other model state (gas absorption, profile, surface) is
 unchanged.
+
+All bands are staged before committing. A failed calculation leaves live
+optics and remembered loading unchanged; scratch buffers may contain trial data.
 
 # Keyword arguments
 
@@ -803,30 +893,33 @@ function update_aerosol_loading!(ctx::BatchContext, i_aer::Int;
     τ_eff  = τ_ref === nothing ? ctx.current_τ_ref[i_aer] : FT(τ_ref)
     dist   = profile_dist === nothing ? ctx.current_profile_dist[i_aer] : profile_dist
 
-    # B4: persist the resolved loading so a later update_model! redistribution
-    # (and a later loading update that omits a field) sees it instead of the
-    # original params τ_ref / profile.
-    ctx.current_τ_ref[i_aer]        = τ_eff
-    ctx.current_profile_dist[i_aer] = dist
-
     k_ref_aer = ctx.k_ref[i_aer]
+    τ_profile = getAerosolLayerOptProp(one(FT), dist, profile)
 
     # Recompute τ_aer rows for all bands using the cached aerosol optics.
     # τ_aer is now 3-D [iAer, nSpec, iLayer]; k_aer may be scalar or nSpec vector.
     if _has_analytic_phase_function(c_aero)
-        τ_profile = getAerosolLayerOptProp(one(FT), dist, profile)
         for i_band in 1:ctx.n_bands
-            model.optics.aerosols.τ_aer[i_band][i_aer, :, :] .= τ_eff .* τ_profile'
+            ctx.scratch_τ_aer[i_band][i_aer, :, :] .= τ_eff .* τ_profile'
         end
     else
         for i_band in 1:ctx.n_bands
             k_aer     = model.optics.aerosols.aerosol_optics[i_band][i_aer].k
-            τ_profile = getAerosolLayerOptProp(one(FT), dist, profile)
-            model.optics.aerosols.τ_aer[i_band][i_aer, :, :] .=
-                (τ_eff / k_ref_aer) .* k_aer .* τ_profile'
+            # Shared with the fresh model build — bit-exact by construction.
+            ctx.scratch_τ_aer[i_band][i_aer, :, :] .=
+                _aerosol_τ_slice(τ_eff, k_aer, FT(k_ref_aer), τ_profile,
+                                 FT.(ctx.params.spec_bands[i_band]),
+                                 FT(1e4) / ctx.params.scattering_params.λ_ref)
         end
     end
 
+    # Commit only after every band has been prepared successfully.
+    for i_band in 1:ctx.n_bands
+        @views copyto!(model.optics.aerosols.τ_aer[i_band][i_aer, :, :],
+                       ctx.scratch_τ_aer[i_band][i_aer, :, :])
+    end
+    ctx.current_τ_ref[i_aer] = τ_eff
+    ctx.current_profile_dist[i_aer] = dist
     return nothing
 end
 
@@ -850,6 +943,9 @@ This updates:
 
 After this call `rt_run(ctx.model)` gives the same result as building a
 fresh model with the new aerosol.
+
+Mie optics, loading and Fourier bounds are prepared before committing. A failed
+calculation leaves the live model and remembered state unchanged.
 
 # Arguments
 
@@ -878,7 +974,9 @@ is necessary.
 # Cost
 
 Full Mie per band (`O(n_bands × nquad_radius × size_distribution_points)`),
-i.e. the same cost as the aerosol section of `model_from_parameters`.
+i.e. the same cost as the aerosol section of `model_from_parameters`. The
+radius nodes are those of `ctx.params.scattering_params` (`r_min`, `r_max`,
+`nquad_radius`); they do not move with the new size distribution.
 
 # What it invalidates
 
@@ -917,12 +1015,9 @@ function update_aerosol_microphysics!(ctx::BatchContext, i_aer::Int, aerosol::Ae
     c_aero          = sp.rt_aerosols[i_aer]
     truncation_type = _resolved_truncation(params, FT)
     # B4: resolve τ_ref / distribution from the CURRENT loading state when not
-    # supplied (not the original params), and persist them so a later
-    # update_model! redistribution preserves this loading.
+    # supplied (not the original params). Commit after all trial work succeeds.
     τ_eff = τ_ref === nothing ? ctx.current_τ_ref[i_aer] : FT(τ_ref)
     dist  = ctx.current_profile_dist[i_aer]
-    ctx.current_τ_ref[i_aer]        = τ_eff
-    ctx.current_profile_dist[i_aer] = dist
 
     # ── 1. Recompute k_ref at reference wavelength ──────────────────────────
     # k_ref uses the reference refractive index n_ref (normalisation convention),
@@ -934,9 +1029,8 @@ function update_aerosol_microphysics!(ctx::BatchContext, i_aer::Int, aerosol::Ae
     mie_model_ref = make_mie_model(
         sp.decomp_type, ref_aerosol_mic, sp.λ_ref,
         params.polarization_type, truncation_type,
-        sp.r_max, sp.nquad_radius)
+        sp.r_max, sp.nquad_radius; r_min = sp.r_min)
     new_k_ref = Float64(compute_ref_aerosol_extinction(mie_model_ref, FT))
-    ctx.k_ref[i_aer] = new_k_ref
 
     # ── 2. Per-band Mie + truncation + τ_aer rows ───────────────────────────
     # Mirror the model_from_parameters.jl endpoint-Mie + linear interpolation
@@ -944,11 +1038,14 @@ function update_aerosol_microphysics!(ctx::BatchContext, i_aer::Int, aerosol::Ae
     # multi-λ bands compute Mie at band edges and linearly interpolate k(λ) in
     # wavenumber so τ_aer is consistent with a fresh model build.
     profile = model.atmosphere.profile
+    τ_profile = getAerosolLayerOptProp(one(FT), dist, profile)
+    # Copy the small per-band containers, not the existing optical payloads.
+    trial_optics = map(copy, model.optics.aerosols.aerosol_optics)
 
     _mie_fwd(λ) = make_mie_model(
         sp.decomp_type, aerosol, λ,
         params.polarization_type, truncation_type,
-        sp.r_max, sp.nquad_radius)
+        sp.r_max, sp.nquad_radius; r_min = sp.r_min)
 
     for i_band in 1:ctx.n_bands
         curr_band_λ = FT.(1e4 ./ params.spec_bands[i_band])
@@ -970,86 +1067,72 @@ function update_aerosol_microphysics!(ctx::BatchContext, i_aer::Int, aerosol::Ae
                                               aerosol_optics_raw)
                 end
 
-            model.optics.aerosols.aerosol_optics[i_band][i_aer] = new_ao
+            trial_optics[i_band][i_aer] = new_ao
 
-            τ_profile = getAerosolLayerOptProp(one(FT), dist, profile)
-            model.optics.aerosols.τ_aer[i_band][i_aer, 1, :] .=
-                (τ_eff / new_k_ref) * new_ao.k * τ_profile
+            # Shared with the fresh model build — bit-exact by construction.
+            ctx.scratch_τ_aer[i_band][i_aer, 1, :] .=
+                vec(_aerosol_τ_slice(τ_eff, new_ao.k, FT(new_k_ref), τ_profile,
+                                     FT.(params.spec_bands[i_band]),
+                                     FT(1e4) / sp.λ_ref))
 
         else
             # ── Multi-wavelength band: endpoint Mie + linear interpolation ──
-            mie_model_0 = _mie_fwd(curr_band_λ[1])
+            # Anchor wavelengths, reference node and interpolation endpoints
+            # follow model_from_parameters with its default anchors (the
+            # band's own grid; BatchContext builds without custom anchors),
+            # so an identical CPU update is bit-exact in Float32 as well.
+            ν_spec = FT.(params.spec_bands[i_band])
+            anchor_λ = FT.(1e4 ./ ν_spec)
+            mie_model_0 = _mie_fwd(anchor_λ[1])
             aerosol_optics_raw_0 = compute_aerosol_optical_properties(mie_model_0, FT)
 
-            mie_model_1 = _mie_fwd(curr_band_λ[end])
+            mie_model_1 = _mie_fwd(anchor_λ[end])
             aerosol_optics_raw_1 = compute_aerosol_optical_properties(mie_model_1, FT)
 
-            # Average Greek coefs from both endpoints (matching forward path).
-            # Robust to either ordering of series length (descending bands).
-            Nl0 = length(aerosol_optics_raw_0.greek_coefs.α)
-            Nl1 = length(aerosol_optics_raw_1.greek_coefs.α)
-            Nlo, Nhi = min(Nl0, Nl1), max(Nl0, Nl1)
-            gc0 = aerosol_optics_raw_0.greek_coefs
-            gc1 = aerosol_optics_raw_1.greek_coefs
-            greek_arrs = Dict{Symbol,Vector{FT}}()
-            for fn in (:α, :β, :γ, :δ, :ϵ, :ζ)
-                g0 = getfield(gc0, fn); g1 = getfield(gc1, fn)
-                arr = zeros(FT, Nhi)
-                arr[1:Nlo] .= FT(0.5) .* (g0[1:Nlo] .+ g1[1:Nlo])
-                if Nl0 > Nlo
-                    arr[1+Nlo:Nhi] .= FT(0.5) .* g0[1+Nlo:Nl0]
-                elseif Nl1 > Nlo
-                    arr[1+Nlo:Nhi] .= FT(0.5) .* g1[1+Nlo:Nl1]
-                end
-                greek_arrs[fn] = arr
+            _truncate(ao) = truncation_type isa Scattering.δBGE &&
+                            size(ao.greek_coefs.β, 1) > truncation_type.l_max ?
+                Scattering.truncate_phase(truncation_type, ao; reportFit=false) :
+                Scattering.truncate_phase(Scattering.NoTruncation(), ao)
+            # BGE is nonlinear: truncate each physical endpoint first, then
+            # linearly interpolate the resulting Greek coefficients, k_ext,
+            # k_sca, and fᵗ in wavenumber.
+            ao0 = _truncate(aerosol_optics_raw_0)
+            ao1 = _truncate(aerosol_optics_raw_1)
+            ν_ref_phase = FT(1e4) / sp.λ_ref
+            ao_ref = nothing
+            if _interior_reference_node(ν_spec, ν_ref_phase)
+                ao_ref = _truncate(compute_aerosol_optical_properties(
+                    _mie_fwd(sp.λ_ref), FT))
             end
-            greek_coeffs = GreekCoefs(greek_arrs[:α], greek_arrs[:β], greek_arrs[:γ],
-                                       greek_arrs[:δ], greek_arrs[:ϵ], greek_arrs[:ζ])
+            new_ao = _spectralize_truncated_endpoints(ao0, ao1, ν_spec;
+                reference=ao_ref, ν_ref=ν_ref_phase,
+                ν_endpoints=(first(ν_spec), last(ν_spec)))
 
-            # Linearly interpolate k_ext and k_sca in wavenumber across the band.
-            # Sort endpoints by wavenumber (bands may be descending) — mirrors
-            # model_from_parameters.jl.
-            ν0, ν1 = 1e4/curr_band_λ[1], 1e4/curr_band_λ[end]
-            asc = ν0 <= ν1
-            ν_grid    = asc ? [ν0, ν1] : [ν1, ν0]
-            kext_grid = asc ? [aerosol_optics_raw_0.k, aerosol_optics_raw_1.k] :
-                              [aerosol_optics_raw_1.k, aerosol_optics_raw_0.k]
-            ksca_grid = asc ?
-                [aerosol_optics_raw_0.k * aerosol_optics_raw_0.ω̃,
-                 aerosol_optics_raw_1.k * aerosol_optics_raw_1.ω̃] :
-                [aerosol_optics_raw_1.k * aerosol_optics_raw_1.ω̃,
-                 aerosol_optics_raw_0.k * aerosol_optics_raw_0.ω̃]
-            interp_kext = LinearInterpolation(ν_grid, kext_grid)
-            interp_ksca = LinearInterpolation(ν_grid, ksca_grid)
-            k_spec  = FT[interp_kext(1e4/curr_band_λ[i]) for i=1:n_spec]
-            ω̃_spec  = FT[interp_ksca(1e4/curr_band_λ[i])/k_spec[i] for i=1:n_spec]
-            fᵗ_spec = zeros(FT, n_spec)
+            trial_optics[i_band][i_aer] = new_ao
 
-            aerosol_optics_raw_interp = AerosolOptics(greek_coefs=greek_coeffs,
-                                                       ω̃=ω̃_spec, k=k_spec, fᵗ=fᵗ_spec)
-
-            β_len = length(aerosol_optics_raw_interp.greek_coefs.β)
-            new_ao =
-                if truncation_type isa Scattering.δBGE && β_len > truncation_type.l_max
-                    Scattering.truncate_phase(truncation_type,
-                                              aerosol_optics_raw_interp; reportFit=false)
-                else
-                    Scattering.truncate_phase(Scattering.NoTruncation(),
-                                              aerosol_optics_raw_interp)
-                end
-
-            model.optics.aerosols.aerosol_optics[i_band][i_aer] = new_ao
-
-            τ_profile = getAerosolLayerOptProp(one(FT), dist, profile)
-            model.optics.aerosols.τ_aer[i_band][i_aer, :, :] .=
-                (τ_eff / new_k_ref) .* new_ao.k .* τ_profile'
+            # Shared with the fresh model build — bit-exact by construction.
+            ctx.scratch_τ_aer[i_band][i_aer, :, :] .=
+                _aerosol_τ_slice(τ_eff, new_ao.k, FT(new_k_ref), τ_profile,
+                                 ν_spec, FT(1e4) / sp.λ_ref)
         end
     end
 
     # ── 3. Re-derive Fourier bounds (CRITICAL anti-silent-wrongness step) ───
     # New Greek series length may differ from the old one → m_max_bands /
     # l_max must be recomputed and written back into the SolverConfig Vectors.
-    _rewrite_solver_fourier_bounds!(ctx)
+    bounds = _updated_solver_fourier_bounds(ctx, trial_optics)
+
+    # All fallible Mie, distribution, and trait work precedes the commit.
+    for i_band in 1:ctx.n_bands
+        model.optics.aerosols.aerosol_optics[i_band][i_aer] = trial_optics[i_band][i_aer]
+        @views copyto!(model.optics.aerosols.τ_aer[i_band][i_aer, :, :],
+                       ctx.scratch_τ_aer[i_band][i_aer, :, :])
+    end
+    model.solver.m_max_bands .= bounds.m_max_bands
+    model.solver.n_fourier_moments_bands .= bounds.n_fourier_moments_bands
+    model.solver.l_max .= bounds.l_max
+    ctx.k_ref[i_aer] = new_k_ref
+    ctx.current_τ_ref[i_aer] = τ_eff
 
     return nothing
 end

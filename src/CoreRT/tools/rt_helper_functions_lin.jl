@@ -4,15 +4,62 @@ This file contains helper functions that are used throughout the linearized vSma
 
 =#
 "Default matrix in linRT calculation (zeros)"
-default_matrix(FT, lin::LinMode, arr_type, Nparams, dims, nSpec)   = arr_type(zeros(FT, tuple(dims[1], dims[2], nSpec, Nparams)))
+default_matrix(FT, lin::LinMode, arr_type, Nparams, dims, nSpec) =
+    _zero_tangent(arr_type(FT[]), dims[1], dims[2], nSpec, Nparams)
 
 "Default J matrix in linRT calculation (zeros)"
-default_J_matrix(FT, lin::LinMode, arr_type, Nparams, dims, nSpec) = arr_type(zeros(FT, tuple(dims[1], 1, nSpec, Nparams)))
+default_J_matrix(FT, lin::LinMode, arr_type, Nparams, dims, nSpec) =
+    _zero_tangent(arr_type(FT[]), dims[1], 1, nSpec, Nparams)
+
+@inline function default_solar_columns_lin(FT, arr_type, dims, nStokes, nSpec, nParams)
+    make_column() = _zero_tangent(arr_type(FT[]), dims[1], nStokes, nSpec, nParams)
+    SolarColumnOperatorsLin(Ṙ₀⁻⁺=make_column(), Ṙ₀⁺⁻=make_column(),
+                            Ṫ₀⁺⁺=make_column(), Ṫ₀⁻⁻=make_column())
+end
+
+"""
+    seed_composite_from_added!(composite, composite_lin, added, added_lin)
+
+Initialize a forward/tangent composite subcolumn from one fully doubled
+atmospheric layer.  The physical-parameter (`ap_*`) derivatives are used,
+which contain the complete physical tangents after direct propagation or
+after local-basis doubling and contraction.
+"""
+function seed_composite_from_added!(composite::CompositeLayer,
+                                    composite_lin::CompositeLayerLin,
+                                    added::AddedLayer,
+                                    added_lin::AddedLayerLin)
+    composite.R⁻⁺ .= added.r⁻⁺
+    composite.R⁺⁻ .= added.r⁺⁻
+    composite.T⁺⁺ .= added.t⁺⁺
+    composite.T⁻⁻ .= added.t⁻⁻
+    composite.J₀⁺ .= added.j₀⁺
+    composite.J₀⁻ .= added.j₀⁻
+
+    composite_lin.Ṙ⁻⁺ .= added_lin.ap_ṙ⁻⁺
+    composite_lin.Ṙ⁺⁻ .= added_lin.ap_ṙ⁺⁻
+    composite_lin.Ṫ⁺⁺ .= added_lin.ap_ṫ⁺⁺
+    composite_lin.Ṫ⁻⁻ .= added_lin.ap_ṫ⁻⁻
+    composite_lin.J̇₀⁺ .= added_lin.ap_J̇₀⁺
+    composite_lin.J̇₀⁻ .= added_lin.ap_J̇₀⁻
+    return nothing
+end
 
 
 
-"Make an added layer and its linearized counterpart, supplying all default matrices"
-function make_added_layer(lin::LinMode, RS_type::Union{noRS, noRS_plus}, FT, arr_type, Nparams, dims, nSpec) 
+"""
+    make_added_layer(LinMode(), rs, FT, AT, nparams, dims, nspec;
+                     doubling_scratch=true, core_partials=true, ...)
+
+Allocate an added layer and its tangent storage. An atmospheric carrier used
+only after local-basis contraction needs no physical-coordinate doubling
+scratch or elemental core partials. A surface never doubles. These switches
+omit those allocations while preserving the adding workspace and public fields.
+"""
+function make_added_layer(lin::LinMode, RS_type::Union{noRS, noRS_plus}, FT, arr_type, Nparams, dims, nSpec;
+                          external_solar::Bool=false, nStokes::Int=1,
+                          doubling_scratch::Bool=true, core_partials::Bool=true)
+    ncore = core_partials ? 3 : 0
     t1 = default_matrix(FT, arr_type, dims, nSpec)
     t2 = default_matrix(FT, arr_type, dims, nSpec)
     t1_ptr = batched_pointer_cache(t1)
@@ -28,15 +75,17 @@ function make_added_layer(lin::LinMode, RS_type::Union{noRS, noRS_plus}, FT, arr
         dbl_gp_refl = default_matrix(FT, arr_type, dims, nSpec),
         dbl_j₁⁺ = default_J_matrix(FT, arr_type, dims, nSpec),
         dbl_j₁⁻ = default_J_matrix(FT, arr_type, dims, nSpec),
+        solar_columns = external_solar ?
+            default_solar_columns(FT, arr_type, dims, nStokes, nSpec) : nothing,
     ), 
     AddedLayerLin(
         # derivatives wrt τ, ϖ and Z
-        ṙ⁻⁺ = default_matrix(FT, lin, arr_type, 3, dims, nSpec),
-        ṫ⁺⁺ = default_matrix(FT, lin, arr_type, 3, dims, nSpec),
-        ṙ⁺⁻ = default_matrix(FT, lin, arr_type, 3, dims, nSpec),
-        ṫ⁻⁻ = default_matrix(FT, lin, arr_type, 3, dims, nSpec),
-        J̇₀⁺ = default_J_matrix(FT, lin, arr_type, 3, dims, nSpec),
-        J̇₀⁻ = default_J_matrix(FT, lin, arr_type, 3, dims, nSpec),
+        ṙ⁻⁺ = default_matrix(FT, lin, arr_type, ncore, dims, nSpec),
+        ṫ⁺⁺ = default_matrix(FT, lin, arr_type, ncore, dims, nSpec),
+        ṙ⁺⁻ = default_matrix(FT, lin, arr_type, ncore, dims, nSpec),
+        ṫ⁻⁻ = default_matrix(FT, lin, arr_type, ncore, dims, nSpec),
+        J̇₀⁺ = default_J_matrix(FT, lin, arr_type, ncore, dims, nSpec),
+        J̇₀⁻ = default_J_matrix(FT, lin, arr_type, ncore, dims, nSpec),
         # derivatives wrt all parameters
         ap_ṙ⁻⁺ = default_matrix(FT, lin, arr_type, Nparams, dims, nSpec),
         ap_ṫ⁺⁺ = default_matrix(FT, lin, arr_type, Nparams, dims, nSpec),
@@ -45,15 +94,18 @@ function make_added_layer(lin::LinMode, RS_type::Union{noRS, noRS_plus}, FT, arr
         ap_J̇₀⁺ = default_J_matrix(FT, lin, arr_type, Nparams, dims, nSpec),
         ap_J̇₀⁻ = default_J_matrix(FT, lin, arr_type, Nparams, dims, nSpec),
         # Doubling workspace (pre-allocated to avoid per-call allocations)
-        dbl_gp_refl_lin    = default_matrix(FT, lin, arr_type, Nparams, dims, nSpec),
-        dbl_tt_gp_refl_lin = default_matrix(FT, lin, arr_type, Nparams, dims, nSpec),
-        dbl_ap_expk_lin    = arr_type(zeros(FT, nSpec, Nparams)),
-        dbl_J₁⁺            = arr_type(zeros(FT, dims[1], 1, nSpec)),
-        dbl_J₁⁻            = arr_type(zeros(FT, dims[1], 1, nSpec)),
-        dbl_ap_J̇₁⁺         = default_J_matrix(FT, lin, arr_type, Nparams, dims, nSpec),
-        dbl_ap_J̇₁⁻         = default_J_matrix(FT, lin, arr_type, Nparams, dims, nSpec),
-        dbl_gp_refl        = arr_type(zeros(FT, dims[1], dims[2], nSpec)),
-        dbl_tt_gp_refl     = arr_type(zeros(FT, dims[1], dims[2], nSpec)),
+        dbl_gp_refl_lin    = doubling_scratch ? default_matrix(FT, lin, arr_type, Nparams, dims, nSpec) : nothing,
+        dbl_tt_gp_refl_lin = doubling_scratch ? default_matrix(FT, lin, arr_type, Nparams, dims, nSpec) : nothing,
+        dbl_ap_expk_lin    = doubling_scratch ? _backend_zeros(FT, arr_type, nSpec, Nparams) : nothing,
+        dbl_J₁⁺            = doubling_scratch ? _backend_zeros(FT, arr_type, dims[1], 1, nSpec) : nothing,
+        dbl_J₁⁻            = doubling_scratch ? _backend_zeros(FT, arr_type, dims[1], 1, nSpec) : nothing,
+        dbl_ap_J̇₁⁺         = doubling_scratch ? default_J_matrix(FT, lin, arr_type, Nparams, dims, nSpec) : nothing,
+        dbl_ap_J̇₁⁻         = doubling_scratch ? default_J_matrix(FT, lin, arr_type, Nparams, dims, nSpec) : nothing,
+        dbl_gp_refl        = doubling_scratch ? _backend_zeros(FT, arr_type, dims[1], dims[2], nSpec) : nothing,
+        dbl_tt_gp_refl     = doubling_scratch ? _backend_zeros(FT, arr_type, dims[1], dims[2], nSpec) : nothing,
+        propagation_workspace = make_jacobian_workspace(t1, Nparams),
+        solar_columns      = external_solar ?
+            default_solar_columns_lin(FT, arr_type, dims, nStokes, nSpec, Nparams) : nothing,
     )
 end
 

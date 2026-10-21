@@ -11,6 +11,7 @@ using Test
 using vSmartMOM, vSmartMOM.CoreRT
 using Distributions
 using Statistics
+import YAML
 
 # Bring Aerosol into scope for Phase-2 microphysics tests. Use a `using`
 # binding (not `const Aerosol = ...`): this file shares `Main` with the other
@@ -184,8 +185,8 @@ inA = scene_A_inputs(paramsA)
         for i_band in 1:n_bands
             result_ctx = rt_run(ctx.model; i_band)
             result_ref = rt_run(modelB;    i_band)
-            R_ctx = result_ctx isa Tuple ? result_ctx[1] : result_ctx
-            R_ref = result_ref isa Tuple ? result_ref[1] : result_ref
+            R_ctx = result_ctx[1]
+            R_ref = result_ref[1]
 
             max_abs_diff = maximum(abs.(R_ctx .- R_ref))
             max_ref      = maximum(abs.(R_ref))
@@ -209,7 +210,7 @@ inA = scene_A_inputs(paramsA)
 
         # 4b: wrong-length q
         q_bad = paramsB.q[1:end-1]
-        @test_throws ErrorException update_model!(ctx; q=q_bad)
+        @test_throws ArgumentError update_model!(ctx; q=q_bad)
 
         # 4c: unknown VMR key
         if !isnothing(ctx.params.absorption_params)
@@ -316,8 +317,8 @@ l_max_A2_snap = copy(ctx2.model.solver.l_max)
         for i_band in 1:ctx2.n_bands
             res_ctx = rt_run(ctx2.model; i_band)
             res_ref = rt_run(modelL2_ref; i_band)
-            R_ctx = res_ctx isa Tuple ? res_ctx[1] : res_ctx
-            R_ref = res_ref isa Tuple ? res_ref[1] : res_ref
+            R_ctx = res_ctx[1]
+            R_ref = res_ref[1]
             max_diff = maximum(abs.(R_ctx .- R_ref))
             max_ref  = maximum(abs.(R_ref))
             rtol_ach = max_ref > 0 ? max_diff / max_ref : max_diff
@@ -403,8 +404,8 @@ end  # @testset Phase 2 loading
         for i_band in 1:ctx2.n_bands
             res_ctx = rt_run(ctx2.model; i_band)
             res_ref = rt_run(modelM_ref; i_band)
-            R_ctx = res_ctx isa Tuple ? res_ctx[1] : res_ctx
-            R_ref = res_ref isa Tuple ? res_ref[1] : res_ref
+            R_ctx = res_ctx[1]
+            R_ref = res_ref[1]
             max_diff = maximum(abs.(R_ctx .- R_ref))
             max_ref  = maximum(abs.(R_ref))
             rtol_ach = max_ref > 0 ? max_diff / max_ref : max_diff
@@ -440,7 +441,7 @@ end  # @testset Phase 2 loading
     # ── Test M2b: SolverConfig l_max re-derivation with NoTruncation ─────────
     # With δBGE truncation the stream_l_cap clamps l_max so small and large
     # particles produce the same l_max.  This sub-test uses NoTruncation to
-    # expose the raw Greek-series length and proves that _rewrite_solver_fourier_bounds!
+    # expose the raw Greek-series length and proves that _updated_solver_fourier_bounds
     # actually tracks the change.
     @testset "M2b — SolverConfig l_max changes under NoTruncation" begin
         println("\n  M2b: SolverConfig l_max change with NoTruncation")
@@ -481,14 +482,40 @@ end  # @testset Phase 2 loading
         for i_band in 1:ctx_nt.n_bands
             res_ctx = rt_run(ctx_nt.model; i_band)
             res_ref = rt_run(modelNT_large_ref; i_band)
-            R_ctx = res_ctx isa Tuple ? res_ctx[1] : res_ctx
-            R_ref = res_ref isa Tuple ? res_ref[1] : res_ref
+            R_ctx = res_ctx[1]
+            R_ref = res_ref[1]
             max_diff = maximum(abs.(R_ctx .- R_ref))
             max_ref  = maximum(abs.(R_ref))
             rtol_ach = max_ref > 0 ? max_diff / max_ref : max_diff
             println("  Band $i_band rt_run (NoTrunc): max|ΔR|/|R_ref| = $(round(rtol_ach, sigdigits=4))")
             @test R_ctx ≈ R_ref  rtol=1e-14 atol=0
         end
+    end
+
+    # ── Test M2c: an identical update reproduces the build in Float32 ────────
+    # The update must use the build's anchor wavelengths, reference-node rule
+    # and interpolation endpoints; in Float32 the λ_ref knot otherwise lands
+    # one ulp inside the band edge and perturbs k, fᵗ and the radiance.
+    @testset "M2c — identical microphysics update is bit-exact in Float32" begin
+        println("\n  M2c: identical Float32 microphysics update vs fresh build")
+        d32 = YAML.load_file(YAML_BATCH)
+        delete!(d32, "absorption")
+        d32["radiative_transfer"]["float_type"] = "Float32"
+        aer32 = d32["scattering"]["aerosols"][1]
+        aer32["μ"] = 0.05; aer32["σ"] = 1.4; aer32["nᵣ"] = 1.4; aer32["nᵢ"] = 0.003
+        params32 = read_parameters(d32)
+        ctx32 = BatchContext(params32)
+        τ0 = copy(ctx32.model.optics.aerosols.τ_aer[1])
+        ao0 = ctx32.model.optics.aerosols.aerosol_optics[1][1]
+        k0, f0 = copy(ao0.k), copy(ao0.fᵗ)
+        R0 = rt_run(ctx32.model).toa
+        update_aerosol_microphysics!(ctx32, 1,
+            params32.scattering_params.rt_aerosols[1].aerosol)
+        ao1 = ctx32.model.optics.aerosols.aerosol_optics[1][1]
+        @test ao1.k == k0
+        @test ao1.fᵗ == f0
+        @test ctx32.model.optics.aerosols.τ_aer[1] == τ0
+        @test rt_run(ctx32.model).toa == R0
     end
 
     # ── Test M3: guard — i_aer out of range ──────────────────────────────────

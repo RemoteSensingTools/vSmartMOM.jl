@@ -1,0 +1,11 @@
+FLOAT64 O2 state=reference
+Looping over layers ...  12%|███▌                        |  ETA: 0:02:33[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:22[K
+Looping over layers ...  88%|████████████████████████▌   |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  94%|██████████████████████████▎ |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  94%|██████████████████████████▎ |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+FLOAT64 O2 state=optimized
+Looping over layers ...  75%|█████████████████████       |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  94%|██████████████████████████▎ |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  94%|██████████████████████████▎ |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  94%|██████████████████████████▎ |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+FLOAT64 COMPLETE

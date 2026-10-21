@@ -48,7 +48,7 @@ batched call would have to be split into chunks.
 
 ## Architecture types and dispatch
 
-The whole abstraction lives in [`src/Architectures.jl:1–98`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Architectures.jl#L1-L98) (~100 lines). It
+The whole abstraction lives in [`src/Architectures.jl:1–189`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Architectures.jl#L1-L189) (~190 lines). It
 defines three architecture types and a four-method dispatch surface:
 
 ```julia
@@ -73,11 +73,11 @@ The four methods (`devi`, `architecture`, `array_type`, `synchronize_if_gpu`)
 plus `default_architecture()` are all there is. CPU is wired up in this file;
 GPU backends inject the rest at extension load.
 
-## Weak GPU dependency via Julia 1.9 package extensions
+## GPU backends via Julia 1.9 package extensions
 
-vSmartMOM does **not** hard-depend on CUDA. CUDA support arrives through a
-package extension (Julia ≥ 1.9 feature) at
-[`ext/vSmartMOMCUDAExt.jl:21–66`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMCUDAExt.jl#L21-L66). When the user does
+vSmartMOM's CUDA backend code is not part of the main module. CUDA support
+arrives through a package extension (Julia ≥ 1.9 feature) at
+[`ext/vSmartMOMCUDAExt.jl:22–129`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMCUDAExt.jl#L22-L129). When the user does
 `using vSmartMOM, CUDA` in the same session, Julia's extension loader runs
 this code:
 
@@ -113,16 +113,17 @@ end
 
 Three things to notice:
 
-1. **No CUDA in `Project.toml`** — CUDA is a `weakdep`, not a hard dependency.
-   Users who don't have CUDA installed get a clean `using vSmartMOM` with no
-   error.
+1. **CPU execution does not require a working CUDA device.** CUDA is
+   currently a direct dependency in `Project.toml`, and is also required by
+   CanopyOptics. Installing the package therefore resolves CUDA even on a
+   CPU-only machine. Metal is an optional weak dependency.
 2. **The dispatch is three method overrides.** The kernels themselves don't
    change.
 3. **`CUDA.allowscalar(false)`** enforces that no kernel does `A[1,1,1] = …`
    on a `CuArray`. Scalar element access on GPU arrays is a performance
    cliff; the policy makes that cliff a hard error.
 
-The Metal extension at [`ext/vSmartMOMMetalExt.jl:19–101`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMMetalExt.jl#L19-L101) follows the same
+The Metal extension at [`ext/vSmartMOMMetalExt.jl:20–174`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMMetalExt.jl#L20-L174) follows the same
 pattern, replacing `CuArray` with `MtlArray`.
 
 ## `KernelAbstractions.@kernel` is the abstraction layer
@@ -131,7 +132,7 @@ Where a CUDA-only code would have `@cuda_kernel function …`, vSmartMOM has
 `@kernel function …` from KernelAbstractions.jl. The same source compiles
 to CPU (multithreaded), CUDA, and Metal.
 
-The D-matrix kernel from [`src/CoreRT/CoreKernel/doubling.jl:85–110`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/doubling.jl#L85-L110) is a good
+The D-matrix kernel from [`src/CoreRT/CoreKernel/doubling.jl:186–208`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/doubling.jl#L186-L208) is a good
 representative — small, complete, and identical across backends:
 
 ```julia
@@ -160,18 +161,19 @@ with `devi(architecture(r⁻⁺))` and instantiates the kernel for that backend.
 `#ifdef CUDA_AVAILABLE`.
 
 The same pattern is used in **gas absorption** (line-shape kernels at
-[`src/Absorption/compute_absorption_cross_section.jl:229–280`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Absorption/compute_absorption_cross_section.jl#L229-L280)) and **Mie
+[`src/Absorption/compute_absorption_cross_section.jl:316–332`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Absorption/compute_absorption_cross_section.jl#L316-L332)) and **Mie
 scattering** (the optional GPU Mie path at
-[`src/Scattering/gpu_mie_kernels.jl:30–100`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/gpu_mie_kernels.jl#L30-L100)). Three different physical
+[`src/Scattering/gpu_mie_kernels.jl:30–158`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/gpu_mie_kernels.jl#L30-L158)). Three different physical
 modules, one kernel-abstraction discipline.
 
 ## Batched matrix algebra: `⊠` and `batch_inv!`
 
-The two operators that show up everywhere in the kernel are `⊠ = NNlib.batched_mul`
-and `batch_inv!`. Each has three backend implementations sharing a single
+The two operators that show up everywhere in the kernel are `⊠ = CoreRT.batched_mul`
+(package-owned, so vSmartMOM's backend methods do not change `NNlib.batched_mul`
+for other packages) and `batch_inv!`. Each has three backend implementations sharing a single
 user-visible interface.
 
-**CPU** ([`src/CoreRT/tools/cpu_batched.jl:24–73`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/tools/cpu_batched.jl#L24-L73)) — threaded over the
+**CPU** ([`src/CoreRT/tools/cpu_batched.jl:49–100`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/tools/cpu_batched.jl#L49-L100)) — threaded over the
 spectral slice with one BLAS `gemm!` per slice:
 
 ```julia
@@ -190,7 +192,7 @@ function batch_inv!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}) where {FT}
 end
 ```
 
-**CUDA** ([`ext/gpu_batched_cuda.jl:122–139`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/gpu_batched_cuda.jl#L122-L139)) — CUBLAS `gemm_strided_batched`
+**CUDA** ([`ext/gpu_batched_cuda.jl:225–239`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/gpu_batched_cuda.jl#L225-L239) for `batched_mul`, [`99–111`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/gpu_batched_cuda.jl#L99-L111) for `batch_inv!`) — CUBLAS `gemm_strided_batched`
 in a single launch covering all spectral points:
 
 ```julia
@@ -204,8 +206,8 @@ function vSmartMOM.CoreRT.batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}) where {
 end
 ```
 
-**Metal** ([`ext/vSmartMOMMetalExt.jl:29–54`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMMetalExt.jl#L29-L54) plus
-`src/CoreRT/tools/ka_batched_kernels.jl:42–49, 100–178`) — portable
+**Metal** ([`ext/vSmartMOMMetalExt.jl:102–141`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMMetalExt.jl#L102-L141) plus
+`src/CoreRT/tools/ka_batched_kernels.jl:56–63, 128–206`) — portable
 KernelAbstractions matmul + LU-with-pivoting in `@localmem` shared memory.
 No vendor BLAS dependency:
 
@@ -221,7 +223,7 @@ end
 
 @kernel function _batched_inv_lu_par_kernel!(X, A, ::Val{N}) where {N}
     # full LU decomposition with partial pivoting in @localmem; ~80 lines.
-    # See ka_batched_kernels.jl:100–178 for the body.
+    # See ka_batched_kernels.jl:128–206 for the body.
 end
 ```
 
@@ -231,9 +233,11 @@ the array type. Adding a fourth backend (e.g. ROCm/AMD) would mean writing
 
 ## ForwardDiff Duals through the GPU path
 
-The hybrid AD story (Concepts/06) requires ForwardDiff `Dual` numbers to flow
-through `batched_mul` on `CuArray`. That's set up in
-[`ext/gpu_batched_cuda.jl:141–177`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/gpu_batched_cuda.jl#L141-L177):
+The CUDA batched algebra also supports ForwardDiff `Dual` arrays for callers
+that need them. This is separate from the production analytic RT tangent
+path, which propagates plain floating-point values and derivative arrays.
+The overload is defined in
+[`ext/gpu_batched_cuda.jl:255–291`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/gpu_batched_cuda.jl#L255-L291):
 
 ```julia
 function vSmartMOM.CoreRT.batched_mul(
@@ -259,19 +263,21 @@ Both the value slab and each partial slab are batched-mul'd on GPU; nothing
 goes back to host until the final result. The same overload is provided for
 `batch_inv!` using the matrix identity ``\partial A^{-1}/\partial x = -A^{-1}(\partial A/\partial x)A^{-1}``.
 
-This is what lets aerosol microphysics derivatives propagate through a GPU
-RT solve and come back as Jacobian columns without manual handling.
+Production aerosol microphysics derivatives use the hand-linearized Mie
+`LinMode()` path and are handed to the analytic RT kernels as ordinary arrays.
+The retired Mie `autodiff=true` wrapper is not enabled by these CUDA overloads.
 
 ## Allocation pattern
 
 All the per-layer workspace arrays come through `array_type(arch)`:
 
 ```julia
-# src/CoreRT/tools/rt_helper_functions.jl:91–142
+# src/CoreRT/tools/rt_helper_functions.jl:114–184
+_backend_zeros(FT, AT, dims...) = fill!(similar(AT(FT[]), dims...), zero(FT))
 @inline default_matrix(FT, arr_type, dims, nSpec) =
-    arr_type(zeros(FT, (dims[1], dims[2], nSpec)))
+    _backend_zeros(FT, arr_type, dims[1], dims[2], nSpec)
 @inline default_J_matrix(FT, arr_type, dims, nSpec) =
-    arr_type(zeros(FT, (dims[1], 1, nSpec)))
+    _backend_zeros(FT, arr_type, dims[1], 1, nSpec)
 
 function make_added_layer(RS_type, FT, arr_type, dims, nSpec)
     AddedLayer(
@@ -295,15 +301,15 @@ Honest list of edges:
 - **RT solver** (elemental → doubling → interaction) — fully GPU-friendly,
   including linearized variant. This is the hot path.
 - **Gas absorption** (HITRAN line-by-line) — the standalone `Absorption`
-  module contains a GPU Voigt kernel (`compute_absorption_cross_section.jl:229–280`)
+  module contains a GPU Voigt kernel (`compute_absorption_cross_section.jl:316–332`)
   used by the direct σ(ν, T, p) API.  The RT production pipeline
   (`model_from_parameters` → `rt_run`) computes LBL absorption via
   [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl),
   which has its own backend dispatch.
 - **Mie scattering** — fully automatic via `make_mie_model(...; architecture=GPU())`.
-  NAI-2 runs on GPU; PCW and the ForwardDiff AD path fall back to CPU
-  (Metal multi-kernel overhead makes CPU-Mie + GPU-RT faster on Apple
-  Silicon for typical aerosol loads, and ForwardDiff requires host arrays).
+  NAI-2 runs on GPU; PCW falls back to CPU with a one-time warning. The
+  retired ForwardDiff Mie path (`autodiff=true`) raises an error; aerosol
+  Jacobians use the hand-linearized `LinMode()` Mie path.
   Pass `architecture=CPU()` to force CPU Mie regardless of the RT backend.
 - **Thermal emission** — not currently a parallel offline source path.
   Solar-only retrievals are unaffected.
@@ -327,9 +333,10 @@ Fortran/C++:
    `batched_mul(A, B)` resolves to a different machine-code instance for
    each `(eltype, array_type)` combination, with no source duplication.
 
-2. **Package extensions (Julia 1.9+).** CUDA and Metal are *weak* dependencies
-   — installed only if the user wants them. CPU-only installs are tiny,
-   start fast, and don't need an NVIDIA driver. This is impossible in
+2. **Package extensions (Julia 1.9+).** The CUDA and Metal backends load only
+   when the user loads `CUDA` or `Metal`. Metal is a *weak* dependency; CUDA
+   is currently a direct dependency (see above), but CPU runs don't need an
+   NVIDIA driver or device. This is impossible in
    Fortran (single static dependency graph) and laborious in C++ (CMake
    toggles + ifdef hell).
 
@@ -339,7 +346,7 @@ Fortran/C++:
    the same activity at every layer.
 
 4. **Composability via type promotion.** `ForwardDiff.Dual{T,V,N}` works
-   inside `NNlib.batched_mul` because the kernels are element-type generic.
+   inside `batched_mul` because the kernels are element-type generic.
    `CuArray{T}` works because Julia's `Array` interface is implemented by
    any `<:AbstractArray` subtype. `KernelAbstractions.@kernel` works
    because all device APIs implement the same `KernelAbstractions.Backend`
@@ -351,31 +358,31 @@ Fortran/C++:
 Recapping the eight differentiators from [Concepts/01](01_overview.md), now
 with code anchors:
 
-1. **Operator-level analytic linearization.** `src/CoreRT/CoreKernel/{elemental,doubling,interaction}_lin.jl`; chain-rule expansion fused into the elemental step via `get_elem_rt_fused!` / `get_elem_rt_SFI_fused!` in `elemental_lin.jl`.
-2. **One `@kernel` source for CPU + CUDA + Metal.** [`src/Architectures.jl:33–96`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Architectures.jl#L33-L96); injected backends in [`ext/vSmartMOMCUDAExt.jl:21–27`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMCUDAExt.jl#L21-L27) and [`ext/vSmartMOMMetalExt.jl:19–22`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMMetalExt.jl#L19-L22).
-3. **Hybrid AD across the GPU boundary.** [`ext/gpu_batched_cuda.jl:141–177`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/gpu_batched_cuda.jl#L141-L177).
-4. **Polarization as a type, not a runtime branch.** [`src/Scattering/types.jl:92–143`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types.jl#L92-L143).
-5. **Optical properties as algebra.** [`src/CoreRT/types.jl:1063–1101`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/types.jl#L1063-L1101).
-6. **Weak GPU dependency.** [`ext/vSmartMOMCUDAExt.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMCUDAExt.jl) (entire file).
-7. **Three `(τ, ϖ, Z)` core variables per layer for analytic Jacobians.** [`src/CoreRT/types_lin.jl:119–149`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/types_lin.jl#L119-L149).
-8. **Exact finite-δ elemental, not the linear limit.** [`src/CoreRT/CoreKernel/elemental.jl:207–252`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental.jl#L207-L252). See [Concepts/04 § Elemental](04_mom_solver.md#elemental-layer) for the side-by-side equations.
+1. **Operator-level analytic linearization.** `src/CoreRT/CoreKernel/{elemental,doubling,interaction}_lin.jl`; chain-rule expansion fused into the elemental step via `get_elem_rt_fused!` / `get_elem_rt_SFI_fused!` (defined in `elemental_fused_lin.jl`, called from `elemental_lin.jl`).
+2. **One `@kernel` source for CPU + CUDA + Metal.** [`src/Architectures.jl:33–187`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Architectures.jl#L33-L187); injected backends in [`ext/vSmartMOMCUDAExt.jl:22–28`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMCUDAExt.jl#L22-L28) and [`ext/vSmartMOMMetalExt.jl:20–23`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMMetalExt.jl#L20-L23).
+3. **Hybrid AD across the GPU boundary.** [`ext/gpu_batched_cuda.jl:255–291`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/gpu_batched_cuda.jl#L255-L291).
+4. **Polarization as a type, not a runtime branch.** [`src/Scattering/types.jl:142–215`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types.jl#L142-L215).
+5. **Optical properties as algebra.** [`src/CoreRT/types.jl:1743–1795`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/types.jl#L1743-L1795).
+6. **GPU backends as package extensions.** [`ext/vSmartMOMCUDAExt.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMCUDAExt.jl) (entire file).
+7. **Three `(τ, ϖ, Z)` core variables per layer for analytic Jacobians.** [`src/CoreRT/types_lin.jl:330–355`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/types_lin.jl#L330-L355).
+8. **Exact finite-δ elemental, not the linear limit.** [`src/CoreRT/CoreKernel/elemental.jl:290–333`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental.jl#L290-L333). See [Concepts/04 § Elemental](04_mom_solver.md#Elemental-layer) for the side-by-side equations.
 
 ## Code anchors
 
 | Concept | Source |
 |---|---|
-| Architecture types | [`src/Architectures.jl:33–96`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Architectures.jl#L33-L96) |
-| CUDA extension init | [`ext/vSmartMOMCUDAExt.jl:21–66`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMCUDAExt.jl#L21-L66) |
-| Metal extension init | [`ext/vSmartMOMMetalExt.jl:19–101`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMMetalExt.jl#L19-L101) |
-| `@kernel apply_D!` | [`src/CoreRT/CoreKernel/doubling.jl:85–110`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/doubling.jl#L85-L110) |
-| `@kernel line_shape_batch!` | [`src/Absorption/compute_absorption_cross_section.jl:229–280`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Absorption/compute_absorption_cross_section.jl#L229-L280) |
-| `@kernel mie_coefficients_kernel_ds!` | [`src/Scattering/gpu_mie_kernels.jl:30–100`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/gpu_mie_kernels.jl#L30-L100) |
-| `@kernel _batched_inv_lu_par_kernel!` (Metal) | [`src/CoreRT/tools/ka_batched_kernels.jl:100–178`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/tools/ka_batched_kernels.jl#L100-L178) |
-| Batched matmul CPU | [`src/CoreRT/tools/cpu_batched.jl:24–73`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/tools/cpu_batched.jl#L24-L73) |
-| Batched matmul CUDA (CUBLAS) | [`ext/gpu_batched_cuda.jl:122–139`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/gpu_batched_cuda.jl#L122-L139) |
-| Batched matmul Metal (KA) | [`ext/vSmartMOMMetalExt.jl:29–54`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMMetalExt.jl#L29-L54) |
-| ForwardDiff.Dual through CUDA matmul | [`ext/gpu_batched_cuda.jl:141–177`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/gpu_batched_cuda.jl#L141-L177) |
-| Allocation by architecture | [`src/CoreRT/tools/rt_helper_functions.jl:91–142`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/tools/rt_helper_functions.jl#L91-L142) |
+| Architecture types | [`src/Architectures.jl:33–187`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Architectures.jl#L33-L187) |
+| CUDA extension init | [`ext/vSmartMOMCUDAExt.jl:99–129`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMCUDAExt.jl#L99-L129) |
+| Metal extension init | [`ext/vSmartMOMMetalExt.jl:142–174`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMMetalExt.jl#L142-L174) |
+| `@kernel apply_D!` | [`src/CoreRT/CoreKernel/doubling.jl:186–208`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/doubling.jl#L186-L208) |
+| `@kernel line_shape_batch!` | [`src/Absorption/compute_absorption_cross_section.jl:316–332`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Absorption/compute_absorption_cross_section.jl#L316-L332) |
+| `@kernel mie_coefficients_kernel_ds!` | [`src/Scattering/gpu_mie_kernels.jl:30–158`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/gpu_mie_kernels.jl#L30-L158) |
+| `@kernel _batched_inv_lu_par_kernel!` (Metal) | [`src/CoreRT/tools/ka_batched_kernels.jl:128–206`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/tools/ka_batched_kernels.jl#L128-L206) |
+| Batched matmul CPU | [`src/CoreRT/tools/cpu_batched.jl:49–100`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/tools/cpu_batched.jl#L49-L100) |
+| Batched matmul CUDA (CUBLAS) | [`ext/gpu_batched_cuda.jl:225–239`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/gpu_batched_cuda.jl#L225-L239) |
+| Batched matmul Metal (KA) | [`ext/vSmartMOMMetalExt.jl:102–141`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMMetalExt.jl#L102-L141) |
+| ForwardDiff.Dual through CUDA matmul | [`ext/gpu_batched_cuda.jl:255–291`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/gpu_batched_cuda.jl#L255-L291) |
+| Allocation by architecture | [`src/CoreRT/tools/rt_helper_functions.jl:114–184`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/tools/rt_helper_functions.jl#L114-L184) |
 
 ## Hands-on tutorials
 

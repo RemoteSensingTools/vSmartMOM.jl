@@ -1,0 +1,2 @@
+Test Summary: |  Pass  Total     Time
+GPU / Metal   | 20301  20301  7m13.2s

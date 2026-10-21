@@ -1,0 +1,20 @@
+RESPONSE_PARITY nparams=1 field=R error=0.0
+RESPONSE_PARITY nparams=1 field=T error=0.0
+RESPONSE_PARITY nparams=1 field=dR error=1.6653345369377348e-16
+RESPONSE_PARITY nparams=1 field=dT error=2.7755575615628914e-17
+RESPONSE_TIME nSpec=5 layers=6 nparams=1 combined=(median = 0.074850782, samples = [0.073332157, 0.075959186, 0.074850782]) ratio=3.608833444843595
+CORE_LOCAL nSpec=5 layers=6 pol=3 nparams=1 local_directions=3 combined=(median = 0.071282394, samples = [0.071282394, 0.072411137, 0.070987149]) ratio=3.4367882421818705 speedup=0.5773276217406503
+CORE_MEASURE nSpec=5 pol=3 nparams=1 forward=(median = 0.020740991, samples = [0.020740991, 0.024525225, 0.020278271]) combined=(median = 0.041153295, samples = [0.040706514, 0.041153295, 0.04365093]) ratio=1.9841527822850895
+CORE_FD_PASS nparams=1 all_columns=true endpoints=R,T azimuth=[0.0, 37.0]
+RESPONSE_PARITY nparams=18 field=R error=0.0
+RESPONSE_PARITY nparams=18 field=T error=0.0
+RESPONSE_PARITY nparams=18 field=dR error=3.469446951953614e-17
+RESPONSE_PARITY nparams=18 field=dT error=2.7755575615628914e-17
+RESPONSE_TIME nSpec=5 layers=6 nparams=18 combined=(median = 0.071875372, samples = [0.071875372, 0.071398245, 0.074685345]) ratio=3.0158396322620624
+CORE_LOCAL nSpec=5 layers=6 pol=3 nparams=18 local_directions=3 combined=(median = 0.118932698, samples = [0.118639186, 0.118932698, 0.11992311]) ratio=4.9903316563044005 speedup=2.4169677375014227
+CORE_MEASURE nSpec=5 pol=3 nparams=18 forward=(median = 0.023832624, samples = [0.030700695, 0.022841701, 0.023832624]) combined=(median = 0.287456494, samples = [0.290254073, 0.287456494, 0.284055971]) ratio=12.061470612719775
+Precompiling packages...
+  25253.7 ms  ✓ vSmartMOM
+  11611.6 ms  ✓ vSmartMOM → vSmartMOMCUDAExt
+  2 dependencies successfully precompiled in 38 seconds. 274 already precompiled.
+CORE_FD_PASS nparams=18 all_columns=true endpoints=R,T azimuth=[0.0, 37.0]

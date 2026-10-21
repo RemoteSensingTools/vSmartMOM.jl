@@ -29,6 +29,7 @@ polarized Cox-Munk ocean surface.
 ```julia
 using vSmartMOM
 using vSmartMOM.CoreRT
+using vSmartMOM.CoreRT: rpvSurfaceScalar, RossLiSurfaceScalar, LambertianSurfaceLegendre, LambertianSurfaceSpline
 using CairoMakie
 ```
 
@@ -161,8 +162,14 @@ crown shape ratio ($h/b = 2$, $b/r = 1$ RAMI defaults).
 
 Ross-Li is scalar-only: it returns zero for Stokes components beyond $I$.
 
+By default both kernel zenith angles are capped at 80° (`zenith_cap_deg =
+80`), a vSmartMOM regularization of the grazing quadrature nodes, where the
+Li-sparse kernel turns strongly negative. `zenith_cap_deg = nothing` uses the
+true angles, i.e. the MODIS kernel definition that VLIDORT implements.
+
 ```julia
 rossli = RossLiSurfaceScalar(0.05, 0.03, 0.1)  ## fvol, fgeo, fiso
+rossli_modis = RossLiSurfaceScalar(0.05, 0.03, 0.1; zenith_cap_deg = nothing)
 ```
 
 ---
@@ -183,9 +190,12 @@ The ocean surface is approximated as a collection of small flat facets
 
 $$P(z_x, z_y) \;=\; \frac{1}{2\pi\sigma^2}\,\exp\!\left(-\frac{z_x^2 + z_y^2}{2\sigma^2}\right)$$
 
-where the slope variance depends linearly on 10-m wind speed $U$ (m/s):
+where $\sigma^2$ is the variance of *each* slope component.  Cox & Munk
+(1954) measured the total mean-square slope
+$\langle z_x^2 + z_y^2\rangle = 2\sigma^2$, which depends linearly on the
+10-m wind speed $U$ (m/s):
 
-$$\sigma^2 \;=\; 0.003 + 0.00512\, U$$
+$$2\sigma^2 \;=\; 0.003 + 0.00512\, U$$
 
 Low wind ($U \lesssim 2$ m/s) gives a nearly mirror-like surface with a
 narrow specular glint; high wind ($U \gtrsim 10$ m/s) spreads the glint
@@ -203,25 +213,33 @@ where $\cos\theta_t = \sqrt{1 - \sin^2\theta_i / n^2}$ (Snell's law).
 
 The Fresnel **Mueller matrix** for reflection is:
 
-$$\mathbf{M}_F = \begin{pmatrix} \tfrac{|r_s|^2+|r_p|^2}{2} & \tfrac{|r_s|^2-|r_p|^2}{2} & 0 & 0 \\ \tfrac{|r_s|^2-|r_p|^2}{2} & \tfrac{|r_s|^2+|r_p|^2}{2} & 0 & 0 \\ 0 & 0 & \operatorname{Re}(r_s r_p^*) & \operatorname{Im}(r_s r_p^*) \\ 0 & 0 & -\operatorname{Im}(r_s r_p^*) & \operatorname{Re}(r_s r_p^*) \end{pmatrix}$$
+$$\mathbf{M}_F = \begin{pmatrix} \tfrac{|r_s|^2+|r_p|^2}{2} & \tfrac{|r_s|^2-|r_p|^2}{2} & 0 & 0 \\ \tfrac{|r_s|^2-|r_p|^2}{2} & \tfrac{|r_s|^2+|r_p|^2}{2} & 0 & 0 \\ 0 & 0 & \operatorname{Re}(r_s r_p^*) & -\operatorname{Im}(r_s r_p^*) \\ 0 & 0 & \operatorname{Im}(r_s r_p^*) & \operatorname{Re}(r_s r_p^*) \end{pmatrix}$$
 
-The off-diagonal (1,2) and (2,1) elements couple the $I$ and $Q$ Stokes
-parameters -- this is the polarizing effect of the ocean surface.
+It refers to the facet basis $(\hat s, \hat p = \mathbf{k}\times\hat s)$, with $\hat s$
+normal to the plane of reflection. The off-diagonal (1,2) and (2,1) elements
+couple the $I$ and $Q$ Stokes parameters -- this is the polarizing effect of
+the ocean surface.
 
 ### 5c) BRDF Mueller matrix
 
-For a given geometry $(\mu_i, \mu_r, \Delta\phi)$ the full BRDF is:
+For incident cosine $\mu_i$ (azimuth 0), reflected cosine $\mu_r$ and relative
+azimuth $\Delta\phi$ (the glint lies at $\Delta\phi = 0$) the full BRDF is:
 
-$$\boldsymbol{\rho} \;=\; \frac{P(z_x, z_y)\;\cdot\; S(\mu_i, \mu_r)}{4\,\mu_i\,\mu_r\,\cos^4\!\beta}\;\; \mathbf{L}(\alpha_2)\;\mathbf{M}_F(\cos\theta_\text{local})\;\mathbf{L}(-\alpha_1)$$
+$$\boldsymbol{\rho} \;=\; \frac{P(z_x, z_y)\;\cdot\; S(\mu_i, \mu_r)}{4\,\mu_i\,\mu_r\,\cos^4\!\beta}\;\; \mathbf{L}(\chi_2)\;\mathbf{M}_F(\cos\theta_\text{local})\;\mathbf{L}(\chi_1)$$
 
 where:
-- $\beta$ is the facet tilt angle ($\cos\beta = n_z$, the $z$-component of the facet normal)
+- $\beta$ is the facet tilt angle ($\cos\beta = n_z$ for the facet normal
+  $\hat n \propto \mathbf{k}_r - \mathbf{k}_i$)
 - $\theta_\text{local}$ is the local incidence angle on the tilted facet
-- $\alpha_1$, $\alpha_2$ are rotation angles between the scattering plane
-  and the facet incidence/reflection planes
-- $\mathbf{L}(\phi)$ is the Stokes rotation matrix:
+- $\mathbf{L}(\chi)$ changes the Stokes basis between a beam's meridian plane
+  $(\hat\varphi, \hat\theta)$ and the facet basis $(\hat s, \hat p)$. The field
+  components transform as $(E_s, E_p) = \begin{pmatrix} \cos\chi & \sin\chi \\ \sin\chi & -\cos\chi\end{pmatrix}(E_\varphi, E_\theta)$
+  with $\hat s = \cos\chi\,\hat\varphi + \sin\chi\,\hat\theta$ — a reflection of
+  the basis, which is its own inverse — so
 
-$$\mathbf{L}(\phi) = \begin{pmatrix} 1 & 0 & 0 & 0 \\ 0 & \cos 2\phi & \sin 2\phi & 0 \\ 0 & -\sin 2\phi & \cos 2\phi & 0 \\ 0 & 0 & 0 & 1 \end{pmatrix}$$
+$$\mathbf{L}(\chi) = \begin{pmatrix} 1 & 0 & 0 & 0 \\ 0 & \cos 2\chi & \sin 2\chi & 0 \\ 0 & \sin 2\chi & -\cos 2\chi & 0 \\ 0 & 0 & 0 & -1 \end{pmatrix}$$
+
+  $\chi_1$ belongs to the incident and $\chi_2$ to the reflected beam.
 
 - $S$ is the Smith (1967) bistatic shadow masking factor
 
@@ -232,7 +250,7 @@ crests.  The Smith shadowing function corrects for this:
 
 $$S(\mu_i, \mu_r) \;=\; \frac{1}{1 + \Lambda(\mu_i) + \Lambda(\mu_r)}$$
 
-where $\Lambda(\mu) = \tfrac{1}{2}\!\left[\tfrac{\exp(-\nu^2)}{\sqrt{2\pi}\,\nu} - \operatorname{erfc}(\nu)\right]$
+where $\Lambda(\mu) = \tfrac{1}{2}\!\left[\tfrac{\exp(-\nu^2)}{\sqrt{\pi}\,\nu} - \operatorname{erfc}(\nu)\right]$
 with $\nu = \cot\theta / (\sqrt{2}\,\sigma)$ and $\sigma = \sqrt{\sigma^2}$.
 
 ### 5e) Whitecap contribution (Monahan & O'Muircheartaigh, 1980)
@@ -252,10 +270,10 @@ $\alpha_\text{wc}/\pi$.
 
 ### 5f) Water refractive index
 
-When `n_water = nothing` (the default), the code uses a built-in lookup
-table from Segelstein (1981) covering 200 nm -- 2600 nm.  The function
-`water_refractive_index(λ_nm)` returns the complex refractive index at any
-wavelength via log-linear interpolation:
+When `n_water = nothing` (the default), the solver uses the Segelstein
+(1981) table (34 nm -- 10 m) at the wavelength of every spectral point.  The
+function `water_refractive_index(λ_nm)` returns the complex refractive index
+at any wavelength, with n and k interpolated linearly in wavelength:
 
 ```julia
 n_water_550 = water_refractive_index(550.0)
@@ -263,8 +281,9 @@ println("Water RI at 550 nm:  n = ", round(real(n_water_550), digits=4),
         ", k = ", round(imag(n_water_550), sigdigits=3))
 ```
 
-You can also provide a fixed value or a per-wavelength vector via the
-`n_water` keyword of `CoxMunkSurface`.
+You can also provide a fixed value for the whole band, or a vector with one
+value per spectral point (used element-wise), via the `n_water` keyword of
+`CoxMunkSurface`.
 
 ### 5g) TMS single-scattering correction
 
@@ -274,7 +293,9 @@ speed), requiring many Fourier moments to resolve.  Rather than increasing
 correction after the Fourier loop: it adds the difference between the exact
 single-scattering surface contribution and the truncated Fourier
 reconstruction at each viewing geometry.  This is handled automatically by
-`apply_ss_correction!` inside `rt_run`.
+`apply_ss_correction!` inside `rt_run`, for the TOA radiance only: upwelling
+radiances at interior observer heights (`obs_alt`) keep the Fourier-series
+glint, in the forward and the linearized solvers alike.
 
 ### 5h) Construction
 
@@ -353,10 +374,10 @@ $\mathbf{w}$ are the quadrature weights.
 ### Cox-Munk (analytical)
 The derivative of the surface reflectance w.r.t. wind speed $U$ is computed
 analytically via the chain rule:
-$$\frac{\partial \boldsymbol{\rho}}{\partial U} \;=\; (1 - f_\text{wc})\!\left[\frac{\partial P}{\partial \sigma^2}\,S + P\,\frac{\partial S}{\partial \sigma^2}\right]\!\frac{d\sigma^2}{dU}\;\frac{\mathbf{L}_2\,\mathbf{M}_F\,\mathbf{L}_1}{4\mu_i\mu_r\cos^4\!\beta} \;+\; \frac{df_\text{wc}}{dU}\left(\boldsymbol{\rho}_\text{wc} - \boldsymbol{\rho}_\text{glint}\right)$$
+$$\frac{\partial \boldsymbol{\rho}}{\partial U} \;=\; (1 - f_\text{wc})\!\left[\frac{\partial P}{\partial \sigma^2}\,S + P\,\frac{\partial S}{\partial \sigma^2}\right]\!\frac{d\sigma^2}{dU}\;\frac{\mathbf{L}(\chi_2)\,\mathbf{M}_F\,\mathbf{L}(\chi_1)}{4\mu_i\mu_r\cos^4\!\beta} \;+\; \frac{df_\text{wc}}{dU}\left(\boldsymbol{\rho}_\text{wc} - \boldsymbol{\rho}_\text{glint}\right)$$
 
-where $d\sigma^2/dU = 0.00512$.  The geometry, Fresnel coefficients, and
-rotation matrices are all independent of $U$ and shared with the forward
+where $d\sigma^2/dU = 0.00256$.  The geometry, Fresnel coefficients, and
+Stokes basis changes are all independent of $U$ and shared with the forward
 evaluation.
 
 ### Canopy
@@ -394,7 +415,7 @@ params.brdf[1] = CoxMunkSurface(wind_speed = 5.0)
 model = model_from_parameters(params)
 R, T = rt_run(model)
 println("R shape: ", size(R))
-println("R(nadir, I): ", R[1, 1, 1])
+println("R(VZA 60°, I): ", R[1, 1, 1])
 ```
 
 Compare with a Lambertian surface at the same geometry:
@@ -404,16 +425,16 @@ params2 = read_parameters(yaml_path)
 params2.brdf[1] = LambertianSurfaceScalar(0.06)
 model2 = model_from_parameters(params2)
 R2, T2 = rt_run(model2)
-println("R(nadir, I) Lambertian 0.06: ", R2[1, 1, 1])
+println("R(VZA 60°, I) Lambertian 0.06: ", R2[1, 1, 1])
 ```
 
-Compare the reflectance spectra from the two surface types:
+Compare the radiance spectra from the two surface types:
 
 ```julia
 fig = Figure(size=(700, 450))
 ax = Axis(fig[1,1],
     xlabel = "Spectral index",
-    ylabel = "TOA Reflectance (Stokes I)")
+    ylabel = "TOA radiance (Stokes I)")
 lines!(ax, R[1, 1, :],  label="Cox-Munk (U=5 m/s)")
 lines!(ax, R2[1, 1, :], label="Lambertian (α=0.06)")
 axislegend(ax, position=:rt)
@@ -422,6 +443,10 @@ fig
 
 The rendered docs include a Plotly comparison of the angular signatures for
 the main surface families:
+
+The interactive panel uses synthetic angular shapes to illustrate these
+surface families. It is not output from the BRDF implementations and is
+not a validation reference.
 
 ```@raw html
 <iframe title="Surface BRDF angular slices" src="../../assets/plots/surface_brdf_slices.html" loading="lazy" style="width: 100%; height: 520px; border: 1px solid var(--vp-c-divider); border-radius: 8px;"></iframe>

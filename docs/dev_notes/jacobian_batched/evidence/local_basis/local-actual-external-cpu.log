@@ -1,0 +1,35 @@
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:16[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:10[K
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:05[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:03[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:14[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:09[K
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:04[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:03[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Test Summary:           | Pass  Total     Time
+Local optical basis CPU | 1634   1634  4m08.6s

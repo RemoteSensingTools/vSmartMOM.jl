@@ -17,31 +17,10 @@ catch
 end
 
 # ---------------------------------------------------------------
-# Helpers
+# Helpers (single contract: test_helpers.jl)
 # ---------------------------------------------------------------
-function run_lin(params)
-    model, lin_model = model_from_parameters(LinMode(), params)
-    NAer  = length(params.scattering_params.rt_aerosols)
-    NGas  = size(lin_model.τ̇_abs[1], 1)
-    NSurf = 1
-    R, T, dR, dT = rt_run(model, lin_model, NAer, NGas, NSurf)
-    return R, dR, model, lin_model, NAer, NGas, NSurf
-end
-
-function run_fwd(params)
-    R, _, _, _, _, _, _ = run_lin(params)
-    return R
-end
-
-function rel_errors(analytic, fd; threshold=1e-12)
-    mask = abs.(fd) .> threshold
-    if any(mask)
-        errs = abs.(analytic[mask] .- fd[mask]) ./ abs.(fd[mask])
-        return (max=maximum(errs), mean=mean(errs))
-    else
-        return (max=maximum(abs.(analytic .- fd)), mean=mean(abs.(analytic .- fd)))
-    end
-end
+isdefined(@__MODULE__, :VSmartMOMTestSupport) || include("test_helpers.jl")
+using .VSmartMOMTestSupport
 
 # =====================================================================
 @testset "Hybrid AD" begin
@@ -51,7 +30,7 @@ end
 @testset "CPU Linearized RT" begin
     params = parameters_from_yaml(YAML_FAST)
     params.architecture = vSmartMOM.Architectures.CPU()
-    R, dR, model, lin_model, NAer, NGas, NSurf = run_lin(params)
+    R, dR, NAer, NGas, NSurf, model, lin_model = run_linearized_rt(params)
 
     @test all(isfinite.(R))
     @test all(isfinite.(dR))
@@ -67,10 +46,11 @@ end
     brdf = params_p.brdf[1]
     params_p.brdf[1] =
         LambertianSurfaceScalar{Float64}(brdf.albedo + eps_alb)
-    R_p = run_fwd(params_p)
+    R_p = linearized_R(params_p)
     dR_fd_alb = (R_p .- R) ./ eps_alb
 
     errs = rel_errors(dR[:, :, :, idx_alb], dR_fd_alb)
+    @test errs.n > 0
     @test errs.max < 0.05
     println("  CPU albedo Jacobian: max rel err = $(round(errs.max, sigdigits=3))")
 end
@@ -80,7 +60,7 @@ if CUDA_OK
     @testset "GPU Linearized RT" begin
         params_gpu = parameters_from_yaml(YAML_FAST)
         params_gpu.architecture = vSmartMOM.Architectures.GPU()
-        R_gpu, dR_gpu, _, _, NAer, NGas, NSurf = run_lin(params_gpu)
+        R_gpu, dR_gpu, NAer, NGas, NSurf = run_linearized_rt(params_gpu)
 
         R_gpu_a  = Array(R_gpu)
         dR_gpu_a = Array(dR_gpu)
@@ -91,25 +71,30 @@ if CUDA_OK
         # Compare with CPU
         params_cpu = parameters_from_yaml(YAML_FAST)
         params_cpu.architecture = vSmartMOM.Architectures.CPU()
-        R_cpu, dR_cpu, _, _, _, _, _ = run_lin(params_cpu)
+        R_cpu, dR_cpu = run_linearized_rt(params_cpu)
 
-        @test all(isapprox.(R_gpu_a, R_cpu; rtol=1e-4, nans=true))
-        @test all(isapprox.(dR_gpu_a, dR_cpu; rtol=1e-3, nans=true))
+        # Both sides must be finite; agreeing NaNs cannot certify a match.
+        @test all(isfinite, R_cpu)
+        @test all(isfinite, dR_cpu)
+        @test all(isapprox.(R_gpu_a, R_cpu; rtol=1e-4))
+        @test all(isapprox.(dR_gpu_a, dR_cpu; rtol=1e-3))
         println("  GPU vs CPU: R and dR match.")
     end
 
     @testset "GPU Forward noRS" begin
+        # Ordinary forward solver (not the linearized path) on both backends.
         params_gpu = parameters_from_yaml(YAML_FAST)
         params_gpu.architecture = vSmartMOM.Architectures.GPU()
-        R_gpu = run_fwd(params_gpu)
+        R_gpu = forward_R(params_gpu)
 
         params_cpu = parameters_from_yaml(YAML_FAST)
         params_cpu.architecture = vSmartMOM.Architectures.CPU()
-        R_cpu = run_fwd(params_cpu)
+        R_cpu = forward_R(params_cpu)
 
         R_gpu_a = Array(R_gpu)
         @test all(isfinite.(R_gpu_a))
-        @test all(isapprox.(R_gpu_a, R_cpu; rtol=1e-4, nans=true))
+        @test all(isfinite, R_cpu)
+        @test all(isapprox.(R_gpu_a, R_cpu; rtol=1e-4))
         println("  GPU Forward: matches CPU.")
     end
 else
@@ -123,7 +108,7 @@ end
     # We test directly at the compute_mie_ab! level to avoid a pre-existing
     # DimensionMismatch bug in phase_function_autodiff.jl's JacobianResult
     # preallocator (it uses gauleg/r_max directly while compute_NAI2 uses
-    # gauleg_log with r_min from quantile, giving a different n_max).
+    # gauleg_log on [r_min, r_max], giving a different n_max).
 
     params = parameters_from_yaml(YAML_FAST)
     rt_aer = params.scattering_params.rt_aerosols[1]
@@ -169,9 +154,9 @@ end
     # NOTE: compute_aerosol_optical_properties(model; autodiff=true) has a
     # pre-existing DimensionMismatch bug in phase_function_autodiff.jl:
     # JacobianResult is preallocated using get_n_max(2π*r_max/λ), but
-    # compute_NAI2 uses gauleg_log with r_min=max(quantile(...,1e-8),1e-6*r_max),
-    # so maximum(x_size_param) < 2π*r_max/λ when run in Float64 but the Dual
-    # path may give a different n_max. Fix requires editing
+    # compute_NAI2 uses gauleg_log on [r_min, r_max] (interior Gauss nodes),
+    # so maximum(x_size_param) < 2π*r_max/λ and the Greek series can be shorter
+    # than the preallocated one. Fix requires editing
     # src/Scattering/phase_function_autodiff.jl (outside the scope of Bug B).
 end
 

@@ -55,7 +55,7 @@ Example: NAI2 (no Wigner tables needed)
 rₘ, σ, nᵣ, nᵢ = 0.3, 2.0, 1.3, 0.001
 aero = Aerosol(LogNormal(log(rₘ), log(σ)), nᵣ, nᵢ)
 λ = 0.55
-model_NAI2 = make_mie_model(NAI2(), aero, λ, Stokes_IQUV(), δBGE(20, 2.0), 30.0, 500)
+model_NAI2 = make_mie_model(NAI2(), aero, λ, Stokes_IQUV(), δBGE(20), 30.0, 500)
 ```
 
 aerosol_optics = compute_aerosol_optical_properties(model_NAI2)
@@ -63,18 +63,22 @@ aerosol_optics = compute_aerosol_optical_properties(model_NAI2)
 PCW requires precomputed Wigner tables (expensive one-time cost):
 N_max = 120
 wigner_A, wigner_B = compute_wigner_values(N_max)
-model_PCW = make_mie_model(PCW(), aero, λ, Stokes_IQUV(), δBGE(20, 2.0), 30.0, 500, wigner_A, wigner_B)
+model_PCW = make_mie_model(PCW(), aero, λ, Stokes_IQUV(), δBGE(20), 30.0, 500, wigner_A, wigner_B)
 
 ---
 
 ### 3. Parameter Selection Guide
 
 **`r_max`** — Upper bound for the size-distribution integral. Must cover the bulk of the
-distribution; truncating too low biases cross-sections. Use ``\sim 5\sigma \cdot r_m``
-for lognormal; check the info message about the fraction cut.
+distribution; truncating too low biases cross-sections. For a lognormal distribution, select a high distribution quantile
+and check convergence of extinction, SSA, and phase coefficients as the
+bound increases; a small omitted number fraction can still carry substantial
+cross section.
 
-**`nquad_radius`** — Gauss–Legendre points over ``[0, r_{\max}]``. More points → better
-accuracy for broad size distributions. Typical: 500–2000; narrow distributions need fewer.
+**`nquad_radius`** — Gauss–Legendre points in ``\ln r`` over the fixed interval
+``[r_{\min}, r_{\max}]`` (`r_min` keyword of `make_mie_model`, default `1e-3` µm). The
+nodes do not depend on the size distribution, so they must resolve the narrowest mode
+and the Mie oscillations of the largest particles. Typical: 500–2000.
 
 **`l_max` / `l_trunc`** — Maximum Legendre order in the Greek expansion. Must exceed
 the effective size parameter; ``l_{\max} \gtrsim 2\pi r_{\max}/\lambda``. Too low truncates
@@ -87,8 +91,7 @@ Start with moderate values (e.g., 500, 20) and increase if needed.
 r_max = 30.0
 nquad_radius = 500
 l_max = 20
-Δ_angle = 2.0
-truncation_type = δBGE(l_max, Δ_angle)
+truncation_type = δBGE(l_max)
 ```
 
 ---
@@ -137,10 +140,10 @@ approximates the forward peak and renormalizes, reducing the effective expansion
 **Truncation factor** ``f^t``: fraction of scattered energy moved to the "delta" term:
 ``f^t = 1 - c_0``, where ``c_0`` is the retained scattering fraction. The RT solver uses
 ``f^t`` to adjust the single-scattering albedo and phase function so that the truncated
-expansion matches the original phase function outside the exclusion cone ``\Delta_\theta``.
+expansion approximates the original phase function on the fitted domain.
 
-Larger ``\Delta_\mathrm{angle}`` → more of the peak is fitted → smaller ``f^t`` and
-fewer required streams. Typical: 1–3°.
+``Δ_angle`` is retired and forced to zero. Do not tune an exclusion cone;
+choose the stream/truncation order and validate the resulting phase/radiance.
 
 ---
 
@@ -151,7 +154,8 @@ fewer required streams. Typical: 1–3°.
 - **`greek_coefs`** — Fourier/Legendre coefficients for the phase matrix
 - **`ω̃`** — single-scattering albedo (``C_{\mathrm{sca}}/C_{\mathrm{ext}}``)
 - **`k`** — extinction cross-section (per particle or per mass, depending on convention)
-- **`fᵗ`** — delta-M truncation factor
+- **`fᵗ`** — delta-M truncation factor (set by `truncate_phase`; the untruncated
+  output of `compute_aerosol_optical_properties` carries the placeholder `1`)
 
 These feed into the doubling-adding kernels. Aerosol layers are combined with molecular
 (Rayleigh) scattering and absorption; the RT solver never needs angle-space phase

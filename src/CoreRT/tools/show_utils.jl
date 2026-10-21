@@ -10,6 +10,29 @@ const _TREE_END   = "└── "
 const _TREE_PIPE  = "│   "
 const _TREE_SPACE = "    "
 
+"Compact description of a raw scalar/vector observer-height request."
+function _observer_request_string(obs_alt)
+    if obs_alt isa Real
+        return iszero(obs_alt) ? "BOA only (scalar 0)" :
+               "$(obs_alt) km only (TOA when at/above model top)"
+    end
+    interior = filter(x -> !iszero(x), obs_alt)
+    if any(iszero, obs_alt)
+        return isempty(interior) ? "TOA + BOA ([0] sentinel)" :
+               "TOA + BOA + requested $(interior) km"
+    end
+    return "requested $(obs_alt) km (values at/above model top select TOA)"
+end
+
+"Compact description of observer outputs resolved onto a model profile."
+function _resolved_observer_string(geom::ObsGeometry)
+    outputs = String[]
+    geom.include_toa && push!(outputs, "TOA")
+    append!(outputs, ["$(h) km" for h in geom.sensor_altitudes])
+    geom.include_boa && push!(outputs, "BOA")
+    return isempty(outputs) ? "none" : join(outputs, ", ")
+end
+
 # ── Surface one-line summaries ────────────────────────────────────────────
 
 function Base.show(io::IO, s::LambertianSurfaceScalar)
@@ -36,7 +59,8 @@ function Base.show(io::IO, s::rpvSurfaceScalar)
 end
 
 function Base.show(io::IO, s::RossLiSurfaceScalar)
-    print(io, "RossLi(fvol=$(s.fvol), fgeo=$(s.fgeo), fiso=$(s.fiso))")
+    cap = s.zenith_cap_deg == 80 ? "" : ", zenith_cap_deg=$(something(s.zenith_cap_deg, "nothing"))"
+    print(io, "RossLi(fvol=$(s.fvol), fgeo=$(s.fgeo), fiso=$(s.fiso)$cap)")
 end
 
 function Base.show(io::IO, s::CoxMunkSurface)
@@ -126,6 +150,91 @@ function Base.show(io::IO, p::AtmosphericProfile{FT}) where FT
     print(io, "AtmosphericProfile{$FT}($nLevels layers)")
 end
 
+# ── Height-aware RT output ───────────────────────────────────────────────
+
+_radiance_shape(x) = x === nothing ? "not requested" : string(size(x))
+
+function Base.show(io::IO, level::LevelRadiance)
+    print(io, "LevelRadiance($(level.height_km) km, boundary=$(level.boundary_index), ",
+          "up=$(_radiance_shape(level.upwelling)), down=$(_radiance_shape(level.downwelling)), ",
+          "unscattered_down=$(_radiance_shape(level.unscattered_downwelling)))")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", level::LevelRadiance)
+    println(io, "LevelRadiance at $(level.height_km) km above BOA")
+    println(io, _TREE_MID, "boundary index: $(level.boundary_index)")
+    println(io, _TREE_MID, "upwelling: $(_radiance_shape(level.upwelling))")
+    println(io, _TREE_MID, "downwelling (diffuse): $(_radiance_shape(level.downwelling))")
+    print(io, _TREE_END,
+          "downwelling (unscattered): $(_radiance_shape(level.unscattered_downwelling))")
+end
+
+function Base.summary(io::IO, result::ObserverRTResult)
+    n_endpoints = (result.toa !== nothing) + (result.boa !== nothing)
+    print(io, "ObserverRTResult($n_endpoints endpoint(s), $(length(result.levels)) interior level(s))")
+end
+
+function Base.show(io::IO, result::ObserverRTResult)
+    print(io, "ObserverRTResult(TOA=$(_radiance_shape(result.toa)), ",
+          "BOA=$(_radiance_shape(result.boa)), levels=$(length(result.levels)))")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", result::ObserverRTResult)
+    println(io, "ObserverRTResult")
+    println(io, _TREE_MID, "TOA ($(result.toa_altitude_km) km): $(_radiance_shape(result.toa))")
+    println(io, _TREE_MID, "BOA (0 km): $(_radiance_shape(result.boa))")
+    if isempty(result.levels)
+        print(io, _TREE_END, "interior levels: none")
+    else
+        println(io, _TREE_END, "interior levels: $(length(result.levels))")
+        for (i, level) in enumerate(result.levels)
+            connector = i == length(result.levels) ? _TREE_END : _TREE_MID
+            println(io, _TREE_SPACE, connector,
+                    "$(level.height_km) km (boundary $(level.boundary_index)): ",
+                    "up=$(_radiance_shape(level.upwelling)), ",
+                    "down=$(_radiance_shape(level.downwelling)), ",
+                    "unscattered=$(_radiance_shape(level.unscattered_downwelling))")
+        end
+    end
+end
+
+function Base.show(io::IO, level::LevelRadianceLin)
+    print(io, "LevelRadianceLin($(level.height_km) km, boundary=$(level.boundary_index), ",
+          "up=$(_radiance_shape(level.upwelling)), down=$(_radiance_shape(level.downwelling)), ",
+          "jacobian=$(_radiance_shape(level.upwelling_jacobian)))")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", level::LevelRadianceLin)
+    println(io, "LevelRadianceLin at $(level.height_km) km above BOA")
+    println(io, _TREE_MID, "boundary index: $(level.boundary_index)")
+    println(io, _TREE_MID, "upwelling: $(_radiance_shape(level.upwelling))")
+    println(io, _TREE_MID, "downwelling (diffuse): $(_radiance_shape(level.downwelling))")
+    println(io, _TREE_MID,
+            "downwelling (unscattered): $(_radiance_shape(level.unscattered_downwelling))")
+    print(io, _TREE_END, "Jacobians: $(_radiance_shape(level.upwelling_jacobian))")
+end
+
+function Base.summary(io::IO, result::ObserverRTResultLin)
+    n_endpoints = (result.toa !== nothing) + (result.boa !== nothing)
+    print(io, "ObserverRTResultLin($n_endpoints endpoint(s), ",
+          "$(length(result.levels)) interior level(s), ",
+          "$(n_total(result.layout)) parameter(s))")
+end
+
+function Base.show(io::IO, result::ObserverRTResultLin)
+    print(io, "ObserverRTResultLin(TOA=$(_radiance_shape(result.toa)), ",
+          "BOA=$(_radiance_shape(result.boa)), levels=$(length(result.levels)), ",
+          "parameters=$(n_total(result.layout)))")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", result::ObserverRTResultLin)
+    println(io, "ObserverRTResultLin")
+    println(io, _TREE_MID, "TOA ($(result.toa_altitude_km) km): $(_radiance_shape(result.toa))")
+    println(io, _TREE_MID, "BOA (0 km): $(_radiance_shape(result.boa))")
+    println(io, _TREE_MID, "parameters: $(n_total(result.layout))")
+    print(io, _TREE_END, "interior levels: $(length(result.levels))")
+end
+
 # ── Optics ───────────────────────────────────────────────────────────────
 
 function Base.show(io::IO, ::MIME"text/plain", o::Optics{FT}) where FT
@@ -151,7 +260,7 @@ function Base.show(io::IO, ::MIME"text/plain", o::Optics{FT}) where FT
             for (ia, ao) in enumerate(aer_ops)
                 ω_str = ao.ω̃ isa Number ? "$(round(ao.ω̃, digits=4))" : "$(round(minimum(ao.ω̃), digits=4))–$(round(maximum(ao.ω̃), digits=4))"
                 fᵗ_str = ao.fᵗ isa Number ? "$(round(ao.fᵗ, digits=4))" : "$(round(minimum(ao.fᵗ), digits=4))–$(round(maximum(ao.fᵗ), digits=4))"
-                l_max = length(ao.greek_coefs.β) - 1
+                l_max = size(ao.greek_coefs.β, 1) - 1
                 connector = (ia < length(aer_ops)) ? _TREE_MID : _TREE_END
                 println(io, _TREE_PIPE, connector, "aerosol #$ia: ω̃=$ω_str, fᵗ=$fᵗ_str, l_max=$l_max")
             end
@@ -209,7 +318,7 @@ function Base.show(io::IO, ::MIME"text/plain", m::RTModel)
 
     # geometry
     vza_str = length(m.geometry.vza) <= 4 ? string(m.geometry.vza) : "[$(length(m.geometry.vza)) angles]"
-    println(io, _TREE_MID, "geometry: SZA=$(m.geometry.sza)°, VZA=$(vza_str)°")
+    println(io, _TREE_MID, "geometry: SZA=$(m.geometry.sza)°, VZA=$(vza_str)°, outputs=$(_resolved_observer_string(m.obs_geom))")
 
     # quad_points
     println(io, _TREE_MID, "quad_points: $(m.quad_points.Nstreams) weighted streams (Nquad=$(m.quad_points.Nquad) inc. SZA/VZA output nodes), μ₀=$(round(m.quad_points.μ₀, digits=4))")
@@ -313,12 +422,13 @@ function Base.show(io::IO, ::MIME"text/plain", x::vSmartMOM_Parameters{FT}) wher
     else
         "max_m=$(x.max_m), l_trunc=$(x.l_trunc), truncation=$trunc_name"
     end
-    println(io, _TREE_PIPE, _TREE_END, "$res_str, Δ_angle=$(x.Δ_angle)°, depol=$(x.depol)")
+    println(io, _TREE_PIPE, _TREE_END, "$res_str, depol=$(x.depol)")
 
     # ── geometry ──
     vza_str = length(x.vza) <= 4 ? string(x.vza) : "[$(length(x.vza)) angles]"
     vaz_str = length(x.vaz) <= 4 ? string(x.vaz) : "[$(length(x.vaz)) angles]"
     println(io, _TREE_MID, "geometry: SZA=$(x.sza)°, VZA=$(vza_str)°, VAZ=$(vaz_str)°")
+    println(io, _TREE_PIPE, _TREE_END, "observer: $(_observer_request_string(x.obs_alt))")
 
     # ── atmosphere ──
     nLevels = length(x.p)
@@ -329,7 +439,8 @@ function Base.show(io::IO, ::MIME"text/plain", x::vSmartMOM_Parameters{FT}) wher
     if !isnothing(x.absorption_params)
         ap = x.absorption_params
         mol_strs = unique(vcat(ap.fixed_molecules..., ap.variable_molecules...))
-        h2o_active = !isempty(ap.h2o_lut) && any(!isnothing, ap.h2o_lut)
+        h2o_active = !isempty(ap.h2o_lut) &&
+                     any(x -> x !== nothing && x !== :disabled, ap.h2o_lut)
         all_mols = h2o_active ? vcat(["H2O (q-driven)"], mol_strs) : mol_strs
         bf_name = typeof(ap.broadening_function).name.name
         println(io, _TREE_MID, "absorption: $(length(all_mols)) molecule(s) [$(join(all_mols, ", "))], $bf_name, wing_cutoff=$(ap.wing_cutoff) cm⁻¹")

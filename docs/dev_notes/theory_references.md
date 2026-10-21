@@ -5,7 +5,7 @@ and target Concepts pages. This file is the **source of truth** for paper
 citations and `file.jl:LINE` references that the Concepts arc draws from.
 
 Built by reading each PDF in targeted mode (equations + design-decision
-passages only, no benchmarks/intros). Updated 2026-04-30.
+passages only, no benchmarks/intros). Updated 2026-08-07.
 
 ## Canonical references
 
@@ -57,12 +57,12 @@ passages only, no benchmarks/intros). Updated 2026-04-30.
 | **S2014 (18)** | Layer operator form: `⟨I_Δ⁻; I_0⁺⟩ = T_Δ I_0 + R_Δ I_Δ + J_Δ`. | `src/CoreRT/rt_run.jl::rt_kernel!` call site |
 | **S2014 (19)** | `T_δ,m = (E − M⁻¹[E − (ϖ₀/2)Z̄ₘ⁽⁺⁺⁾C])·δ` — elemental transmission for `m=0` thermal-only. | `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt!` lines 113–139 |
 | **S2014 (20)** | `R_δ,m = M⁻¹·(ϖ₀/2)·Z̄ₘ⁽⁻⁺⁾·C·δ` — elemental reflection. | `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt!` lines 113–139 |
-| **S2014 (21)** | `J_δ,m = δ_0m·(E − T − R)·B(T)·1` — elemental thermal source (no solar SFI here, see §2.2). | `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt_SFI!` |
+| **S2014 (21)** | `J_δ,m = δ_0m·(E − T − R)·B(T)·1` — elemental thermal source in the paper's historical no-solar-SFI formulation. This is not `get_elem_rt_SFI!`, which is the current direct-solar source kernel. | `src/CoreRT/Sources/thermal_emission.jl` (current finite-δ thermal source implementation) |
 | **S2014 (22)** | Elemental-thickness bound `0 < δ < min(μ_i)/(1 − ϖ₀/2)` — guarantees non-negative operators. | `src/CoreRT/tools/rt_helper_functions.jl::doubling_number`, consumed in `rt_kernel.jl::get_dtau_ndoubl` (lines 245–253) |
-| **S2014 §2.2** | **Design choice (echo verbatim)**: vSmartMOM does *not* include solar single-scatter in `J`. Trade-off: simpler doubling/adding, no off-quadrature SFI integration; recovered via Block-Radau (App. B). | `src/CoreRT/CoreKernel/rt_kernel.jl` (no solar term in elemental J for `m>0` thermal-only path) |
+| **S2014 §2.2** | **Historical paper design choice**: the 2014 formulation does *not* include solar single scatter in `J`. Trade-off: simpler doubling/adding, with off-quadrature geometry recovered through Block-Radau (App. B). Do not state this as a limitation of the current solver, whose SFI kernel operates with either an embedded or external `μ₀` representation. | Historical rationale for the DNI/Block-Radau lineage; current SFI is `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt_SFI!`. |
 | **SF2023-II (8)–(9)** | **Constant-`N_doubl` trick** for absorbing bands: `δτ = δτ_abs + δτ_scatt`; doubling sized by `δτ_scatt` only, so `N_doubl` is held constant across the spectral grid even when `τ_abs` swings over orders of magnitude. | `src/CoreRT/tools/atmo_prof.jl::construct_atm_layer` lines ~340–376; `rt_kernel.jl::get_dtau_ndoubl` lines 245–253 |
-| **SF2023-II (10)–(11)** | Explicit elastic R, T, J for elemental layer with absorption baked into `δτ = δτ_abs + δτ_scatt`. Includes `1 − exp(−δτ(1/μ_i+1/μ_j))` and `exp(−δτ/μ_i) − exp(−δτ/μ_j)` factors. | `src/CoreRT/CoreKernel/elemental.jl` lines 207–252 (the `expm1` / `expdiff_neg` numerical-stability forms) |
-| **Fell 1997 Eqs. 1.52–1.56** | Single-scatter elemental r/t/J formulas in the form vSmartMOM implements (matches SF2023-II (10)–(11)). | Already cited verbatim in `src/CoreRT/CoreKernel/elemental.jl` source comments |
+| **SF2023-II (10)–(11)** | Explicit elastic R, T, J for elemental layer with absorption baked into `δτ = δτ_abs + δτ_scatt`. Includes `1 − exp(−δτ(1/μ_i+1/μ_j))` and `exp(−δτ/μ_i) − exp(−δτ/μ_j)` factors. | `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt!` (the `expm1` form, and `elem_trans_factor`/`expdiff_ratio` in `rt_helpers.jl` for the `μⱼ/(μᵢ−μⱼ)` term) |
+| **Fell 1997 Eqs. 1.52–1.56** | Single-scatter elemental r/t/J formulas in the form vSmartMOM implements (matches SF2023-II (10)–(11)). The direct-solar `J₀±` terms use scalar `μ₀` and exact `Zₘ(μᵢ,μ₀)` coupling, including the `μᵢ=μ₀` L'Hôpital limit. | `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt_SFI!` |
 
 ### C. Doubling and adding (S2014 §2.1, Eqs. 23–32; SF2023-II §3.3) → Concepts/04
 
@@ -90,7 +90,8 @@ passages only, no benchmarks/intros). Updated 2026-04-30.
 | **SS2015 (26)** | `f_tr = β_{L_tr}/(2L_tr+1)` — Wiscombe choice of truncation factor. | `src/Scattering/truncate_phase.jl` |
 | **SS2015 (27a–f)** | **Modified Greek coefficients** `β_l*, δ_l*, γ_l*, ϵ_l*, α_l*, ζ_l*` at truncation order `L_tr`. The exact formulas to quote in Concepts/03c. | `src/Scattering/truncate_phase.jl`; `src/CoreRT/LayerOpticalProperties/delta_m_truncation.jl` |
 | **SS2015 §2.4** | Two error sources: **DSE** (delta-separation error, from setting all `B_l = 0` for `l > L_tr`) and **PTE** (phase-truncation error, from approximating the forward peak as a Dirac delta). | (design-rationale callout for Concepts/03c) |
-| **SS2015 §3, Eqs. (38a–d)** | **δBGE-fit** (δ Beta-Gamma-Epsilon fit) — vector extension of Hu et al. δ-fit; `β_l*, δ_l*, α_l*, ζ_l*` from SVD of a least-squares system on `b_1(μ), b_2(μ)`. Used as default for accurate hyperspectral retrievals near backscatter. | `src/CoreRT/LayerOpticalProperties/` (δBGE-fit selector) |
+| **SS2015 §3, Eqs. (38a–d)** | **δBGE-fit** (δ Beta-Gamma-Epsilon fit) — vector extension of Hu et al. δ-fit. Eqs. (38a–d) cover **only the diagonal families**: `β*_l = c_l/c₀`, and `δ*_l, α*_l, ζ*_l = (x_l − (β_l − c_l))/c₀`. The `(β_l − c_l)` peak subtraction is diagonal-only because the Dirac spike has `γ^δ_l = ϵ^δ_l = 0` (S2014 A.5–A.10). | `src/Scattering/truncate_phase.jl` (`truncate_phase(::δBGE, …)`, `truncate_phase_lowconf`), `truncate_phase_lin.jl` |
+| **SS2015 §3, Eqs. (39)–(47)** | The off-diagonal δBGE fits: normal equations `A^g x^g = b^g`, `A^e x^e = b^e` for the coefficients `g_l`, `e_l` fitted to the **untruncated** `b_1(μ)`, `b_2(μ)`. ⚠ **The paper never writes the final normalisation of `g_l`/`e_l` into `γ*_l`/`ϵ*_l` explicitly — it is textually ambiguous at this point.** It is however fixed unambiguously by Eq. (8) (`Z* = (Z − f_tr·δ·E)/(1 − f_tr)`, i.e. *every* family divided by `c₀`) and by the δ-m analogue Eqs. (27c,d), which read `γ^n_l = γ_l/(1 − f_tr)`, `ϵ^n_l = ϵ_l/(1 − f_tr)` — pure `1/c₀`, no peak subtraction. So `γ*_l = g_l/c₀`, `ϵ*_l = e_l/c₀`. Omitting the `1/c₀` dilutes the truncated degree of linear polarisation `−f₁₂/f₁₁` by exactly `c₀`. | `src/Scattering/truncate_phase.jl`, `truncate_phase_lin.jl` (the `γᵗ = γᵗ_fit / c₀` lines) |
 | **SS2015 §4.1** | **Critical for retrievals**: δ-m distorts O₂ A-band line shapes near exact backscatter (ϑ_view ≈ −60° in principal plane); δBGE-fit eliminates this. Worth one-paragraph callout in Concepts/03c. | (design-rationale callout) |
 | **SS2015 §5** | TMS (Nakajima & Tanaka) single-scattering correction reduces remaining truncation error by ~3× near exact backscatter. | (rt_run_ss connection — Concepts/04 also) |
 
@@ -99,7 +100,8 @@ passages only, no benchmarks/intros). Updated 2026-04-30.
 | Paper Eq. | What it says | Source file:line |
 |---|---|---|
 | **S2014 (B.1)–(B.2)** | Block-Radau scheme: composite `(N₁+N₂)`-point quadrature where solar `μ₀` is included as a quadrature root with non-zero weight (a true Radau node), and viewing angles `μ_v` are appended as zero-weight dummy nodes. Eliminates interpolation error between quadrature points for direct ray tracing. | `src/CoreRT/tools/rt_set_streams.jl::RadauQuad` lines 24–110 |
-| **S2014 App. B (text)** | Without DNI/Radau, off-quadrature solar/viewing angles need interpolation between roots → error. The Radau construction is the cost paid for the §2.2 design choice (no solar SFI in J). | (design-rationale callout for Concepts/02) |
+| **S2014 App. B (text)** | In the historical DNI/no-solar-SFI formulation, off-quadrature solar/viewing angles require interpolation; Block-Radau removes the solar interpolation by making `μ₀` a weighted root. | (historical design-rationale callout for Concepts/02) |
+| **Current external-solar SFI** | Opt-in Gauss mode keeps `μ₀` outside the diffuse quadrature. Rectangular `Z₀` phase columns generate explicit `R₀/T₀` (and Raman `ieR₀/ieT₀`) operators, while scalar `μ₀` controls attenuation. Five weighted streams plus one distinct VZA in IQU therefore gives an 18×18 diffuse operator. | `src/CoreRT/tools/rt_set_streams.jl`; `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt_solar_columns!`; `src/CoreRT/CoreKernel/elemental_inelastic.jl::get_elem_rt_solar_columns_RRS!` |
 
 ### F. Layer optical-property assembly → Concepts/03 + 03a + 03b + 03c
 
@@ -122,7 +124,7 @@ passages only, no benchmarks/intros). Updated 2026-04-30.
 | **SF2014 (3)–(6)** | Scattering matrix elements `f_ij` from Wigner d-functions `π_n`, `τ_n`. | (theory anchor, code uses Greek directly) |
 | **SF2014 (12)–(14)** | **Phase matrix Z Fourier decomposition**: `Z = (1/2)C⁰ + Σₘ[Cᵐ cos m(φ−φ') + Sᵐ sin m(φ−φ')]`, with `Cᵐ = Aᵐ·Δ + Δ·Aᵐ·Δ`, `Aᵐ = Σ_{l=m}^∞ Π^m_l(μ)·B_l·Π^m_l(μ')`. | `compute_Z_matrices.jl::compute_Z_moments` |
 | **SF2014 (15)** | Generalized spherical-harmonic matrices `Π^m_l(μ)` (4×4 with `P^m_l`, `R^m_l`, `T^m_l`). | `compute_Z_matrices.jl` |
-| **SF2014 (16)** | **Greek matrix B_l** with the six coefficients `(α_l, β_l, γ_l, δ_l, ϵ_l, ζ_l)` populating its 4×4 form. | `src/Scattering/types.jl::GreekCoefs` lines 231–244 |
+| **SF2014 (16)** | **Greek matrix B_l** with the six coefficients `(α_l, β_l, γ_l, δ_l, ϵ_l, ζ_l)` populating its 4×4 form. | `src/Scattering/types.jl::GreekCoefs` lines 462–475 |
 | **SF2014 (17)** | Six integral formulas for the Greek coefficients in terms of `f_ij` integrals — used by NAI-2 path. | `src/Scattering/compute_NAI2.jl` |
 | **SF2014 (24)** | Greek matrix `B_l` from precomputed Wigner-3j combinations of `(aₙ, bₙ)` products — used by PCW path. | `src/Scattering/compute_PCW.jl` |
 | **SF2014 §5** | **NAI-2 vs PCW choice**: NAI-2 ≥13× faster than NAI-1 for individual large particles (>228 size parameter); PCW 6–8× faster than NAI-2 for polydispersions over a finite size range. NAI-2 is the safer default; PCW dominates for big polydisperse populations. | `src/Scattering/Scattering.jl` (DECOMP_MAP entry) |
@@ -133,8 +135,8 @@ passages only, no benchmarks/intros). Updated 2026-04-30.
 |---|---|---|
 | **S2014 (C.1)–(C.4)** | Differentiated RTE and boundary conditions; linearization is exact at the operator level. | `src/CoreRT/rt_run_lin.jl` |
 | **S2014 (C.5)–(C.7)** | Differentiation rules for matrix products and inverses (used everywhere in the chain rule). | (foundation) |
-| **S2014 (C.8)–(C.10)** | **Elemental derivatives**: `Ṫ_δ,m`, `Ṙ_δ,m`, `J̇_δ,m` w.r.t. the three core layer variables `(τ, ϖ, Z)`. | `src/CoreRT/CoreKernel/elemental_lin.jl` |
-| **S2014 (C.11)–(C.16)** | **Derivatives propagated through doubling/adding**: same shape as Eqs. (23)–(28) but for tangent-linear operators. | `src/CoreRT/CoreKernel/{doubling,interaction}_lin.jl` |
+| **S2014 (C.8)–(C.10)** | **Infinitesimal elemental derivatives** and thermal-source derivatives. The current finite-δ and solar-source derivatives apply the same calculus to **SF2023-II (10)–(11)**; they are not literal implementations of the infinitesimal expressions. | `src/CoreRT/CoreKernel/elemental_fused_lin.jl::get_elem_rt_fused!`, `get_elem_rt_SFI_fused!` |
+| **S2014 (C.11)–(C.16)** | **Derivatives propagated through doubling/adding**: same shape as Eqs. (23)–(28) but for tangent-linear operators. | `src/CoreRT/CoreKernel/jacobian_batched.jl::{doubling_batched_lin!,_interaction_direction_lin!}`; reference in `{doubling,interaction}_lin.jl` |
 | **S2014 (C.17)–(C.18)** | **D-matrix symmetry on derivatives**: `Ṫ_ab = D·Ṫ_ba·D`, `Ṙ_ab = D·Ṙ_ba·D` — halves the linearized doubling cost too. | `doubling_lin.jl::apply_D_lin!` (or equivalent) |
 | **S2014 (C.19)** | `Ṙ*_10 = D·Ṙ_10` — the fast linearized doubling counterpart of (31). | `doubling_lin.jl` |
 | **S2014 (C.21)** | Final assembled derivative form `⟨İ_Δ⁻; İ_0⁺⟩ = J̇_Δ + Ṙ_Δ I_Δ + T_Δ İ_0 + …`. | `src/CoreRT/CoreKernel/lin_added_layer_all_params.jl` lines 1–100 |
@@ -143,10 +145,10 @@ passages only, no benchmarks/intros). Updated 2026-04-30.
 | **S2014 (C.27)** | `δ = τ̄ / 2^N_dbl` — elemental thickness used in derivatives. | `rt_kernel.jl::get_dtau_ndoubl` |
 | **S2014 (C.28)–(C.31)** | Derivatives of `δ` w.r.t. `τ_i`, `ϖ_0,i`, `Z_i`, `β_i`. | `compEffectiveLayerProperties_lin.jl` |
 | **S2014 (C.32)–(C.39)** | Derivatives of `ϖ̄_0` and `Z̄` (post-truncation forms). | same |
-| **S2014 (C.40)** | `Ż_m(μ_i, μ_j)` formula via generalized spherical harmonics. | `compute_Z_matrices.jl` (linearized variant) |
+| **S2014 (C.40)**; **SF2014 (14)–(16)** | `Ż_m(μ_i, μ_j)`: at fixed geometry replace Greek `B_l` with `dB_l` in the spherical-function expansion. Angular tables are shared by all wavelengths and tangent directions. | `src/Scattering/compute_Z_matrices_lin.jl::_phase_column_tabulated!`; reference in `mie_helper_functions_lin.jl::compute_Z_moments` |
 | **S2014 (C.41)–(C.42)** | `β̇*` and `Ḃ*_l` for the truncated case — chain rule through the δ-M factor `f_tr`. | `delta_m_truncation_lin.jl` |
 | **S2013 (35)–(46)** | Scalar predecessor of S2014 App. C — same structure for scalar `(τ, ϖ_0, P)`. Useful as the simpler-derivation reference for readers learning the chain rule. | (theory anchor for Concepts/06 history paragraph) |
-| **S2013 (61)–(67)** | δ-M chain rule for scalar (`P_mod`, `τ_mod`, `ϖ_mod`). | `compEffectiveLayerProperties_lin.jl` |
+| **S2013 (61)–(67)** | δ-M chain rule for scalar (`P_mod`, `τ_mod`, `ϖ_mod`). | `optical_jacobian_cache.jl::_createAero_invariant` |
 | **S2013 (90)** | `N_aer = τ_λ / k_λ` — number density invariant w.r.t. wavelength. | `compEffectiveLayerProperties.jl` |
 | **S2014 §C.2.2 / S2013 §3.2.2** | Surface BRDF derivatives (Lambertian, mRPV, Cox-Munk wind speed). | `Surfaces/{lambertian,rpv,coxmunk}_surface_lin.jl` |
 
@@ -184,6 +186,7 @@ citations. Listed here so the Concepts/07 page can grep this file.)
 | `@kernel` line shape (Doppler/Lorentz/Voigt) | `src/Absorption/compute_absorption_cross_section.jl:229–280` |
 | `@kernel` Mie coefficients (DoubleSingle precision for FP32 GPU) | `src/Scattering/gpu_mie_kernels.jl:30–100` |
 | `@kernel` portable LU inverse with `@localmem` | `src/CoreRT/tools/ka_batched_kernels.jl:100–178` |
+| CUDA shared-memory tangent products (wavelength × parameter batches) | `src/CoreRT/CoreKernel/jacobian_batched.jl::_jac_product_tiled!` |
 | Batched matmul CPU (threaded BLAS) | `src/CoreRT/tools/cpu_batched.jl:24–73` |
 | Batched matmul CUDA (CUBLAS strided) | `ext/gpu_batched_cuda.jl:122–139` |
 | Batched matmul Metal (KA portable) | `ext/vSmartMOMMetalExt.jl:29–54` |
@@ -197,10 +200,21 @@ These are not equations but explicit decisions made in the papers that the
 docs should quote (or paraphrase tightly) so users understand *why* the code
 is shaped as it is:
 
-1. **No solar SFI in J** (S2014 §2.2). The matrix-operator Eqs. (23)–(28)
-   suffice instead of (23)–(33); for thermal-only `m=0`, `J` is isotropic
-   so its computations can be reused. The cost is needing Block-Radau
-   (App. B) for off-quadrature angles. → Concepts/02 + Concepts/04.
+1. **Historical no-solar-SFI choice, plus the current opt-in alternative.**
+   S2014 §2.2 omits direct-solar single scatter from `J`, allowing the
+   matrix-operator Eqs. (23)–(28) instead of (23)–(33), at the cost of
+   Block-Radau (App. B) for exact off-quadrature solar geometry. The current
+   solver implements Fell-style SFI in both angular representations. In the
+   optional external form, `μ₀` is a scalar and exact phase-source column
+   outside the diffuse streams. Enable it with the constructor keyword
+   `model_from_parameters(...; external_solar=true)`, not a YAML entry.
+   The Gauss + Lambertian `rt_run_toa` path supports elastic and forward
+   rotational Raman `RRS`; elastic Jacobians use linearized `rt_run`.
+   These paths do not construct BOA/HDR/BHR outputs. Embedded-`μ₀` behavior
+   remains the default; Raman Jacobians, VRS, non-Lambertian,
+   single-scatter-only, and interior-sensor paths require it and reject
+   external-solar models.
+   → Concepts/02 + Concepts/04.
 2. **Constant-`N_doubl` across the spectral grid** (SF2023-II §3.2,
    Eqs. 8–9). `N_doubl` is sized by the scattering optical depth, not the
    total. Lets line-by-line on hyperspectral grids run on GPU at one
@@ -239,7 +253,9 @@ is shaped as it is:
    t⁺⁺[i,j] = ϖ_λ·Z⁺⁺[i,j]·(μⱼ/(μᵢ−μⱼ))·wⱼ·(exp(−δτ/μᵢ) − exp(−δτ/μⱼ))   (i ≠ j)
    t⁺⁺[i,i] = exp(−δτ/μᵢ)·(1 + ϖ_λ·Z⁺⁺[i,i]·(δτ/μᵢ)·wᵢ)                  (i = j L'Hôpital limit)
    ```
-   coded with `-expm1(-x)` and `expdiff_neg(a, b)` for numerical stability
+   coded with `-expm1(-x)` and, for the `μⱼ/(μᵢ−μⱼ)` term, the divided
+   difference `elem_trans_factor(δτ, μᵢ, μⱼ) = (δτ/μᵢ)·expdiff_ratio(δτ/μᵢ, δτ/μⱼ)`
+   (no division by `μᵢ−μⱼ`; `rt_helpers.jl`) for numerical stability
    in optically thin layers and especially in `Float32`. This means the
    elemental layer can be **thicker at the same single-scatter accuracy**
    → fewer doublings, less round-off accumulation. It compounds with the
@@ -325,3 +341,63 @@ is shaped as it is:
   year = {1997}
 }
 ```
+
+### Local optical basis and contraction order
+
+`LayerOpticalProperties/local_jacobian_cache.jl` differentiates the mixture
+definitions S2014 (C.22)–(C.24) using a fixed Rayleigh reference. This is an
+algebraic choice of basis, not a claim about the 2013 Fortran implementation.
+`local_jacobian.jl` shares its complete phase directions across layers;
+`CoreKernel/local_jacobian.jl::build_doubled_layer_lin!` applies the
+(C.25)–(C.26) chain rule after local tangent propagation. The contraction is
+linear in complete doubled matrices; it is never an elementwise dR/dZ product.
+The independent attenuation term follows directly from J=exp(-τ_above/μ₀) Ĵ.
+The scalar truncation chain remains in
+`LayerOpticalProperties/optical_jacobian_cache.jl::_createAero_invariant`, and
+`phase_blocks_lin.jl` receives derivatives of the normalized truncated Greek
+coefficients. Backend-native interpolation in `phase_interpolation.jl` is
+linear at fixed wavenumber knots and therefore acts identically on these
+values and tangents.
+
+### Regular elemental limits
+
+`elemental_fused_lin.jl::_single_scatter_source_factors` evaluates the finite-δ
+SF2023-II (11) factors and their τ partials, including the equal-μ limit at
+τ=0. Since j=wₘϖ(ZF₀)f, its ϖ and projected-phase partials are products with
+one linear factor removed. Dividing j by ϖ or ZF₀ and substituting zero for
+0/0 loses nonzero tangents. The same principle applies to the diffuse
+reflection/transmission partials in (10). The boundary regression compares
+these derivatives to independent forward-kernel finite differences at zero
+albedo, zero thickness and a zero projected phase entry.
+
+### Equivalent-source tangent adding (opt-in)
+
+`CoreKernel/source_adding_lin.jl` applies S2014 (C.6) to each complete doubled
+layer at fixed incident fields: `f⁻=dr⁻⁺D+dt⁻⁻U+dj⁻`, with the corresponding
+downward expression. A backward interface solve supplies D,U; S2014 (27)–(28)
+/ SF2023-II (12) then propagate these equivalent sources through fixed forward
+operators. Local forcing vectors are contracted to retrieval columns before
+this source solve. Solar attenuation above each layer is restored once as
+`−j dτ_above/μ₀`. The Lambertian boundary uses only its own albedo directions
+and appends the full-column solar tangent once, using the reflected solar source
+saved before emission is injected. Surface SIF and its amplitude/slope derivatives
+enter as independent boundary vectors (`2 SIF₀` and `2 ∂SIF₀/∂p` at `m=0`),
+consistent with the affine boundary in S2014 (33)–(37). The factor two is the
+package's Fourier normalization, documented in `Sources/surface_sif.jl`;
+SIF does not carry direct-solar attenuation. The fixed incident fields include
+SIF, retaining its atmospheric and albedo derivatives. This ordering is a derivation
+of the affine adding equations, not an attribution to the historical code.
+See [source adding](jacobian_batched/source_adding.md) for scope and memory cost.
+
+The local derivative basis does not change the floating-point evaluation order
+of the forward mixture. `local_jacobian_cache.jl` retains the successive `τ·ϖ`
+weights of optical-property `+`; `mix_local_forward_phase` applies those weights
+in the same order. Phase differences remain derivative directions only. This
+is an implementation choice for Float32 parity, not a different form of
+S2014 (C.22)–(C.26).
+
+For pure absorption, S2014 (C.22)–(C.24) reduce to `S_after=S_before` and
+`Z_after=Z_before`. The scattering-plus-absorption `+` method in `types_lin.jl`
+therefore preserves existing phase derivatives and appends exact zero gas
+directions through `_append_absorption_phase_columns`. It does not evaluate
+the cancelling expanded quotient in floating-point arithmetic.

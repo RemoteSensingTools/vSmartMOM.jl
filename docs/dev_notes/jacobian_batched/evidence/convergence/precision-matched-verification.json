@@ -1,0 +1,71 @@
+{
+  "configuration": "precision64-matched",
+  "Float32": {
+    "max_noise_sigma": 0.017233658615559626,
+    "prediction_max_noise_sigma": 0.000424400976104465,
+    "remainder_max_noise_sigma": 0.01727668783072165
+  },
+  "Float64": {
+    "max_noise_sigma": 0.0004258806547934414,
+    "prediction_max_noise_sigma": 0.0004241965375603506,
+    "remainder_max_noise_sigma": 4.795352167163283e-06
+  },
+  "fixed_state_precision_difference": {
+    "reference": 0.90874920932122,
+    "optimized": 0.9069823302407986
+  },
+  "n_measurements": 934,
+  "output_sha256": {
+    "precision64-matched-reference.jld2": "c978c86e4ab79f55e243e1137119b6572cb1c06c18fe4be4483f1f963d0b6cb7",
+    "precision64-matched-optimized.jld2": "310e6522effd6eae0e51ababfb8d814ff1ca0b94d2585dcba915d6f7e0f3cb6e"
+  },
+  "matched_doubling_counts": true,
+  "numerical_settings": [
+    {
+      "ndoubl": [
+        4,
+        4,
+        5,
+        6,
+        6,
+        4,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        9,
+        10,
+        9,
+        6
+      ],
+      "d_tau_min_floor": 0.0001220703125,
+      "d_tau_max_threshold": 0.0010000000474974513,
+      "state": "reference"
+    },
+    {
+      "ndoubl": [
+        4,
+        4,
+        5,
+        6,
+        6,
+        4,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        9,
+        10,
+        9,
+        6
+      ],
+      "d_tau_min_floor": 0.0001220703125,
+      "d_tau_max_threshold": 0.0010000000474974513,
+      "state": "optimized"
+    }
+  ]
+}

@@ -1,6 +1,126 @@
 "Abstract Type for Layer Ṙ,Ṫ and J̇ matrices"
 abstract type AbstractLayerLin end
 
+# Allocate/zero on the array's backend; never stage a large zero tensor on
+# the CPU merely to copy it to a GPU. This also preserves the floating type.
+_zero_tangent(A, dims...) = fill!(similar(A, dims...), zero(eltype(A)))
+
+"""
+Reusable forward and tangent scratch for batched doubling and interaction.
+The last tangent axis holds either local optical directions or retrieval
+columns. `products` owns optional backend multiplication metadata; it shares
+the workspace lifetime and contains no physical state or derivative formulas.
+"""
+struct JacobianPropagationWorkspace{M,V,DM,DV,P}
+    G::M
+    H::M
+    m1::M
+    m2::M
+    R::M
+    T::M
+    v1::V
+    v2::V
+    Jminus::V
+    Jplus::V
+    dH::DM
+    dm1::DM
+    dm2::DM
+    dR::DM
+    dT::DM
+    dv1::DV
+    dv2::DV
+    dJminus::DV
+    dJplus::DV
+    products::P
+end
+
+"""
+    SolarColumnOperatorsLin{FT}
+
+Physical-parameter tangents of the rectangular direct-solar layer operators.
+Each field has layout `(NquadN, nStokes, nSpec, nParams)`, matching the
+corresponding field of [`SolarColumnOperators`](@ref) with a final retrieval-
+parameter axis.
+"""
+Base.@kwdef struct SolarColumnOperatorsLin{FT}
+    Ṙ₀⁻⁺::AbstractArray{FT,4}
+    Ṙ₀⁺⁻::AbstractArray{FT,4}
+    Ṫ₀⁺⁺::AbstractArray{FT,4}
+    Ṫ₀⁻⁻::AbstractArray{FT,4}
+end
+
+"""
+    LevelRadianceLin
+
+Forward radiances and analytic Jacobians at one strict-interior atmospheric
+interface.  The three radiance fields mirror [`LevelRadiance`](@ref); each
+`*_jacobian` field appends the `ParameterLayout` dimension as its last axis.
+
+The unscattered solar beam is kept separate from the diffuse MOM field.  Use
+[`total_downwelling`](@ref) and [`total_downwelling_jacobian`](@ref) when the
+sum of both components is desired.
+
+As in the forward [`LevelRadiance`](@ref), a `CoxMunkSurface` glint enters
+`upwelling` and `upwelling_jacobian` through the Fourier series only; the
+exact-glint correction is applied at TOA only.
+"""
+struct LevelRadianceLin{FT,U,D,JU,JD}
+    "Geometric height in km above model BOA"
+    height_km::FT
+    "Interface index: number of atmospheric layers above this level"
+    boundary_index::Int
+    upwelling::U
+    downwelling::D
+    unscattered_downwelling::D
+    upwelling_jacobian::JU
+    downwelling_jacobian::JD
+    unscattered_downwelling_jacobian::JD
+end
+
+"Return diffuse plus unscattered downwelling radiance at an interior level."
+function total_downwelling(level::LevelRadianceLin)
+    return level.downwelling .+ level.unscattered_downwelling
+end
+
+"Return the analytic Jacobian of [`total_downwelling`](@ref)."
+function total_downwelling_jacobian(level::LevelRadianceLin)
+    return level.downwelling_jacobian .+
+           level.unscattered_downwelling_jacobian
+end
+
+"""
+    ObserverRTResultLin
+
+Height-aware result from the analytic tangent-linear RT solver.  `toa` and
+`boa` contain the requested endpoint radiances, their matching Jacobians are
+stored in `toa_jacobian` and `boa_jacobian`, and `levels` contains co-located
+up/down results at every requested strict-interior height.
+
+For backward compatibility the result is iterable and indexable as the
+historical four slots `(toa, boa, toa_jacobian, boa_jacobian)`.
+"""
+struct ObserverRTResultLin{FT,TOA,BOA,JTOA,JBOA,L}
+    toa::TOA
+    boa::BOA
+    toa_jacobian::JTOA
+    boa_jacobian::JBOA
+    levels::Vector{L}
+    toa_altitude_km::FT
+    layout::AbstractParameterLayout
+end
+
+@inline _observer_lin_legacy_tuple(r::ObserverRTResultLin) =
+    (r.toa, r.boa, r.toa_jacobian, r.boa_jacobian)
+Base.length(::ObserverRTResultLin) = 4
+Base.firstindex(::ObserverRTResultLin) = 1
+Base.lastindex(::ObserverRTResultLin) = 4
+Base.getindex(r::ObserverRTResultLin, indices...) =
+    getindex(_observer_lin_legacy_tuple(r), indices...)
+Base.iterate(r::ObserverRTResultLin, state...) =
+    iterate(_observer_lin_legacy_tuple(r), state...)
+Base.Tuple(r::ObserverRTResultLin) = _observer_lin_legacy_tuple(r)
+Base.keys(r::ObserverRTResultLin) = keys(_observer_lin_legacy_tuple(r))
+
 """
     CompositeLayerLin{FT} <: AbstractLayerLin
 
@@ -94,6 +214,41 @@ Base.@kwdef struct AddedLayerLin{FT} <: AbstractLayerLin
     dbl_gp_refl::Union{AbstractArray{FT,3}, Nothing} = nothing
     "Doubling workspace: T⁺⁺·gp_refl (forward) [nμ × nμ × nSpec]"
     dbl_tt_gp_refl::Union{AbstractArray{FT,3}, Nothing} = nothing
+    "Scratch shared across doubling and interaction; nothing retains the reference path"
+    propagation_workspace::Union{JacobianPropagationWorkspace,Nothing} = nothing
+    "Optional physical-parameter tangents of direct-solar columns"
+    solar_columns::Union{SolarColumnOperatorsLin{FT},Nothing} = nothing
+end
+
+"""
+    AbundanceTangentContract
+
+Records what the native gas-abundance tangents `τ̇_abs` omit. Each native gas
+column is the partial `∂τ/∂VMR = σ·N_dry`: it differentiates the explicit
+abundance factor of line/LUT absorption with every cross section, CIA and
+MT_CKD optical depth held fixed. The q-driven H₂O columns also include the
+exact response of ABSCO H₂O-broadener axes, which is therefore never listed
+as omitted. `omitted[i_band][igas]` lists the forward
+terms of band `i_band` that nevertheless respond to native gas slot `igas`
+(slot 1 is q-driven H₂O, slot `1+i` is `variable_molecules[i_band][i]`).
+
+With `abundance_jacobians == :complete` (the default), a solve or Jacobian
+plan that requests a slot with omitted terms is rejected. `:frozen_cross_section`
+accepts those omissions explicitly; the tangent values are identical in both
+settings. When `q ≡ 0`, H₂O absorption
+is not evaluated and the q-driven H₂O columns are structural zeros rather than
+derivatives; Jacobian plans may not select them.
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct AbundanceTangentContract
+    "Accepted abundance-derivative definition: `:complete` or `:frozen_cross_section`"
+    abundance_jacobians::Symbol
+    "Species label of each native gas slot, per band"
+    species::Vector{Vector{String}}
+    "Forward terms responding to each native gas slot but absent from τ̇_abs, per band"
+    omitted::Vector{Vector{Vector{String}}}
 end
 
 """
@@ -105,13 +260,54 @@ and aerosol properties w.r.t. physical state-vector elements.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-mutable struct RTModelLin{A,B,C}
-    "∂τ_abs/∂x per band: Vector of arrays [NGas × nSpec × nLayers]"
+mutable struct RTModelLin{A,B,C,D,E,F}
+    "∂τ_abs/∂VMR(gas,z) per band: [NGas*Nz × nSpec × Nz], species-major"
     τ̇_abs::A
     "∂τ_aer/∂x per band: Vector of arrays [NAer × 7 × nSpec × nLayers]"
     τ̇_aer::B
     "Linearized aerosol optics per band per aerosol: Vector{Vector{linAerosolOptics}}"
     lin_aerosol_optics::C
+    "∂τ_rayl/∂p_surf per band: [nSpec × nLayers]; nothing when pressure is disabled"
+    τ̇_rayl_psurf::D
+    "∂τ_aer/∂p_surf per band: [NAer × nSpec × nLayers]; nothing when disabled"
+    τ̇_aer_psurf::E
+    "∂τ_abs/∂p_surf per band: [nSpec × nLayers]; nothing when pressure is disabled"
+    τ̇_abs_psurf::F
+    "Terms omitted by the gas-abundance tangents; nothing when the caller supplied τ̇_abs"
+    abundance_contract::Union{Nothing,AbundanceTangentContract}
+end
+
+# Hand-assembled tangents carry no construction record; their provenance
+# remains the caller's responsibility (as for a manual `PlannedRTModelLin`).
+RTModelLin(τ̇_abs, τ̇_aer, lin_aerosol_optics, τ̇_rayl_psurf, τ̇_aer_psurf,
+           τ̇_abs_psurf) =
+    RTModelLin(τ̇_abs, τ̇_aer, lin_aerosol_optics, τ̇_rayl_psurf,
+               τ̇_aer_psurf, τ̇_abs_psurf, nothing)
+RTModelLin{A,B,C,D,E,F}(τ̇_abs, τ̇_aer, lin_aerosol_optics, τ̇_rayl_psurf,
+                        τ̇_aer_psurf, τ̇_abs_psurf) where {A,B,C,D,E,F} =
+    RTModelLin{A,B,C,D,E,F}(τ̇_abs, τ̇_aer, lin_aerosol_optics, τ̇_rayl_psurf,
+                            τ̇_aer_psurf, τ̇_abs_psurf, nothing)
+
+"""
+    PlannedRTModelLin
+
+Backward-compatible wrapper pairing the ordinary physical-derivative model
+with a compiled [`JacobianPlan`](@ref). Unknown properties are forwarded to
+`base`, so diagnostic code written for `RTModelLin` continues to work.
+"""
+struct PlannedRTModelLin{M,P<:JacobianPlan}
+    base::M
+    plan::P
+end
+
+function Base.getproperty(model::PlannedRTModelLin, name::Symbol)
+    name === :base && return getfield(model, :base)
+    name === :plan && return getfield(model, :plan)
+    return getproperty(getfield(model, :base), name)
+end
+
+function Base.propertynames(model::PlannedRTModelLin, private::Bool=false)
+    return (:base, :plan, propertynames(getfield(model, :base), private)...)
 end
 abstract type AbstractOpticalPropertiesLin end
 
@@ -138,7 +334,7 @@ the full `∂R/∂x` via:
 
 See also: [`OpticalPropertyJacobian`](@ref) (alias).
 """
-Base.@kwdef struct CoreScatteringOpticalPropertiesLin{T1,T2,T3} <: AbstractOpticalPropertiesLin
+Base.@kwdef struct CoreScatteringOpticalPropertiesLin{T1,T2,T3,T4} <: AbstractOpticalPropertiesLin
     "∂τ/∂x — [Nparams] or [nSpec × Nparams]"
     τ̇::T1
     "∂ϖ/∂x — [Nparams] or [nSpec × Nparams]"
@@ -147,7 +343,14 @@ Base.@kwdef struct CoreScatteringOpticalPropertiesLin{T1,T2,T3} <: AbstractOptic
     Ż⁺⁺::T3
     "∂Z⁻⁺/∂x — [nμ × nμ × nSpec] or [nμ × nμ × nSpec × Nparams]"
     Ż⁻⁺::T3
+    "∂Z₀⁺/∂x for the external solar phase block, or nothing"
+    Ż₀⁺::T4 = nothing
+    "∂Z₀⁻/∂x for the external solar phase block, or nothing"
+    Ż₀⁻::T4 = nothing
 end
+
+CoreScatteringOpticalPropertiesLin(τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺) =
+    CoreScatteringOpticalPropertiesLin(τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺, nothing, nothing)
 
 """
     OpticalPropertyJacobian
@@ -175,6 +378,20 @@ end
 
 
 # Adding Core Optical Properties, can have mixed dimensions!
+@inline _spectral_Z4(Z::AbstractArray{T,2}, n) where {T} = reshape(Z, size(Z,1), size(Z,2), 1, 1)
+@inline _spectral_Z4(Z::AbstractArray{T,3}, n) where {T} = reshape(Z, size(Z,1), size(Z,2), size(Z,3), 1)
+@inline _spectral_Zdot4(Z::AbstractArray{T,3}, n) where {T} = reshape(Z, size(Z,1), size(Z,2), 1, size(Z,3))
+@inline _spectral_Zdot4(Z::AbstractArray{T,4}, n) where {T} = Z
+
+"Append exactly zero gas-phase directions; pure absorption leaves scattering Z unchanged."
+function _append_absorption_phase_columns(Ż, n, n_absorption)
+    phase = _spectral_Zdot4(Ż,n)
+    n_scattering = size(phase,4)
+    out = _zero_tangent(phase,size(phase,1),size(phase,2),n,n_scattering+n_absorption)
+    @views out[:,:,:,1:n_scattering] .= phase
+    return out
+end
+
 """
     Base.:+(a::UmbrellaCoreScatteringOpticalProperties, b::UmbrellaCoreScatteringOpticalProperties)
 
@@ -203,6 +420,8 @@ function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
     xZ⁻⁺ = x.Z⁻⁺
     yZ⁺⁺ = y.Z⁺⁺
     yZ⁻⁺ = y.Z⁻⁺
+    (x.Z₀⁺ === nothing) == (y.Z₀⁺ === nothing) || throw(ArgumentError(
+        "cannot mix linearized optics with inconsistent solar phase columns"))
 
     if ẋ==nothing # Rayleigh    
         τ  = x.τ .+ y.τ
@@ -223,23 +442,25 @@ function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
         
         Z⁺⁺ = (wx .* xZ⁺⁺ .+ wy .* yZ⁺⁺) 
         Z⁻⁺ = (wx .* xZ⁻⁺ .+ wy .* yZ⁻⁺)
+        Z₀⁺ = x.Z₀⁺ === nothing ? nothing : wx .* x.Z₀⁺ .+ wy .* y.Z₀⁺
+        Z₀⁻ = x.Z₀⁻ === nothing ? nothing : wx .* x.Z₀⁻ .+ wy .* y.Z₀⁻
     
         nμ = size(xZ⁺⁺,1)
         n1 = 0
         n2 = size(ẏ.τ̇,2)
 
         Ż⁺⁺ = (reshape(ẏ.τ̇.*y.ϖ .+ y.τ.*ẏ.ϖ̇, 1, 1, n, n2).*
-            reshape(yZ⁺⁺, nμ, nμ, 1, 1) .+ 
+            _spectral_Z4(yZ⁺⁺, n) .+
             reshape(y.τ.*y.ϖ, 1, 1, n, 1).*
-            reshape(ẏ.Ż⁺⁺, nμ, nμ, 1, n2) .- 
+            _spectral_Zdot4(ẏ.Ż⁺⁺, n) .-
             reshape(τ.*ϖ̇ .+ τ̇.*ϖ, 1, 1, n, n2).*
             reshape(Z⁺⁺, nμ, nμ, n, 1))./
             reshape(τ.*ϖ, 1, 1, n, 1)
 
         Ż⁻⁺ = (reshape(ẏ.τ̇.*y.ϖ .+ y.τ.*ẏ.ϖ̇, 1, 1, n, n2).*
-            reshape(yZ⁻⁺, nμ, nμ, 1, 1) .+ 
+            _spectral_Z4(yZ⁻⁺, n) .+
             reshape(y.τ.*y.ϖ, 1, 1, n, 1).*
-            reshape(ẏ.Ż⁻⁺, nμ, nμ, 1, n2) .- 
+            _spectral_Zdot4(ẏ.Ż⁻⁺, n) .-
             reshape(τ.*ϖ̇ .+ τ̇.*ϖ, 1, 1, n, n2).*
             reshape(Z⁻⁺, nμ, nμ, n, 1))./
             reshape(τ.*ϖ, 1, 1, n, 1)
@@ -264,22 +485,57 @@ function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
         
         Z⁺⁺ = (wx .* xZ⁺⁺ .+ wy .* yZ⁺⁺) 
         Z⁻⁺ = (wx .* xZ⁻⁺ .+ wy .* yZ⁻⁺)
+        Z₀⁺ = x.Z₀⁺ === nothing ? nothing : wx .* x.Z₀⁺ .+ wy .* y.Z₀⁺
+        Z₀⁻ = x.Z₀⁻ === nothing ? nothing : wx .* x.Z₀⁻ .+ wy .* y.Z₀⁻
     
         nμ = size(xZ⁺⁺,1)
         n1 = size(ẋ.τ̇,2)
         n2 = size(ẏ.τ̇,2)
+        # Differentiate normalized phase mixing, S2014 (C.22)–(C.24):
+        # S = τϖ = Sₓ+Sᵧ, Z = (Sₓ Zₓ+Sᵧ Zᵧ)/S,
+        # dZ = [d(Sₓ Zₓ+Sᵧ Zᵧ) - Z dS]/S. Each component's
+        # independent parameter block contributes to the numerator and S.
         Ż⁺⁺ = (cat(
-            reshape(ẋ.τ̇.*x.ϖ .+ x.τ.*ẋ.ϖ̇, 1, 1, n, n1).*reshape(xZ⁺⁺,nμ,nμ,1,1) .+ reshape(x.τ.*x.ϖ,1,1,n,1).*reshape(ẋ.Ż⁺⁺,nμ,nμ,1,n1),
-            reshape(ẏ.τ̇.*y.ϖ .+ y.τ.*ẏ.ϖ̇, 1, 1, n, n2).*reshape(yZ⁺⁺,nμ,nμ,1,1) .+ reshape(y.τ.*y.ϖ,1,1,n,1).*reshape(ẏ.Ż⁺⁺,nμ,nμ,1,n2),
+            reshape(ẋ.τ̇.*x.ϖ .+ x.τ.*ẋ.ϖ̇, 1, 1, n, n1).*_spectral_Z4(xZ⁺⁺, n) .+ reshape(x.τ.*x.ϖ,1,1,n,1).*_spectral_Zdot4(ẋ.Ż⁺⁺, n),
+            reshape(ẏ.τ̇.*y.ϖ .+ y.τ.*ẏ.ϖ̇, 1, 1, n, n2).*_spectral_Z4(yZ⁺⁺, n) .+ reshape(y.τ.*y.ϖ,1,1,n,1).*_spectral_Zdot4(ẏ.Ż⁺⁺, n),
                 dims=4) .- reshape(τ.*ϖ̇ .+ τ̇.*ϖ, 1, 1, n, n1+n2).*reshape(Z⁺⁺,nμ,nμ,n,1))./reshape(τ.*ϖ,1,1,n,1)
 
 
         Ż⁻⁺ = (cat(
-            reshape(ẋ.τ̇.*x.ϖ .+ x.τ.*ẋ.ϖ̇, 1, 1, n, n1).*reshape(xZ⁻⁺,nμ,nμ,1,1) .+ reshape(x.τ.*x.ϖ,1,1,n,1).*reshape(ẋ.Ż⁻⁺,nμ,nμ,1,n1),
-            reshape(ẏ.τ̇.*y.ϖ .+ y.τ.*ẏ.ϖ̇, 1, 1, n, n2).*reshape(yZ⁻⁺,nμ,nμ,1,1) .+ reshape(y.τ.*y.ϖ,1,1,n,1).*reshape(ẏ.Ż⁻⁺,nμ,nμ,1,n2),
+            reshape(ẋ.τ̇.*x.ϖ .+ x.τ.*ẋ.ϖ̇, 1, 1, n, n1).*_spectral_Z4(xZ⁻⁺, n) .+ reshape(x.τ.*x.ϖ,1,1,n,1).*_spectral_Zdot4(ẋ.Ż⁻⁺, n),
+            reshape(ẏ.τ̇.*y.ϖ .+ y.τ.*ẏ.ϖ̇, 1, 1, n, n2).*_spectral_Z4(yZ⁻⁺, n) .+ reshape(y.τ.*y.ϖ,1,1,n,1).*_spectral_Zdot4(ẏ.Ż⁻⁺, n),
                 dims=4) .- reshape(τ.*ϖ̇ .+ τ̇.*ϖ, 1, 1, n, n1+n2).*reshape(Z⁻⁺,nμ,nμ,n,1))./reshape(τ.*ϖ,1,1,n,1)
     end
-    return UmbrellaCoreScatteringOpticalProperties(CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺), CoreScatteringOpticalPropertiesLin(τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺))    
+    if x.Z₀⁺ === nothing
+        Ż₀⁺ = Ż₀⁻ = nothing
+    elseif ẋ === nothing
+        n2 = size(ẏ.τ̇, 2)
+        Ż₀⁺ = (reshape(ẏ.τ̇.*y.ϖ .+ y.τ.*ẏ.ϖ̇, 1, 1, n, n2) .* _spectral_Z4(y.Z₀⁺, n) .+
+                reshape(y.τ.*y.ϖ, 1, 1, n, 1) .* _spectral_Zdot4(ẏ.Ż₀⁺, n) .-
+                reshape(τ.*ϖ̇ .+ τ̇.*ϖ, 1, 1, n, n2) .* _spectral_Z4(Z₀⁺, n)) ./
+               reshape(τ.*ϖ, 1, 1, n, 1)
+        Ż₀⁻ = (reshape(ẏ.τ̇.*y.ϖ .+ y.τ.*ẏ.ϖ̇, 1, 1, n, n2) .* _spectral_Z4(y.Z₀⁻, n) .+
+                reshape(y.τ.*y.ϖ, 1, 1, n, 1) .* _spectral_Zdot4(ẏ.Ż₀⁻, n) .-
+                reshape(τ.*ϖ̇ .+ τ̇.*ϖ, 1, 1, n, n2) .* _spectral_Z4(Z₀⁻, n)) ./
+               reshape(τ.*ϖ, 1, 1, n, 1)
+    else
+        n1, n2 = size(ẋ.τ̇, 2), size(ẏ.τ̇, 2)
+        function mixdot(X, Xdot, Y, Ydot, mixed)
+            numerator = cat(
+                reshape(ẋ.τ̇.*x.ϖ .+ x.τ.*ẋ.ϖ̇, 1, 1, n, n1) .* _spectral_Z4(X, n) .+
+                    reshape(x.τ.*x.ϖ, 1, 1, n, 1) .* _spectral_Zdot4(Xdot, n),
+                reshape(ẏ.τ̇.*y.ϖ .+ y.τ.*ẏ.ϖ̇, 1, 1, n, n2) .* _spectral_Z4(Y, n) .+
+                    reshape(y.τ.*y.ϖ, 1, 1, n, 1) .* _spectral_Zdot4(Ydot, n); dims=4)
+            return (numerator .-
+                    reshape(τ.*ϖ̇ .+ τ̇.*ϖ, 1, 1, n, n1+n2) .* _spectral_Z4(mixed, n)) ./
+                   reshape(τ.*ϖ, 1, 1, n, 1)
+        end
+        Ż₀⁺ = mixdot(x.Z₀⁺, ẋ.Ż₀⁺, y.Z₀⁺, ẏ.Ż₀⁺, Z₀⁺)
+        Ż₀⁻ = mixdot(x.Z₀⁻, ẋ.Ż₀⁻, y.Z₀⁻, ẏ.Ż₀⁻, Z₀⁻)
+    end
+    return UmbrellaCoreScatteringOpticalProperties(
+        CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺, Z₀⁺, Z₀⁻),
+        CoreScatteringOpticalPropertiesLin(τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺, Ż₀⁺, Ż₀⁻))
 end
 
 """
@@ -324,8 +580,8 @@ function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
         nμ = size(xZ⁺⁺,1)
         n1 = 0
         n2 = size(ẏ.τ̇,2)
-        Ż⁺⁺ = zeros(nμ, nμ, n, n2)
-        Ż⁻⁺ = zeros(nμ, nμ, n, n2)
+        Ż⁺⁺ = _zero_tangent(xZ⁺⁺, nμ, nμ, n, n2)
+        Ż⁻⁺ = _zero_tangent(xZ⁻⁺, nμ, nμ, n, n2)
 
     else
         τ  = x.τ .+ y.τ
@@ -352,17 +608,25 @@ function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
         n1 = size(ẋ.τ̇,2)
         n2 = size(ẏ.τ̇,2)
         
-        Ż⁺⁺ = (cat(
-            reshape(ẋ.τ̇ .* x.ϖ .+ x.τ.*ẋ.ϖ̇, 1, 1, n, n1).*reshape(xZ⁺⁺,nμ,nμ,n,1) .+ reshape(x.τ.*x.ϖ,1,1,n,1).*ẋ.Ż⁺⁺,
-            zeros(nμ, nμ, n, n2),
-                dims=4) .- reshape(τ.*ϖ̇ .+ τ̇.*ϖ, 1, 1, n, n1+n2).*reshape(Z⁺⁺,nμ,nμ,n,1))./reshape(τ.*ϖ,1,1,n,1)
-
-        Ż⁻⁺ = (cat(
-            reshape(ẋ.τ̇ .* x.ϖ .+ x.τ.*ẋ.ϖ̇, 1, 1, n, n1).*reshape(xZ⁻⁺,nμ,nμ,n,1) .+ reshape(x.τ.*x.ϖ,1,1,n,1).*ẋ.Ż⁻⁺,
-            zeros(nμ, nμ, n, n2),
-                dims=4) .- reshape(τ.*ϖ̇ .+ τ̇.*ϖ, 1, 1, n, n1+n2).*reshape(Z⁻⁺,nμ,nμ,n,1))./reshape(τ.*ϖ,1,1,n,1)
+        # S2014 (C.22)–(C.24): adding pure absorption changes τ and ϖ,
+        # but S=τϖ=Sₓ and Z=Zₓ. Therefore dZ=[dZₓ, 0] exactly.
+        # Expanding the quotient and then cancelling its numerator creates
+        # spurious gas-phase derivatives in Float32 and extra large tensors.
+        Ż⁺⁺ = _append_absorption_phase_columns(ẋ.Ż⁺⁺,n,n2)
+        Ż⁻⁺ = _append_absorption_phase_columns(ẋ.Ż⁻⁺,n,n2)
     end
-    return UmbrellaCoreScatteringOpticalProperties(CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺), CoreScatteringOpticalPropertiesLin(τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺))
+    if x.Z₀⁺ === nothing
+        Ż₀⁺ = Ż₀⁻ = nothing
+    elseif ẋ === nothing
+        Ż₀⁺ = _zero_tangent(x.Z₀⁺, size(x.Z₀⁺,1), size(x.Z₀⁺,2), n, n2)
+        Ż₀⁻ = _zero_tangent(x.Z₀⁻, size(x.Z₀⁻,1), size(x.Z₀⁻,2), n, n2)
+    else
+        Ż₀⁺ = _append_absorption_phase_columns(ẋ.Ż₀⁺,n,n2)
+        Ż₀⁻ = _append_absorption_phase_columns(ẋ.Ż₀⁻,n,n2)
+    end
+    return UmbrellaCoreScatteringOpticalProperties(
+        CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺, x.Z₀⁺, x.Z₀⁻),
+        CoreScatteringOpticalPropertiesLin(τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺, Ż₀⁺, Ż₀⁻))
 end
 
 

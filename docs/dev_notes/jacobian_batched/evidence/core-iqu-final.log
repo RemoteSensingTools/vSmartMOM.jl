@@ -1,0 +1,7 @@
+CORE_MEASURE nSpec=10000 pol=3 nparams=1 forward=(median = 0.184371025, samples = [0.190814549, 0.180093031, 0.184371025]) combined=(median = 0.883860149, samples = [0.901724906, 0.883860149, 0.882887149]) ratio=4.793921110977172
+CORE_MEASURE nSpec=10000 pol=3 nparams=3 forward=(median = 0.180381954, samples = [0.179793458, 0.180381954, 0.180834536]) combined=(median = 1.306906533, samples = [1.299508457, 1.314554644, 1.306906533]) ratio=7.245217739464115
+CORE_MEASURE nSpec=10000 pol=3 nparams=15 forward=(median = 0.18332083, samples = [0.183080959, 0.185302225, 0.18332083]) combined=(median = 3.856487752, samples = [3.852825145, 3.856487752, 3.899960793]) ratio=21.036822449472872
+Precompiling packages...
+  24971.0 ms  ✓ vSmartMOM
+  11318.2 ms  ✓ vSmartMOM → vSmartMOMCUDAExt
+  2 dependencies successfully precompiled in 38 seconds. 274 already precompiled.

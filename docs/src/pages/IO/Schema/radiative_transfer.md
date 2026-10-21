@@ -10,29 +10,48 @@ defaults are, and which legacy aliases still work.
 
 - **`spec_bands`** — `Vector{String}`. Each string is a Julia range
   expression in cm⁻¹, e.g. `"(1e7/777):0.015:(1e7/757)"`. Multiple
-  bands run as a band-batched solve.
+  bands run as a band-batched solve. See
+  [`Schema/spec_bands.md`](spec_bands.md) for the full expression
+  grammar (explicit lists, ranges, `u"nm"` wavelength tagging).
 - **`surface`** — `Vector{String}`. One BRDF constructor per spectral
   band. See [`Schema/surface.md`](surface.md) for the surface vocabulary
   (`LambertianSurfaceScalar`, `CoxMunkSurface`, `rpvSurfaceScalar`, etc.).
 - **`polarization_type`** — `String`. One of `"Stokes_I()"`,
   `"Stokes_IQ()"`, `"Stokes_IQU()"`, `"Stokes_IQUV()"`. Sets the Stokes
-  vector dimension (1/2/3/4 channels respectively).
-- **`Δ_angle`** — `Real`, **optional** (default `0.0`). Forward-peak
-  exclusion angle in degrees, consumed by `δBGE` truncation. Ignored
-  when `truncation: NoTruncation()` or when `truncation: auto` resolves
-  to `NoTruncation()`. Legacy YAMLs commonly set `2.0` to reproduce
-  VLIDORT's `DO_DELTAM_SCALING` default — set explicitly when matching
-  a benchmark that pins this value.
-- **`depol`** — `Real`. Rayleigh depolarization factor (0 = no
-  depolarization, the Natraj-2009 idealization).
+  vector dimension (1/2/3/4 channels respectively). `"Stokes_IQ()"` is
+  parsed but rejected when an RT model is built: neglecting U in multiple
+  scattering can cause intensity errors of several percent. Use
+  `"Stokes_IQU()"` instead.
+- **`depol`** — `Real`. Rayleigh depolarization factor. A negative value
+  (`-1`, as in `DefaultParameters.yaml`) derives the depolarization per band
+  from the N₂/O₂ molecular constants; a value `≥ 0` is used uniformly for the
+  Rayleigh and Cabannes Greek coefficients and the Rayleigh optical depth
+  (0 = no depolarization, the Natraj-2009 idealization).
+- **`rayleigh_anisotropy`** — *optional `String`, default
+  `"DispersiveAnisotropy()"`*. Wavelength dependence of the N₂/O₂
+  polarizability tensor behind the automatic (`depol < 0`) Rayleigh
+  depolarization, which sets the Rayleigh Greek coefficients and rescales the
+  Rayleigh optical depth. `"DispersiveAnisotropy()"` takes the mean
+  polarizability and anisotropy from the refractive-index fits and King
+  factors of `UsingRefInd` (the depolarization then falls from 0.028 at
+  400 nm to 0.025 at 2 µm for air); `"ConstantAnisotropy()"` uses the
+  Raman-module constants with a wavelength-independent anisotropy and
+  reproduces the v2.2 pre-release automatic depolarization bit for bit. The Cabannes
+  fraction always, and the Cabannes depolarization when `depol < 0`, use the
+  Raman-module constants, so use
+  `"ConstantAnisotropy()"` when an elastic-only run is compared with or
+  subtracted from a Raman run (Ring/filling-in spectra). Ignored when
+  `depol ≥ 0`.
 - **`float_type`** — `String`. `"Float64"` or `"Float32"`. Float32 is
   fine for most retrievals and gives a ~2× speedup on large spectral
   windows; Float64 is required for reproducing published benchmarks at
   full precision.
-- **`architecture`** — `String`. `"Architectures.CPU()"`,
-  `"Architectures.GPU()"`, or `"Architectures.MetalGPU()"`. The CUDA
-  GPU path is loaded via the `vSmartMOMCUDAExt` weak-dependency
-  extension (`using CUDA` activates it).
+- **`architecture`** — `String`. `"default_architecture"`,
+  `"CPU()"`, `"GPU()"`, or `"MetalGPU()"` (the last three also accepted
+  with an `Architectures.` prefix, e.g. `"Architectures.CPU()"`;
+  `default_architecture` takes no prefix). The CUDA
+  GPU path is implemented by the `vSmartMOMCUDAExt` extension. CUDA is
+  currently a direct dependency; CPU execution needs no CUDA device.
 
 ## Resolution knobs (Phase D — v0.7)
 
@@ -50,11 +69,45 @@ recommended path; legacy `max_m` + `l_trunc` configs keep working.
   bound (order). When set, clamps the trait-aggregator output below
   `stream_l_cap`. Useful when you want to truncate the loop more
   aggressively than the per-component traits would.
+- **`greek_beta_cutoff`** — *optional positive number, default `null`*.
+  Applies a second-stage Fourier-support filter after each aerosol size
+  distribution has been integrated into Greek coefficients. For every aerosol,
+  the retained support ends at the largest degree satisfying
+  ``|β_l| ≥ greek_beta_cutoff`` at any wavelength in the band; the maximum
+  across aerosols enters the component trait aggregator. This tightens the
+  conservative maximum-size-parameter ceiling when the particle distribution
+  has a very weak large-radius tail. It does not inspect α, γ, δ, ϵ, or ζ.
+  Omit it or set it to `null` to preserve the full coefficient-length support.
+
+  The resulting aerosol rule is deliberately two-stage:
+
+  1. The maximum Mie size parameter determines the conservative coefficient
+     allocation ceiling.
+  2. After integration over the complete size distribution, the last
+     significant β coefficient determines effective Fourier support.
+
+  The scan uses magnitude because β may be signed, and uses the last passing
+  degree rather than assuming a monotonic tail. For spectrally resolved β, a
+  degree is retained if it passes at **any** wavelength in the band. The
+  maximum support across aerosol species is combined with Rayleigh, surface,
+  and source traits. Finally, `m_max`, `stream_l_cap`, and available
+  coefficient length act as upper caps.
+
+  **Aerosol input migration:** aerosol YAML/TOML files should now state this
+  choice explicitly. Use `greek_beta_cutoff: 1.0e-5` (or another validated
+  positive threshold) to remove insignificant high-degree β tails, or use
+  `greek_beta_cutoff: null` to retain the complete Mie-series support. For
+  backward compatibility, omission still behaves as `null`, but the parser
+  emits a warning so legacy aerosol inputs are not silently left unreviewed.
+
+  This reduces the number of Fourier moments evaluated. It does **not** reduce
+  `nstreams` or rebuild a smaller angular operator; choose `nstreams`
+  separately when those memory savings are desired.
 - **`truncation`** — *optional, default `auto`*. Controls how the
   aerosol phase function is treated relative to the projection cap:
   - `"auto"` *(default)*: VLIDORT-`DO_DELTAM_SCALING`-style. With no
     aerosols, resolves to `NoTruncation()`. With aerosols, picks
-    `δBGE(stream_l_cap, Δ_angle)` and the per-band Mie loop applies
+    `δBGE(stream_l_cap)` and the per-band Mie loop applies
     it only when `length(greek.β) > stream_l_cap` — short phase
     functions automatically fall back to `NoTruncation()` so the
     truncation step can never crash on a fits-the-cap series.
@@ -64,7 +117,10 @@ recommended path; legacy `max_m` + `l_trunc` configs keep working.
     projection (per Phase C trait clamps).
   - `"δBGE(L, Δ)"`: explicit δ-BGE-fit truncation (Sanghavi & Stephens
     2015). Used for benchmark reproducibility when you want exact
-    parity with a published numerical convention.
+    parity with a published numerical convention. Both arguments are
+    required in the string form; the second is the retired `Δ_angle`,
+    so write `δBGE(L, 0.0)` (a non-zero value warns once and is forced
+    to `0`).
 
 ### Legacy schema (still supported, deprecated v0.7)
 
@@ -76,10 +132,17 @@ recommended path; legacy `max_m` + `l_trunc` configs keep working.
   `stream_l_cap` under the legacy schema.
 
 Setting **both** `nstreams` and `l_trunc` produces a `@warn` — the
-legacy `l_trunc` is ignored and `nstreams` wins.
+legacy `l_trunc` is ignored and `nstreams` wins. Setting both the legacy
+`max_m` (a count) and `m_max` (an order) is rejected with an
+`ArgumentError`, because the two conflict.
 
 ## Other optional fields
 
+- **`Δ_angle`** — `Real`, **retired** (parsed for backward
+  compatibility; non-zero values warn once and are stored as `0`, so the
+  parsed parameters match what the fit uses). The δBGE fit always uses
+  the full angular domain. In TOML the Unicode key must be quoted
+  (`"Δ_angle" = 0.0`); new configurations should omit it.
 - **`quadrature_type`** — *optional, default `"GaussLegQuad()"`*. The
   recommended default. `"RadauQuad()"` is supported but documented as
   expert/legacy: it includes the SZA as a quadrature node (handy for
@@ -96,12 +159,33 @@ legacy `l_trunc` is ignored and `nstreams` wins.
   - `dτ_min_floor`     *(default `1024·eps(FT)`)* — absolute floor on
     `dτ_max`. ~`1.2e-4` for Float32 / `2.3e-13` for Float64. Prevents
     grazing-VZA configs from collapsing dτ below FT precision.
-  - `blas_threads`     *(default `null`)*  — per-model BLAS thread
-    cap. `null` leaves `BLAS.get_num_threads()` alone; an integer
-    pins it for the duration of `rt_run`. See commit `37390d2`.
+  - `blas_threads`     *(default `null`)* — selects the process-wide BLAS
+    thread count when `rt_run` starts. `null` leaves the current setting alone;
+    an integer persists after the call. Treat it as an application-level
+    choice: models with different values must not run concurrently in one
+    process.
   - `verbose`          *(default `false`)*  — when `true`, `rt_run`
     prints the `TimerOutputs` timing tree at the end of each call
     (useful for profiling, noisy in batched loops).
+  - `fourier_convergence` *(default `all`)* — `all` evaluates every allowed
+    moment; `intensity` checks I, and `stokes` checks I/Q/U. Aliases are `none`
+    for `all`, and `iqu` for `stokes`.
+  - `fourier_tolerance` *(default `1e-5`)*, `fourier_min_m` *(default `3`,
+    minimum `3`)*, and `fourier_n_consecutive` *(default `2`, minimum `1`)*
+    control the convergence test. These keys require `intensity` or `stokes`;
+    they are rejected with `all` so a requested threshold cannot be ignored.
+  - `ss_correction` *(default `none`)* — `tms` enables the aerosol
+    exact-single-scattering correction for forward elastic SFI. Raman and
+    linearized drivers reject this strategy. Cox–Munk's direct glint correction
+    is separate and is included in forward and linearized ocean solves.
+
+Unknown numerics keys are rejected. The ASCII aliases `dtau_max_threshold`
+and `dtau_min_floor` are accepted; conflicting Unicode/ASCII values are rejected.
+
+Any other key directly under `radiative_transfer` that the parser does not
+read (for example a misspelled `nstream`) is not an error: the parser emits a
+one-time warning per key and session naming the known keys, and the default
+stays in effect. The same check applies to the top level and to `geometry`.
 
 ## Example — minimal new schema
 
@@ -116,7 +200,7 @@ radiative_transfer:
   surface:
     - LambertianSurfaceScalar(0.0)
   polarization_type: Stokes_IQU()
-  Δ_angle: 2.0
+  # Δ_angle is retired (always 0)
   depol: 0.0
   float_type: Float64
   architecture: Architectures.CPU()
@@ -135,8 +219,8 @@ radiative_transfer:
   surface: ["CoxMunkSurface(wind_speed=5.0)"]
   polarization_type: Stokes_IQU()
   nstreams: 16          # 16 weighted streams ⇒ stream_l_cap = 31
-  truncation: auto      # auto → δBGE(31, 2.0) once Mie aerosol is added
-  Δ_angle: 2.0
+  truncation: auto      # auto → δBGE truncation at l = 31 once Mie aerosol is added
+  # Δ_angle is retired (always 0)
   depol: 0.0
   float_type: Float64
   architecture: Architectures.CPU()
@@ -144,6 +228,7 @@ radiative_transfer:
 
 ## See also
 
+- [`Schema/spec_bands.md`](spec_bands.md) — `spec_bands` expression grammar
 - [`Schema/surface.md`](surface.md) — BRDF vocabulary
 - [`Schema/aerosols.md`](aerosols.md) — Mie size distribution + refractive index
 - [`Schema/sources.md`](sources.md) — `SolarBeam`, `SurfaceSIF`, `BlackbodySource`

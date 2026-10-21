@@ -76,8 +76,8 @@ function get_refractive_index(db::RefractiveIndexDatabase{FT}, species::String, 
     end
     
     # Linear interpolation for real and imaginary parts
-    itp_real = LinearInterpolation(lut.wavelengths, lut.n_real)
-    itp_imag = LinearInterpolation(lut.wavelengths, lut.n_imag)
+    itp_real = linear_interpolation(lut.wavelengths, lut.n_real)
+    itp_imag = linear_interpolation(lut.wavelengths, lut.n_imag)
     
     n_real_interp = itp_real(λ)
     n_imag_interp = itp_imag(λ)

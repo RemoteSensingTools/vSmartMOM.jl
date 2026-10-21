@@ -1,0 +1,83 @@
+package = "/home/cfranken/code/gitHub/vSmartMOM-jacobian-perf/src/vSmartMOM.jl"
+saved_state = "/home/sanghavi/code/github/uni_vSmartMOM/RRS_XCO2/bottom_layer_XCO2_retrievals/retrievals_acos_mapped_tapered_vertical_correlation_nosif/corrected/retrieval_state035_perturbation10.nc"
+
+[[records]]
+mode = "copied"
+
+    [[records.samples]]
+    trial = 1
+    seconds = 9.3806329
+    host_bytes = 4672400304
+
+        [records.samples.timing]
+        model_build_seconds = 0.484160443
+        forward_seconds = 5.525287407
+        instrument_seconds = 0.059127400999999996
+        jacobian_seconds = 5.041126964
+        rt_linearized_seconds = 5.041126964
+    [[records.samples]]
+    trial = 2
+    seconds = 7.893950691
+    host_bytes = 4669975072
+
+        [records.samples.timing]
+        model_build_seconds = 0.403620936
+        forward_seconds = 5.3947937050000005
+        instrument_seconds = 0.062859469
+        jacobian_seconds = 4.991172769
+        rt_linearized_seconds = 4.991172769
+    [[records.samples]]
+    trial = 3
+    seconds = 8.304788965
+    host_bytes = 4670103200
+
+        [records.samples.timing]
+        model_build_seconds = 0.398179244
+        forward_seconds = 5.578075741
+        instrument_seconds = 0.058124576
+        jacobian_seconds = 5.1798964970000005
+        rt_linearized_seconds = 5.1798964970000005
+[[records]]
+mode = "shared"
+
+    [[records.samples]]
+    trial = 1
+    seconds = 5.367628512
+    host_bytes = 956052248
+
+        [records.samples.timing]
+        model_build_seconds = 0.422425729
+        forward_seconds = 5.2584347430000005
+        instrument_seconds = 0.058255751999999994
+        jacobian_seconds = 4.836009014
+        rt_linearized_seconds = 4.836009014
+    [[records.samples]]
+    trial = 2
+    seconds = 5.445260774
+    host_bytes = 954170128
+
+        [records.samples.timing]
+        model_build_seconds = 0.416085259
+        forward_seconds = 5.377747116
+        instrument_seconds = 0.061487219999999995
+        jacobian_seconds = 4.961661857
+        rt_linearized_seconds = 4.961661857
+    [[records.samples]]
+    trial = 3
+    seconds = 5.360929588
+    host_bytes = 954111488
+
+        [records.samples.timing]
+        model_build_seconds = 0.422582254
+        forward_seconds = 5.295847191
+        instrument_seconds = 0.059747839
+        jacobian_seconds = 4.873264937
+        rt_linearized_seconds = 4.873264937
+
+[copy_probes.true]
+bytes = 44832.0
+seconds = 0.000328017
+
+[copy_probes.false]
+bytes = 3.715869744e9
+seconds = 3.19023071

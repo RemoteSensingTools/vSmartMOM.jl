@@ -127,6 +127,24 @@ end
     @test size(dZ⁻⁺) == (4, 4, 4)
     @test all(iszero, dZ⁺⁺)
     @test all(iszero, dZ⁻⁺)
+
+    # δBGE truncation of phase matrices with identically zero f₁₂ (HG) or
+    # f₃₄ (synthetic polarized HG): those elements truncate to zero, and the
+    # f₁₁ fit is the same for both, since their f₁₁ agree.
+    hg_optics = analytic_aerosol_optics(HenyeyGreensteinPhaseFunction(g = 0.8); l_max = 80)
+    pol_optics = analytic_aerosol_optics(SyntheticPolarizedHenyeyGreensteinPhaseFunction(
+        g = 0.8, polarization_fraction = 0.5); l_max = 80)
+    hg_t = Scattering.truncate_phase(δBGE{Float64}(20), hg_optics)
+    pol_t = Scattering.truncate_phase(δBGE{Float64}(20), pol_optics)
+    for t in (hg_t, pol_t), f in fieldnames(typeof(t.greek_coefs))
+        @test all(isfinite, getfield(t.greek_coefs, f))
+    end
+    @test 0 < hg_t.fᵗ < 1
+    @test all(iszero, hg_t.greek_coefs.γ)
+    @test all(iszero, pol_t.greek_coefs.ϵ)
+    @test any(!iszero, pol_t.greek_coefs.γ)
+    @test pol_t.fᵗ ≈ hg_t.fᵗ
+    @test pol_t.greek_coefs.β ≈ hg_t.greek_coefs.β
 end
 
 # Test the Aerosol Optics calculations (both NAI2 and Siewert)
@@ -153,8 +171,16 @@ end
 
     λ = 0.55   # Incident wavelength
     polarization_type = Stokes_IQUV()
-    truncation_type = δBGE(10, 10)
-    model_NAI2 = make_mie_model(NAI2(), aero, λ, polarization_type, truncation_type, r_max, nquad_radius)
+    truncation_type = δBGE(10)
+    # The saved PCW reference was computed on the radius nodes of the former
+    # distribution-dependent lower bound, the 1e-8 quantile. Since the radius
+    # grid is fixed (default r_min = 1e-3 µm, v2.2 decision 11), pass that
+    # bound explicitly: NAI2 and PCW are then compared on identical nodes.
+    # (On the default grid k moves by -2.4e-5 relative, ω̃ by -6.3e-7 and the
+    # Greek coefficients by up to 1.4e-3 — radius-quadrature error at 2500 nodes.)
+    r_min_reference = max(quantile(size_distribution, 1e-8), 1e-6 * r_max)
+    model_NAI2 = make_mie_model(NAI2(), aero, λ, polarization_type, truncation_type, r_max, nquad_radius;
+                                r_min = r_min_reference)
 
     # STEP 3: Perform the Mie Calculations and compare against saved PCW reference
 
@@ -183,25 +209,131 @@ end
 # Use the saved PCW reference (a large, forward-peaked aerosol with ~760 Greek
 # modes) and l_max=10.  The normal equations are then 750+ observations × 10
 # unknowns — strongly overdetermined and numerically stable on every platform.
-# Using l_max ≈ length(β) (as the original test did with a small aerosol)
-# makes the system nearly rank-deficient after the forward-cone exclusion
-# removes a handful of GL points, causing c₀ to blow up outside [0,1].
-@testset "δBGE forward-cone exclusion" begin
+# The forward-peak exclusion cone (Δ_angle) is RETIRED: the constructor
+# forces it to zero (with a one-time warning), so the legacy two-argument
+# form must produce optics identical to the canonical single-argument form.
+@testset "δBGE Δ_angle retirement" begin
     @load "test_pcw/PCW_AerosolOptics_v2.jld" aerosol_optics_PCW
+    aerosol_optics_PCW = AerosolOptics(
+        greek_coefs=aerosol_optics_PCW.greek_coefs,
+        ω̃=aerosol_optics_PCW.ω̃, k=aerosol_optics_PCW.k,
+        fᵗ=aerosol_optics_PCW.fᵗ)
     # aerosol_optics_PCW carries raw Greek coefficients (fᵗ=1 sentinel).
     l_max = 10   # << length(β) ≈ 760 → strongly overdetermined → stable
 
-    aop_tr0  = Scattering.truncate_phase(δBGE(l_max, 0.0),  aerosol_optics_PCW)
-    aop_tr10 = Scattering.truncate_phase(δBGE(l_max, 10.0), aerosol_optics_PCW)
+    aop_tr0  = Scattering.truncate_phase(δBGE(l_max), aerosol_optics_PCW)
+    # The legacy two-argument form is forced to the same full angular
+    # domain (the constructor warns once per session, maxlog=1 — not
+    # asserted here to stay order-independent) — its result must be
+    # IDENTICAL, not merely close.
+    @test δBGE(l_max, 10.0).Δ_angle == 0
+    aop_legacy = Scattering.truncate_phase(δBGE(l_max, 10.0), aerosol_optics_PCW)
 
     # SSA and extinction unchanged by truncation:
     @test aop_tr0.ω̃ ≈ aerosol_optics_PCW.ω̃
     @test aop_tr0.k  ≈ aerosol_optics_PCW.k
     # fᵗ = 1 - c₀ must be non-negative; with l_max=10 the 10-mode fit of the
-    # large aerosol's 760-mode series gives fᵗ ≈ 0.33 even at Δ_angle=0.
+    # large aerosol's 760-mode series gives fᵗ ≈ 0.33.
     @test aop_tr0.fᵗ  ≥ -1e-10
-    @test 0 ≤ aop_tr10.fᵗ ≤ 1
-    # fᵗ changes when the exclusion cone is applied (proves iμ subset is used):
-    @test aop_tr10.fᵗ > 0.1   # Δ_angle=10° should give non-trivial truncation for large aerosol
-    println("  δBGE fᵗ: Δ_angle=0° → $(round(aop_tr0.fᵗ, sigdigits=6)), Δ_angle=10° → $(round(aop_tr10.fᵗ, sigdigits=6))")
+    @test aop_legacy.fᵗ == aop_tr0.fᵗ
+    @test aop_legacy.greek_coefs.β == aop_tr0.greek_coefs.β
+    @test aop_legacy.greek_coefs.γ == aop_tr0.greek_coefs.γ
+    @test aop_legacy.greek_coefs.ϵ == aop_tr0.greek_coefs.ϵ
+    println("  δBGE fᵗ (full domain): $(round(aop_tr0.fᵗ, sigdigits=6))")
+end
+
+@testset "δBGE uniformly normalizes polarized matrix elements" begin
+    @load "test_pcw/PCW_AerosolOptics_v2.jld" aerosol_optics_PCW
+    aerosol_optics_PCW = AerosolOptics(
+        greek_coefs=aerosol_optics_PCW.greek_coefs,
+        ω̃=aerosol_optics_PCW.ω̃, k=aerosol_optics_PCW.k,
+        fᵗ=aerosol_optics_PCW.fᵗ)
+    mod = δBGE(10)
+    μ, wμ = Scattering.gausslegendre(
+        length(aerosol_optics_PCW.greek_coefs.β))
+    outside = findall(x -> x < cosd(mod.Δ_angle), μ)
+    original = Scattering.reconstruct_phase(
+        aerosol_optics_PCW.greek_coefs, μ)
+
+    for (truncator, lowconf) in ((Scattering.truncate_phase, false),
+                                 (Scattering.truncate_phase_lowconf, true))
+        truncated = truncator(mod, aerosol_optics_PCW)
+        reconstructed = Scattering.reconstruct_phase(
+            truncated.greek_coefs, μ)
+        c₀ = 1 - truncated.fᵗ
+
+        # The fit targets the original, unnormalised f12/f34. After removal
+        # of the delta spike, the retained smooth matrix must therefore obey
+        # c₀ Fᵗ ≈ F for every fitted element outside the forward cone.
+        for field in (:f₁₂, :f₃₄)
+            truth = getproperty(original, field)[outside]
+            scaled = c₀ .* getproperty(reconstructed, field)[outside]
+            unscaled = getproperty(reconstructed, field)[outside]
+            floor = fill(1e-8, length(truth))
+            denominator = max.(abs.(truth), floor)
+            # Main solver objective: Σw (residual/y)^2. Low-confidence
+            # solver applies W=diag(w/|y|) before least squares, hence W².
+            weights = lowconf ? (wμ[outside] ./ denominator).^2 :
+                                wμ[outside] ./ denominator.^2
+            objective(x) = sum(weights .* (x .- truth).^2)
+            @test objective(scaled) ≤ objective(unscaled)
+        end
+        @test truncated.greek_coefs.β[1] ≈ 1 atol=1e-10
+    end
+end
+
+@testset "δBGE polarized normalization tangent matches finite difference" begin
+    @load "test_pcw/PCW_AerosolOptics_v2.jld" aerosol_optics_PCW
+    raw = AerosolOptics(greek_coefs=aerosol_optics_PCW.greek_coefs,
+        ω̃=aerosol_optics_PCW.ω̃, k=aerosol_optics_PCW.k,
+        fᵗ=aerosol_optics_PCW.fᵗ)
+    g = raw.greek_coefs
+    fields = (:α, :β, :γ, :δ, :ϵ, :ζ)
+    directions = Dict(f => 0.01 .* getproperty(g, f) for f in fields)
+    tangent(a) = vcat(reshape(a, 1, :), zeros(3, length(a)))
+    lg = linGreekCoefs((tangent(directions[f]) for f in fields)...)
+    raw_lin = linAerosolOptics(lin_greek_coefs=lg,
+        ω̃̇=zeros(4), k̇=zeros(4), ḟᵗ=zeros(4))
+
+    # Δ=0 makes the forward and legacy linearized fit domains identical.
+    mod = δBGE(10, 0.0)
+    _, lin_out = Scattering.truncate_phase(mod, raw, raw_lin)
+    # Central-difference step. The δ-BGE normal equations are ill-conditioned,
+    # so the FD noise floor scales as O(eps·cond/h) and even flips with
+    # compiler flags (Pkg.test's --check-bounds=yes changes SIMD summation
+    # order); with the tangent direction 0.01·g, h = 1e-2 gives a 1e-4
+    # relative step — large enough to dominate that noise, small enough that
+    # the O(h²) truncation stays far below the tolerance below.
+    h = 1e-2
+    function perturbed(sign)
+        gp = GreekCoefs((getproperty(g, f) .+
+                         sign * h .* directions[f] for f in fields)...)
+        Scattering.truncate_phase(mod,
+            AerosolOptics(greek_coefs=gp, ω̃=raw.ω̃, k=raw.k, fᵗ=raw.fᵗ))
+    end
+    plus, minus = perturbed(1), perturbed(-1)
+    for (field, tangent_field) in ((:γ, :γ̇), (:ϵ, :ϵ̇))
+        fd = (getproperty(plus.greek_coefs, field) .-
+              getproperty(minus.greek_coefs, field)) ./ (2h)
+        analytic = getproperty(lin_out.lin_greek_coefs, tangent_field)[1, :]
+        @test analytic ≈ fd rtol=2e-4 atol=2e-7
+    end
+end
+
+@testset "δBGE tangent at an identically zero f₁₂ / f₃₄" begin
+    # HG has γ ≡ ϵ ≡ 0: zero tangents truncate to zero tangents, while a
+    # direction that switches on polarization has no derivative under the
+    # 1/f² weighting and is rejected.
+    raw = analytic_aerosol_optics(HenyeyGreensteinPhaseFunction(g = 0.6); l_max = 40)
+    n = length(raw.greek_coefs.β)
+    make_lin(γ̇) = linAerosolOptics(lin_greek_coefs=linGreekCoefs(
+        zeros(4, n), [1e-2 .* raw.greek_coefs.β'; zeros(3, n)], γ̇,
+        zeros(4, n), zeros(4, n), zeros(4, n)), ω̃̇=zeros(4), k̇=zeros(4), ḟᵗ=zeros(4))
+    t, lin_out = Scattering.truncate_phase(δBGE(15), raw, make_lin(zeros(4, n)))
+    @test all(iszero, t.greek_coefs.γ) && all(iszero, t.greek_coefs.ϵ)
+    @test all(iszero, lin_out.lin_greek_coefs.γ̇)
+    @test all(iszero, lin_out.lin_greek_coefs.ϵ̇)
+    @test any(!iszero, lin_out.lin_greek_coefs.β̇)
+    γ̇ = zeros(4, n); γ̇[1, 4] = 1
+    @test_throws r"nonzero f₁₂ tangent" Scattering.truncate_phase(δBGE(15), raw, make_lin(γ̇))
 end

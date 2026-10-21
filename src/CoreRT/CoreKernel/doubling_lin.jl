@@ -13,6 +13,13 @@ doubles the elemental layer ``n_d`` times to reach the full homogeneous-layer
 optical depth, **and simultaneously propagates derivatives** with respect to
 the three core layer variables ``(\\tau, \\varpi, \\mathbf{Z})``.
 
+This is the legacy three-slot helper. Production uses `doubling_allparams!`
+with supplied tangent directions contracted at the elemental boundary. In
+particular, the third elemental slot is an entry-local phase partial; passing
+it through matrix multiplication does not construct the full fourth-rank
+phase-matrix derivative. It must not be used to justify a full core-Jacobian
+cost estimate or a post-doubling elementwise Z chain rule.
+
 # Forward (Sanghavi 2014, Eqs. 23–28; restated for homogeneous case)
 
 ```math
@@ -40,17 +47,12 @@ For each core parameter ``c \\in \\{\\tau, \\varpi, \\mathbf{Z}\\}``:
 \\dot{\\mathbf{R}}_{2\\tau,c} = \\dot{\\mathbf{R}}_c + \\dot{\\mathbf{T}}_c\\,\\mathbf{G}\\,\\mathbf{R}\\,\\mathbf{T} + \\ldots
 ```
 
-The closed-form ``\\dot{\\mathbf{G}} = -\\mathbf{G}\\,\\dot{(\\mathbf{R}\\mathbf{R})}\\,\\mathbf{G}`` derivation
-keeps the linearization analytic — no AD through the batched matrix
-inversion. **Crucially, ``\\mathbf{G}`` is the same inverse the forward
-doubling step already computed**, so the linearized partner *reuses* it
-rather than recomputing. The marginal cost per linearized iteration is
-two extra batched matmuls per core parameter, not another LU. This is
-why a combined forward + linearized run costs **less than 2× a forward-only
-run** — the dominant ``N_\\mathrm{quad}^3`` LU work is paid once. ForwardDiff
-through `batch_inv!` would force ``(1+N_\\mathrm{params})`` evaluations of the
-inverse; finite differences would force ``(1+N_\\mathrm{state})`` full forward
-runs. See [Concepts/06 — Linearization § Why this is fast](../../docs/src/pages/concepts/06_linearization.md#why-this-is-fast-the-matrix-inversion-is-reused).
+The inverse tangent reuses the forward geometric progression. Physical
+parameter columns still require product-rule matrix multiplications and source
+updates; their cost depends on the active layout and backend. The batched path
+in `jacobian_batched.jl` groups wavelength and parameter in each GPU launch and
+reuses propagation scratch. The reference path remains available for numerical
+A/B checks and larger GPU operators. See Concepts/06 for the cost model.
 
 The D-matrix symmetry from Sanghavi 2014 Eqs. (C.17)–(C.18) is preserved on
 the derivatives too (`apply_D_matrix!` is reused), halving the linearized
@@ -199,16 +201,15 @@ end
     doubling_allparams_helper!(pol_type, SFI, expk, ndoubl, added_layer, 
                                added_layer_lin, I_static, architecture, dτ̇, μ₀)
 
-Propagate **N physical-parameter** derivatives through the doubling method (Bug 19 fix).
+Propagate the supplied complete matrix directions through doubling.
 
-Unlike `doubling_helper!` which propagates only the 3 core derivatives (τ, ϖ, Z),
-this function propagates the `ap_` (all-params) fields through doubling. This is 
-necessary because the Z chain rule must be applied at the **elemental** level 
-(where it is correctly element-wise), not after doubling (where matrix products 
-have mixed the Z indices).
-
-The chain rule (`lin_added_layer_all_params!`) should be called BEFORE this function
-to fill the `ap_ṙ⁻⁺`, `ap_ṫ⁺⁺`, `ap_J̇₀⁺`, `ap_J̇₀⁻` fields.
+The `ap_` fields can carry physical retrieval columns or a compact local
+optical basis. The elemental kernel initializes them by the chain rule on
+finite-thickness single scattering. Doubling then differentiates each matrix
+product and inverse, preserving angular coupling (S2014, Appendix C).
+A local basis may be contracted to physical columns after doubling because
+this tangent map is linear at a fixed forward state; an elementwise phase
+partial may not. See [`build_doubled_layer_lin!`](@ref).
 
 For SFI, the beam attenuation derivative `d(e^{-τ/μ₀})/dp_j = -e^{-τ/μ₀}/μ₀ ⋅ ∂τ/∂p_j`
 is per-parameter, handled via `dτ̇` (the elemental τ derivative per parameter).
@@ -224,6 +225,11 @@ function doubling_allparams_helper!(pol_type,
                           dτ̇::AbstractArray,
                           μ₀::FT;
                           N_active::Int=0) where {FT}
+
+    if _use_batched_jacobians(added_layer_lin)
+        return doubling_batched_lin!(pol_type, expk, ndoubl, added_layer,
+            added_layer_lin, I_static, dτ̇, μ₀; N_active)
+    end
 
     # Unpack the added layer (forward)
     (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻) = added_layer
@@ -455,4 +461,3 @@ function apply_D_matrix_SFI!(n_stokes::Int,
     synchronize_if_gpu();
     nothing
 end
-

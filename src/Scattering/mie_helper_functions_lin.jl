@@ -232,6 +232,10 @@ function reconstruct_phase(greek_coefs, lin_greek_coefs, μ; returnLeg=false)
     return returnLeg ? (scattering_matrix, lin_scattering_matrix, P, P²) : (scattering_matrix, lin_scattering_matrix, nothing, nothing)
 end
 
+# LogNormal's native coordinates are μ=log(median radius), σ=log(geometric
+# width). For its density f(r), ∂f/∂μ = f(log r-μ)/σ² and
+# ∂f/∂σ = f[(log r-μ)²/σ³-1/σ]. These are the two size directions
+# returned by the Mie Jacobian; they are not derivatives of exp(μ), exp(σ).
 function compute_wₓ(lin::LinMode, size_distribution, wᵣ, r, r_max)
 
     wₓ = pdf.(size_distribution,r)      # Weights from distribution
@@ -243,9 +247,13 @@ function compute_wₓ(lin::LinMode, size_distribution, wᵣ, r, r_max)
     ẇₓ[1,:] .*= wᵣ
     ẇₓ[2,:] .*= wᵣ
 
-    wₓ /= sum(wₓ)
-    for ctr = 1:2
-        ẇₓ[ctr,:] .= ẇₓ[ctr,:]./sum(wₓ) .- (sum(ẇₓ[ctr,:]) * wₓ)./(sum(wₓ)^2)
+    # For raw quadrature weights u and S=Σu, w=u/S gives
+    # dw=(du-w Σdu)/S. Save S before normalizing; replacing it by Σw=1
+    # incorrectly scales size tangents when r_max cuts a distribution's tail.
+    normalization = sum(wₓ)
+    wₓ /= normalization
+    for ctr in 1:2
+        @views ẇₓ[ctr,:] .= (ẇₓ[ctr,:] .- sum(ẇₓ[ctr,:]) .* wₓ) ./ normalization
     end
     @debug "Fraction of size distribution cut by max radius: $((1-cdf.(size_distribution,r_max))*100) %"
 
@@ -261,8 +269,36 @@ function compute_Z_moments(mod::AbstractPolarizationType,
             greek_coefs::GreekCoefs,
             lin_greek_coefs::linGreekCoefs,
             m::Int ; arr_type = Array)
+    if _Z_JACOBIAN_TABLES_ENABLED[] && m >= 0 &&
+       eltype(greek_coefs.β) <: Union{Float32,Float64} &&
+       eltype(greek_coefs.β) === eltype(lin_greek_coefs.β̇) &&
+       size(lin_greek_coefs.β̇, 1) == 4
+        return _compute_Z_moments_lin_tabulated(
+            mod, μ, greek_coefs, lin_greek_coefs, m, arr_type)
+    end
     (; α, β, γ, δ, ϵ, ζ) = greek_coefs
     (; α̇, β̇, γ̇, δ̇, ϵ̇, ζ̇) = lin_greek_coefs
+    if ndims(β) == 2
+        n_spec = size(β, 2)
+        ndims(β̇) == 3 && size(β̇, 3) == n_spec || throw(DimensionMismatch(
+            "Spectral Greek tangents must be (nParam,l,nSpec); got $(size(β̇))"))
+        moments = map(1:n_spec) do iν
+            gc = GreekCoefs(collect(@view(α[:, iν])), collect(@view(β[:, iν])),
+                            collect(@view(γ[:, iν])), collect(@view(δ[:, iν])),
+                            collect(@view(ϵ[:, iν])), collect(@view(ζ[:, iν])))
+            lgc = linGreekCoefs(collect(@view(α̇[:, :, iν])), collect(@view(β̇[:, :, iν])),
+                                collect(@view(γ̇[:, :, iν])), collect(@view(δ̇[:, :, iν])),
+                                collect(@view(ϵ̇[:, :, iν])), collect(@view(ζ̇[:, :, iν])))
+            compute_Z_moments(mod, μ, gc, lgc, m; arr_type=Array)
+        end
+        Z⁺⁺ = cat((z[1] for z in moments)...; dims=3)
+        Z⁻⁺ = cat((z[2] for z in moments)...; dims=3)
+        Ż⁺⁺ = cat((z[3] for z in moments)...; dims=4)
+        Ż⁻⁺ = cat((z[4] for z in moments)...; dims=4)
+        return arr_type(Z⁺⁺), arr_type(Z⁻⁺), arr_type(Ż⁺⁺), arr_type(Ż⁻⁺)
+    elseif ndims(β) != 1 || ndims(β̇) != 2
+        throw(DimensionMismatch("Greek/tangent coefficients must be (l,)/(nParam,l) or spectral; got $(size(β))/$(size(β̇))"))
+    end
     FT = eltype(β)
     n = length(μ)
 
@@ -369,4 +405,40 @@ function compute_Z_moments(mod::AbstractPolarizationType,
 
     # Return Z-moments
     return arr_type(Z⁺⁺), arr_type(Z⁻⁺), arr_type(Ż⁺⁺), arr_type(Ż⁻⁺)
+end
+
+"""Forward and tangent solar-direction phase blocks without a square μ₀ node."""
+function compute_Z_source_moments(mod::AbstractPolarizationType, μ_out, μ₀,
+                                  greek::GreekCoefs, lin_greek::linGreekCoefs,
+                                  m::Int; arr_type=Array)
+    Z₀⁺, Z₀⁻ = compute_Z_source_moments(
+        mod, μ_out, μ₀, greek, m; arr_type=Array)
+    fields = (:α̇, :β̇, :γ̇, :δ̇, :ϵ̇, :ζ̇)
+    tangent_arrays = map(f -> getfield(lin_greek, f), fields)
+    nparam = size(tangent_arrays[2], 1)
+    if ndims(greek.β) == 1
+        tangents = map(1:nparam) do p
+            gc = GreekCoefs((collect(@view(a[p, :])) for a in tangent_arrays)...)
+            compute_Z_source_moments(mod, μ_out, μ₀, gc, m; arr_type=Array)
+        end
+        Ż₀⁺ = cat((z[1] for z in tangents)...; dims=3)
+        Ż₀⁻ = cat((z[2] for z in tangents)...; dims=3)
+        # Match compute_Z_moments tangent convention: parameter axis first.
+        return arr_type(Z₀⁺), arr_type(Z₀⁻),
+               arr_type(permutedims(Ż₀⁺, (3, 1, 2))),
+               arr_type(permutedims(Ż₀⁻, (3, 1, 2)))
+    end
+    n_spec = size(greek.β, 2)
+    all(ndims(a) == 3 && size(a, 3) == n_spec for a in tangent_arrays) ||
+        throw(DimensionMismatch("spectral solar phase tangents must be (nParam,l,nSpec)"))
+    moments = map(1:n_spec) do iν
+        gc = GreekCoefs((collect(@view(getfield(greek, f)[:, iν]))
+                         for f in (:α, :β, :γ, :δ, :ϵ, :ζ))...)
+        lgc = linGreekCoefs((collect(@view(a[:, :, iν])) for a in tangent_arrays)...)
+        compute_Z_source_moments(mod, μ_out, μ₀, gc, lgc, m; arr_type=Array)
+    end
+    return arr_type(cat((z[1] for z in moments)...; dims=3)),
+           arr_type(cat((z[2] for z in moments)...; dims=3)),
+           arr_type(cat((z[3] for z in moments)...; dims=4)),
+           arr_type(cat((z[4] for z in moments)...; dims=4))
 end

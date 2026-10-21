@@ -33,18 +33,18 @@ final VLIDORT `GREEKMAT(1,2)` values. Passing `b1` through here keeps the
 aerosol in the same internal convention as vSmartMOM's Rayleigh
 `get_greek_rayleigh`; the VLIDORT truth Q/U values are sign-flipped at
 comparison."
-function solar_tester_vector_aerosol_optics()
+function solar_tester_vector_aerosol_optics(FT::Type{<:AbstractFloat} = Float64)
     Lp1 = VEC_AEROSOL_NMOMENTS + 1   # L = 0..VEC_AEROSOL_NMOMENTS
     @assert length(PROBLEMIII_a1) >= Lp1 "PROBLEMIII has $(length(PROBLEMIII_a1)) moments, need ≥$(Lp1)"
-    α = collect(Float64, PROBLEMIII_a2[1:Lp1])
-    β = collect(Float64, PROBLEMIII_a1[1:Lp1])
-    γ = collect(Float64, PROBLEMIII_b1[1:Lp1])
-    δ = collect(Float64, PROBLEMIII_a4[1:Lp1])
-    ϵ = .-collect(Float64, PROBLEMIII_b2[1:Lp1])
-    ζ = collect(Float64, PROBLEMIII_a3[1:Lp1])
+    α = collect(FT, PROBLEMIII_a2[1:Lp1])
+    β = collect(FT, PROBLEMIII_a1[1:Lp1])
+    γ = collect(FT, PROBLEMIII_b1[1:Lp1])
+    δ = collect(FT, PROBLEMIII_a4[1:Lp1])
+    ϵ = .-collect(FT, PROBLEMIII_b2[1:Lp1])
+    ζ = collect(FT, PROBLEMIII_a3[1:Lp1])
     greek = Scattering.GreekCoefs(α, β, γ, δ, ϵ, ζ)
-    return Scattering.AerosolOptics(greek_coefs=greek, ω̃=VEC_AEROSOL_OMEGA,
-                                    k=1.0, fᵗ=0.0)
+    return Scattering.AerosolOptics(greek_coefs=greek, ω̃=FT(VEC_AEROSOL_OMEGA),
+                                    k=FT(1), fᵗ=FT(0))
 end
 
 "VLIDORT-style aerosol extinction per layer: parcel × (h[n−1] − h[n])."
@@ -63,7 +63,9 @@ end
 vector solar_tester atmosphere + Problem III aerosol."
 function inject_solar_tester_vector_optics!(model)
     aerext = solar_tester_vector_aerosol_extinction()
-    model.aerosol_optics[1][1] = solar_tester_vector_aerosol_optics()
+    # Match the model float type — see the note in case_B's injection.
+    model.aerosol_optics[1][1] =
+        solar_tester_vector_aerosol_optics(CoreRT.float_type(model))
     @assert size(model.τ_rayl[1], 2) == 23 "expected 23 layers, got $(size(model.τ_rayl[1], 2))"
     for n in 1:23
         ext = SOLAR_TESTER_MOLEXT[n]
@@ -111,6 +113,9 @@ for spec in axis_specs()
 
         @info "Case C: running solar_tester vector [$(spec_tag(spec))]" sza raz
         R, T = solar_tester_vector_run_at(sza, raz; spec=spec)
+        # A NaN rel-err would otherwise be dropped below; require finite output.
+        @test all(isfinite, R)
+        @test all(isfinite, T)
 
         # Per-Stokes representative scale = max truth magnitude in this set.
         # `atol = 100·eps(FT)·scale` is the FT noise floor.
@@ -147,8 +152,8 @@ for spec in axis_specs()
                 end
                 re_u = compare(R[i_vza, s_idx, 1], truth_up, "TOA-up", sza, vza, raz, geom, s_sym)
                 re_d = compare(T[i_vza, s_idx, 1], truth_dn, "BOA-dn", sza, vza, raz, geom, s_sym)
-                isnan(re_u) || push!(rel_up[s_sym], re_u)
-                isnan(re_d) || push!(rel_dn[s_sym], re_d)
+                push!(rel_up[s_sym], re_u)
+                push!(rel_dn[s_sym], re_d)
             end
         end
 

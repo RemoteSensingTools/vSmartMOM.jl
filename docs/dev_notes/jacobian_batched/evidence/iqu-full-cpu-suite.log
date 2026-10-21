@@ -1,0 +1,2857 @@
+Testing HAPI equivalence (On CO2 Band)...  40%|████      |  ETA: 0:00:57[KTesting HAPI equivalence (On CO2 Band)... 100%|██████████| Time: 0:00:38[K
+Testing HAPI equivalence (On Other Molecules)...  40%|█▎ |  ETA: 0:00:09[KTesting HAPI equivalence (On Other Molecules)...  60%|█▊ |  ETA: 0:00:06[KTesting HAPI equivalence (On Other Molecules)...  80%|██▍|  ETA: 0:00:03[KTesting HAPI equivalence (On Other Molecules)... 100%|███| Time: 0:00:10[K
+┌ Info: Note: Cross-section reported to wavelength grid
+└ (will internally convert to wavenumber grid for calculations)
+┌ Info: Note: Cross-section reported to wavelength grid
+└ (will internally convert to wavenumber grid for calculations)
+┌ Info: Note: Cross-section reported to wavelength grid
+└ (will internally convert to wavenumber grid for calculations)
+┌ Info: Note: Cross-section reported to wavelength grid
+└ (will internally convert to wavenumber grid for calculations)
+┌ Warning: saved type AerosolOptics{Float64} is missing field phase_ν in workspace type; reconstructing
+└ @ JLD2 ~/.julia/packages/JLD2/r2pdD/src/data/reconstructing_datatypes.jl:197
+┌ Warning: saved type AerosolOptics{Float64} is missing field phase_ν in workspace type; reconstructing
+└ @ JLD2 ~/.julia/packages/JLD2/r2pdD/src/data/reconstructing_datatypes.jl:197
+┌ Warning: δBGE's Δ_angle is retired and forced to 0 — the fit always uses the full angular domain (a non-zero cone was never honoured by the linearized path).
+└ @ vSmartMOM.Scattering ~/code/gitHub/vSmartMOM-jacobian-perf/src/Scattering/types.jl:292
+┌ Warning: saved type AerosolOptics{Float64} is missing field phase_ν in workspace type; reconstructing
+└ @ JLD2 ~/.julia/packages/JLD2/r2pdD/src/data/reconstructing_datatypes.jl:197
+┌ Warning: saved type AerosolOptics{Float64} is missing field phase_ν in workspace type; reconstructing
+└ @ JLD2 ~/.julia/packages/JLD2/r2pdD/src/data/reconstructing_datatypes.jl:197
+[ Info: test_mie_nodes: CUDA is functional — running real-GPU node-API testsets.
+[ Info: test_mie_nodes: Metal not functional — real-Metal node-API testsets are skipped (KA-CPU/mock coverage above still runs).
+[ Info: test_mie_nodes_batched: CUDA is functional — running real-GPU batched testsets.
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (64, 64, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (64, 64, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+[ Info: Skipping local Metal batched-kernel smoke on non-Mac or without Metal.jl in the active environment.
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (18, 18, 17)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (18, 18, 6)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (18, 18, 17)
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:19[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:12[K
+┌ Info: Processing on: vSmartMOM.Architectures.GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (18, 18, 6)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (1, 3, 3, 1)
+Looping over layers ...  67%|██████████████████▋         |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (1, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Single-scatter mode — processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Single-scatter mode — processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+Looping over layers ...  67%|██████████████████▋         |  ETA: 0:00:04[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:08[K
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (9, 9, 1)
+Looping over layers ...  67%|██████████████████▋         |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 9, 9, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 9, 9, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 9, 9, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+Looping over layers ...  67%|██████████████████▋         |  ETA: 0:00:05[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:10[K
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+Looping over layers ...  67%|██████████████████▋         |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:04[K
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 5, 5, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (2, 5, 5, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+Looping over layers ...  67%|██████████████████▋         |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (1, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (1, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (1, 12, 12, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (18, 18, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (18, 18, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (18, 18, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (5, 5, 4)
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:03[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (5, 5, 4)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (5, 5, 4)
+┌ Info: selective Jacobian finite difference
+│   parameter = "tau_ref"
+│   max_abs = 1.8375284627225597e-10
+└   max_rel = 2.7701162019476646e-9
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (5, 5, 4)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (5, 5, 4)
+┌ Info: selective Jacobian finite difference
+│   parameter = "z0"
+│   max_abs = 3.3914635998914897e-12
+└   max_rel = 1.0594221624068226e-6
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (5, 5, 4)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (5, 5, 4)
+┌ Info: selective Jacobian finite difference
+│   parameter = "layer absorption"
+│   max_abs = 1.0816890569018134e-11
+└   max_rel = 2.499382036928771e-8
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 2)
+┌ Info: selective Jacobian finite difference
+│   parameter = "surface pressure"
+│   max_abs = 8.841109580429927e-12
+└   max_rel = 8.792350366119762e-6
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 2)
+┌ Info: selective Jacobian finite difference
+│   parameter = "surface P0"
+│   max_abs = 1.1675660438470459e-12
+└   max_rel = 1.7832875327512383e-7
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 2)
+┌ Info: selective Jacobian finite difference
+│   parameter = "surface P1"
+│   max_abs = 1.1675660438470459e-12
+└   max_rel = 1.7832875327512383e-7
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 2)
+┌ Info: selective Jacobian finite difference
+│   parameter = "surface P2"
+│   max_abs = 1.1675660438470459e-12
+└   max_rel = 1.7832875327512383e-7
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 2)
+┌ Info: selective Jacobian finite difference
+│   parameter = "SIF760"
+│   max_abs = 1.68516312015754e-11
+└   max_rel = 8.741339575691292e-7
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 2)
+┌ Info: selective Jacobian finite difference
+│   parameter = "mSIF"
+│   max_abs = 1.3156977729522623e-9
+└   max_rel = 4.5792898229578124e-7
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (44, 44, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (44, 44, 2)
+Looping over layers ...   6%|█▊                          |  ETA: 0:00:28[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (44, 44, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (44, 44, 2)
+┌ Warning: JET report count (281) exceeds baseline (232) — 49 new report(s); set VSMARTMOM_JET_STRICT=1 to gate.
+└ @ Main ~/code/gitHub/vSmartMOM-jacobian-perf/test/test_jet.jl:60
+[ Info: Reading GEOSChem scene at lat=34.0°, lon=-118.0°, time=0.0
+[ Info: Reading GEOSChem scene at lat=34.0°, lon=-118.0°, time=0.0
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (9, 9, 2)
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (20, 20, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (21, 21, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (18, 18, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (21, 21, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (18, 18, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (21, 21, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (18, 18, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (18, 18, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (18, 18, 2)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+Progress:   4%|█▋                                       |  ETA: 0:00:24[KProgress: 100%|█████████████████████████████████████████| Time: 0:00:01[K
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Phase B parity coverage
+└   n_compared = 11
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Info: Fourier series converged
+│   m_used = 4
+│   m_max = 4
+│   tolerance = 0.0001
+│   guard_through_m = 2
+└   n_consecutive = 2
+┌ Warning: Assuming unit of [nm] here for optical struct
+└ @ CanopyOptics ~/.julia/packages/CanopyOptics/8VpxI/src/initialization/loadProspect.jl:64
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (32, 32, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (32, 32, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (32, 32, 2)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:22[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:14[K
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+Looping over layers ...   6%|█▊                          |  ETA: 0:00:23[KLooping over layers ...  39%|███████████                 |  ETA: 0:00:04[KLooping over layers ...  70%|███████████████████▌        |  ETA: 0:00:02[KLooping over layers ...  94%|██████████████████████████▎ |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:05[K
+Looping over layers ...  61%|█████████████████           |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+Looping over layers ...  42%|███████████▉                |  ETA: 0:00:01[KLooping over layers ...  82%|██████████████████████▉     |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (8, 8, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (8, 8, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (8, 8, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (8, 8, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (8, 8, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (64, 64, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (64, 64, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (56, 56, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (56, 56, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (56, 56, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (56, 56, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (56, 56, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (56, 56, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (52, 52, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (52, 52, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (52, 52, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (52, 52, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (52, 52, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (52, 52, 2)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 7)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 7)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Info: Fourier series converged
+│   m_used = 4
+│   m_max = 4
+│   tolerance = 0.0001
+│   guard_through_m = 2
+└   n_consecutive = 2
+┌ Info: Processing on: vSmartMOM.Architectures.GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+Looping over layers ...   6%|█▊                          |  ETA: 0:00:18[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+┌ Info: Processing on: vSmartMOM.Architectures.GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Warning: TMSCorrection: 2 of 9 view zenith angles coincide with weighted quadrature nodes; their beam source feeds the diffuse field and cannot be masked, so their single scattering remains truncated (no correction applied there).
+└ @ vSmartMOM.CoreRT ~/code/gitHub/vSmartMOM-jacobian-perf/src/CoreRT/tools/single_scattering.jl:282
+┌ Info: Processing on: vSmartMOM.Architectures.GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Single-scatter mode — processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (24, 24, 4)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Info: TMS truncation-order convergence
+│   gap_uncorrected = 0.0012860693559943702
+└   gap_tms = 0.0011445627066086206
+┌ Info: TMS activity |on - off| (l_max = 6)
+└   activity = 0.00016100431087594236
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 103)
+Looping over layers ...  17%|████▋                       |  ETA: 0:00:55[KLooping over layers ...  50%|██████████████              |  ETA: 0:00:12[KLooping over layers ...  75%|█████████████████████       |  ETA: 0:00:04[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:14[K
+Looping over layers ...  33%|█████████▍                  |  ETA: 0:00:03[KLooping over layers ...  67%|██████████████████▋         |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+Looping over layers ...  33%|█████████▍                  |  ETA: 0:00:03[KLooping over layers ...  67%|██████████████████▋         |  ETA: 0:00:01[KLooping over layers ...  92%|█████████████████████████▋  |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+Looping over layers ...  33%|█████████▍                  |  ETA: 0:00:03[KLooping over layers ...  67%|██████████████████▋         |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+Looping over layers ...  33%|█████████▍                  |  ETA: 0:00:02[KLooping over layers ...  67%|██████████████████▋         |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 103)
+Looping over layers ...  17%|████▋                       |  ETA: 0:00:08[KLooping over layers ...  50%|██████████████              |  ETA: 0:00:03[KLooping over layers ...  83%|███████████████████████▍    |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:04[K
+Looping over layers ...  33%|█████████▍                  |  ETA: 0:00:02[KLooping over layers ...  67%|██████████████████▋         |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+Looping over layers ...  33%|█████████▍                  |  ETA: 0:00:03[KLooping over layers ...  58%|████████████████▍           |  ETA: 0:00:02[KLooping over layers ...  92%|█████████████████████████▋  |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+Looping over layers ...  33%|█████████▍                  |  ETA: 0:00:03[KLooping over layers ...  67%|██████████████████▋         |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+Looping over layers ...  33%|█████████▍                  |  ETA: 0:00:02[KLooping over layers ...  67%|██████████████████▋         |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (12, 12, 103)
+Looping over layers ...  17%|████▋                       |  ETA: 0:00:11[KLooping over layers ...  58%|████████████████▍           |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:04[K
+Looping over layers ...  33%|█████████▍                  |  ETA: 0:00:02[KLooping over layers ...  75%|█████████████████████       |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  42%|███████████▋                |  ETA: 0:00:02[KLooping over layers ...  83%|███████████████████████▍    |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  42%|███████████▋                |  ETA: 0:00:02[KLooping over layers ...  83%|███████████████████████▍    |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  42%|███████████▋                |  ETA: 0:00:02[KLooping over layers ...  83%|███████████████████████▍    |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Single-scatter mode — processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 103)
+┌ Info: Single-scatter mode — processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 103)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Single-scatter mode — processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 103)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 103)
+┌ Info: Single-scatter mode — processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 103)
+┌ Info: Single-scatter mode — processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 103)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: StandaloneSS CPU/GPU timing smoke
+│   cpu_time = 0.09587363933333333
+│   gpu_time = 0.001444021
+└   speedup = 66.39352151619217
+┌ Warning: Skipping TOMAS-15 data reading test: file not found at /home/cfranken/code/gitHub/vSmartMOM-jacobian-perf/GEOSChem.Custom.20190702_0000z.nc4
+└ @ Main ~/code/gitHub/vSmartMOM-jacobian-perf/test/test_Aerosols.jl:178
+┌ Warning: Skipping optical properties test: file not found
+└ @ Main ~/code/gitHub/vSmartMOM-jacobian-perf/test/test_Aerosols.jl:308
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Single-scatter mode — processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 103)
+┌ Info: Single-scatter mode — processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 103)
+┌ Info: Skipping load_sif_spectrum smoke — fixture not present
+└   path = "/home/cfranken/code/gitHub/vSmartMOM-jacobian-perf/src/SIF_emission/sif-spectra.csv"
+┌ Info: Skipping load_ficus_reflectance smoke — fixture not present
+└   path = "/home/cfranken/code/gitHub/vSmartMOM-jacobian-perf/src/SIF_emission/ficus_refl_600to800nm.dat"
+┌ Info: Skipping build_sif_source — fixture not present
+└   path = "/home/cfranken/code/gitHub/vSmartMOM-jacobian-perf/src/SIF_emission/sif-spectra.csv"
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: M1: l_max identical for A and B under δBGE truncation (stream_l_cap=5). Re-derivation path is exercised; values are correct.
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Warning: M2b: l_max did not increase for larger particles under NoTruncation — check Mie params
+└ @ Main ~/code/gitHub/vSmartMOM-jacobian-perf/test/test_update_model.jl:478
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (60, 60, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (52, 52, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (52, 52, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (52, 52, 2)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: solar_tester discretization [scalar]
+│   weighted_nodes = 8
+│   total_nodes = 12
+│   zero_weight_nodes = 4
+│   max_m = 16
+│   l_trunc = 15
+└   truncation = NoTruncation
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: solar_tester discretization [vector]
+│   weighted_nodes = 8
+│   total_nodes = 12
+│   zero_weight_nodes = 4
+│   max_m = 16
+│   l_trunc = 15
+└   truncation = NoTruncation
+[ Info: running Siewert IIA at azimuth 0.0 [GaussLegQuad/Float64/CPU]
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 1)
+[ Info: running Siewert IIA at azimuth 90.0 [GaussLegQuad/Float64/CPU]
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 1)
+[ Info: running Siewert IIA at azimuth 180.0 [GaussLegQuad/Float64/CPU]
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 1)
+[ Info: running Siewert IIA at azimuth 0.0 [GaussLegQuad/Float64/GPU]
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 1)
+[ Info: running Siewert IIA at azimuth 90.0 [GaussLegQuad/Float64/GPU]
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 1)
+[ Info: running Siewert IIA at azimuth 180.0 [GaussLegQuad/Float64/GPU]
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 1)
+[ Info: running Siewert IIA at azimuth 0.0 [GaussLegQuad/Float32/CPU]
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 1)
+[ Info: running Siewert IIA at azimuth 90.0 [GaussLegQuad/Float32/CPU]
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 1)
+[ Info: running Siewert IIA at azimuth 180.0 [GaussLegQuad/Float32/CPU]
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 1)
+[ Info: running Siewert IIA at azimuth 0.0 [GaussLegQuad/Float32/GPU]
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.GPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 1)
+[ Info: running Siewert IIA at azimuth 90.0 [GaussLegQuad/Float32/GPU]
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.GPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 1)
+[ Info: running Siewert IIA at azimuth 180.0 [GaussLegQuad/Float32/GPU]
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.GPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 1)
+┌ Info: Case B: running solar_tester [GaussLegQuad/Float64/CPU]
+│   sza = 35.0
+└   raz = 0.0
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (12, 12, 2)
+┌ Info:   geom=1 TOA-up
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 0.0
+│   modeled = 0.0645675
+│   truth = 0.0645975
+└   rel_err = 0.000464
+┌ Info:   geom=1 BOA-dn
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 0.0
+│   modeled = 0.104896
+│   truth = 0.104954
+└   rel_err = 0.000557
+┌ Info:   geom=4 TOA-up
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 0.0
+│   modeled = 0.0640452
+│   truth = 0.0640754
+└   rel_err = 0.000472
+┌ Info:   geom=4 BOA-dn
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 0.0
+│   modeled = 0.182458
+│   truth = 0.182564
+└   rel_err = 0.000582
+┌ Info:   geom=7 TOA-up
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 0.0
+│   modeled = 0.0655501
+│   truth = 0.0655817
+└   rel_err = 0.000481
+┌ Info:   geom=7 BOA-dn
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 0.0
+│   modeled = 0.386133
+│   truth = 0.386369
+└   rel_err = 0.000611
+┌ Info: Case B: running solar_tester [GaussLegQuad/Float64/GPU]
+│   sza = 35.0
+└   raz = 0.0
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (12, 12, 2)
+Looping over layers ...   9%|██▍                         |  ETA: 0:00:20[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+┌ Info:   geom=1 TOA-up
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 0.0
+│   modeled = 0.0645675
+│   truth = 0.0645975
+└   rel_err = 0.000464
+┌ Info:   geom=1 BOA-dn
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 0.0
+│   modeled = 0.104896
+│   truth = 0.104954
+└   rel_err = 0.000557
+┌ Info:   geom=4 TOA-up
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 0.0
+│   modeled = 0.0640452
+│   truth = 0.0640754
+└   rel_err = 0.000472
+┌ Info:   geom=4 BOA-dn
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 0.0
+│   modeled = 0.182458
+│   truth = 0.182564
+└   rel_err = 0.000582
+┌ Info:   geom=7 TOA-up
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 0.0
+│   modeled = 0.0655501
+│   truth = 0.0655817
+└   rel_err = 0.000481
+┌ Info:   geom=7 BOA-dn
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 0.0
+│   modeled = 0.386133
+│   truth = 0.386369
+└   rel_err = 0.000611
+┌ Info: Case B: running solar_tester [GaussLegQuad/Float32/CPU]
+│   sza = 35.0
+└   raz = 0.0
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (12, 12, 2)
+┌ Info:   geom=1 TOA-up
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 0.0
+│   modeled = 0.0645524f0
+│   truth = 0.0645975
+└   rel_err = 0.000698
+┌ Info:   geom=1 BOA-dn
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 0.0
+│   modeled = 0.104863f0
+│   truth = 0.104954
+└   rel_err = 0.000867
+┌ Info:   geom=4 TOA-up
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 0.0
+│   modeled = 0.0640303f0
+│   truth = 0.0640754
+└   rel_err = 0.000704
+┌ Info:   geom=4 BOA-dn
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 0.0
+│   modeled = 0.182501f0
+│   truth = 0.182564
+└   rel_err = 0.000343
+┌ Info:   geom=7 TOA-up
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 0.0
+│   modeled = 0.0655335f0
+│   truth = 0.0655817
+└   rel_err = 0.000734
+┌ Info:   geom=7 BOA-dn
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 0.0
+│   modeled = 0.386172f0
+│   truth = 0.386369
+└   rel_err = 0.000511
+┌ Info: Case B: running solar_tester [GaussLegQuad/Float32/GPU]
+│   sza = 35.0
+└   raz = 0.0
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.GPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (12, 12, 2)
+Looping over layers ...   9%|██▍                         |  ETA: 0:00:39[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+┌ Info:   geom=1 TOA-up
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 0.0
+│   modeled = 0.0646149f0
+│   truth = 0.0645975
+└   rel_err = 0.000269
+┌ Info:   geom=1 BOA-dn
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 0.0
+│   modeled = 0.104917f0
+│   truth = 0.104954
+└   rel_err = 0.000353
+┌ Info:   geom=4 TOA-up
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 0.0
+│   modeled = 0.0640783f0
+│   truth = 0.0640754
+└   rel_err = 4.4e-5
+┌ Info:   geom=4 BOA-dn
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 0.0
+│   modeled = 0.182554f0
+│   truth = 0.182564
+└   rel_err = 5.42e-5
+┌ Info:   geom=7 TOA-up
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 0.0
+│   modeled = 0.0655745f0
+│   truth = 0.0655817
+└   rel_err = 0.00011
+┌ Info:   geom=7 BOA-dn
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 0.0
+│   modeled = 0.386234f0
+│   truth = 0.386369
+└   rel_err = 0.00035
+┌ Info: Case C: running solar_tester vector [GaussLegQuad/Float64/CPU]
+│   sza = 35.0
+└   raz = 10.0
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (36, 36, 1)
+┌ Info:   geom=1 TOA-up I
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = 0.0695924
+│   truth = 0.0696249
+└   rel_err = 0.000467
+┌ Info:   geom=1 BOA-dn I
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = 0.0991701
+│   truth = 0.0992248
+└   rel_err = 0.000551
+┌ Info:   geom=1 TOA-up Q
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = 0.0127804
+│   truth = 0.0127849
+└   rel_err = 0.00035
+┌ Info:   geom=1 BOA-dn Q
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = 0.00274698
+│   truth = 0.00274801
+└   rel_err = 0.000373
+┌ Info:   geom=1 TOA-up U
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = 0.00369825
+│   truth = 0.00369954
+└   rel_err = 0.000351
+┌ Info:   geom=1 BOA-dn U
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = -0.00156618
+│   truth = -0.00156682
+└   rel_err = 0.000412
+┌ Info:   geom=4 TOA-up I
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = 0.0676772
+│   truth = 0.0677094
+└   rel_err = 0.000475
+┌ Info:   geom=4 BOA-dn I
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = 0.155447
+│   truth = 0.155536
+└   rel_err = 0.000573
+┌ Info:   geom=4 TOA-up Q
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = 0.0181564
+│   truth = 0.0181627
+└   rel_err = 0.000348
+┌ Info:   geom=4 BOA-dn Q
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = -0.000732303
+│   truth = -0.000733138
+└   rel_err = 0.00114
+┌ Info:   geom=4 TOA-up U
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = 0.00456349
+│   truth = 0.00456512
+└   rel_err = 0.000356
+┌ Info:   geom=4 BOA-dn U
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = -0.000168343
+│   truth = -0.000168238
+└   rel_err = 0.00062
+┌ Info:   geom=7 TOA-up I
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = 0.0664034
+│   truth = 0.0664358
+└   rel_err = 0.000487
+┌ Info:   geom=7 BOA-dn I
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = 0.352806
+│   truth = 0.353021
+└   rel_err = 0.000608
+┌ Info:   geom=7 TOA-up Q
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = 0.0279615
+│   truth = 0.0279706
+└   rel_err = 0.000325
+┌ Info:   geom=7 BOA-dn Q
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = -0.00250999
+│   truth = -0.00251204
+└   rel_err = 0.000817
+┌ Info:   geom=7 TOA-up U
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = 0.00618283
+│   truth = 0.00618501
+└   rel_err = 0.000352
+┌ Info:   geom=7 BOA-dn U
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = -5.44826e-5
+│   truth = -5.45485e-5
+└   rel_err = 0.00121
+┌ Info: Case C maxima
+│   TOA_I_max = 0.00048686855217287654
+│   BOA_I_max = 0.0006083658457592851
+│   Q_TOA_max = 0.0003502852088138707
+│   Q_BOA_max = 0.0011393453081944033
+│   U_TOA_max = 0.0003560260032766977
+└   U_BOA_max = 0.001207749699425798
+┌ Info: Case C: running solar_tester vector [GaussLegQuad/Float64/GPU]
+│   sza = 35.0
+└   raz = 10.0
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (36, 36, 1)
+Looping over layers ...   9%|██▍                         |  ETA: 0:00:20[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+┌ Info:   geom=1 TOA-up I
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = 0.0695924
+│   truth = 0.0696249
+└   rel_err = 0.000467
+┌ Info:   geom=1 BOA-dn I
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = 0.0991701
+│   truth = 0.0992248
+└   rel_err = 0.000551
+┌ Info:   geom=1 TOA-up Q
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = 0.0127804
+│   truth = 0.0127849
+└   rel_err = 0.00035
+┌ Info:   geom=1 BOA-dn Q
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = 0.00274698
+│   truth = 0.00274801
+└   rel_err = 0.000373
+┌ Info:   geom=1 TOA-up U
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = 0.00369825
+│   truth = 0.00369954
+└   rel_err = 0.000351
+┌ Info:   geom=1 BOA-dn U
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = -0.00156618
+│   truth = -0.00156682
+└   rel_err = 0.000412
+┌ Info:   geom=4 TOA-up I
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = 0.0676772
+│   truth = 0.0677094
+└   rel_err = 0.000475
+┌ Info:   geom=4 BOA-dn I
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = 0.155447
+│   truth = 0.155536
+└   rel_err = 0.000573
+┌ Info:   geom=4 TOA-up Q
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = 0.0181564
+│   truth = 0.0181627
+└   rel_err = 0.000348
+┌ Info:   geom=4 BOA-dn Q
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = -0.000732303
+│   truth = -0.000733138
+└   rel_err = 0.00114
+┌ Info:   geom=4 TOA-up U
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = 0.00456349
+│   truth = 0.00456512
+└   rel_err = 0.000356
+┌ Info:   geom=4 BOA-dn U
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = -0.000168343
+│   truth = -0.000168238
+└   rel_err = 0.00062
+┌ Info:   geom=7 TOA-up I
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = 0.0664034
+│   truth = 0.0664358
+└   rel_err = 0.000487
+┌ Info:   geom=7 BOA-dn I
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = 0.352806
+│   truth = 0.353021
+└   rel_err = 0.000608
+┌ Info:   geom=7 TOA-up Q
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = 0.0279615
+│   truth = 0.0279706
+└   rel_err = 0.000325
+┌ Info:   geom=7 BOA-dn Q
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = -0.00250999
+│   truth = -0.00251204
+└   rel_err = 0.000817
+┌ Info:   geom=7 TOA-up U
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = 0.00618283
+│   truth = 0.00618501
+└   rel_err = 0.000352
+┌ Info:   geom=7 BOA-dn U
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = -5.44826e-5
+│   truth = -5.45485e-5
+└   rel_err = 0.00121
+┌ Info: Case C maxima
+│   TOA_I_max = 0.0004868685530053046
+│   BOA_I_max = 0.0006083658461045971
+│   Q_TOA_max = 0.0003502852089757431
+│   Q_BOA_max = 0.0011393453050820128
+│   U_TOA_max = 0.00035602600342641595
+└   U_BOA_max = 0.0012077497088554417
+┌ Info: Case C: running solar_tester vector [GaussLegQuad/Float32/CPU]
+│   sza = 35.0
+└   raz = 10.0
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (36, 36, 1)
+┌ Info:   geom=1 TOA-up I
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = 0.0695881f0
+│   truth = 0.0696249
+└   rel_err = 0.00053
+┌ Info:   geom=1 BOA-dn I
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = 0.099153f0
+│   truth = 0.0992248
+└   rel_err = 0.000724
+┌ Info:   geom=1 TOA-up Q
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = 0.0127804f0
+│   truth = 0.0127849
+└   rel_err = 0.000351
+┌ Info:   geom=1 BOA-dn Q
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = 0.00274709f0
+│   truth = 0.00274801
+└   rel_err = 0.000335
+┌ Info:   geom=1 TOA-up U
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = 0.00369827f0
+│   truth = 0.00369954
+└   rel_err = 0.000345
+┌ Info:   geom=1 BOA-dn U
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = -0.0015661f0
+│   truth = -0.00156682
+└   rel_err = 0.000462
+┌ Info:   geom=4 TOA-up I
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = 0.0676731f0
+│   truth = 0.0677094
+└   rel_err = 0.000536
+┌ Info:   geom=4 BOA-dn I
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = 0.155496f0
+│   truth = 0.155536
+└   rel_err = 0.000257
+┌ Info:   geom=4 TOA-up Q
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = 0.0181568f0
+│   truth = 0.0181627
+└   rel_err = 0.000324
+┌ Info:   geom=4 BOA-dn Q
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = -0.000731892f0
+│   truth = -0.000733138
+└   rel_err = 0.0017
+┌ Info:   geom=4 TOA-up U
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = 0.00456362f0
+│   truth = 0.00456512
+└   rel_err = 0.000327
+┌ Info:   geom=4 BOA-dn U
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = -0.000168562f0
+│   truth = -0.000168238
+└   rel_err = 0.00192
+┌ Info:   geom=7 TOA-up I
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = 0.0663944f0
+│   truth = 0.0664358
+└   rel_err = 0.000623
+┌ Info:   geom=7 BOA-dn I
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = 0.352756f0
+│   truth = 0.353021
+└   rel_err = 0.000752
+┌ Info:   geom=7 TOA-up Q
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = 0.0279614f0
+│   truth = 0.0279706
+└   rel_err = 0.00033
+┌ Info:   geom=7 BOA-dn Q
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = -0.00250828f0
+│   truth = -0.00251204
+└   rel_err = 0.0015
+┌ Info:   geom=7 TOA-up U
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = 0.00618281f0
+│   truth = 0.00618501
+└   rel_err = 0.000355
+┌ Info:   geom=7 BOA-dn U
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = -5.5188f-5
+│   truth = -5.45485e-5
+└   rel_err = 0.0117
+┌ Info: Case C maxima
+│   TOA_I_max = 0.0006225970463054571
+│   BOA_I_max = 0.0007515491977020267
+│   Q_TOA_max = 0.00035051953412035345
+│   Q_BOA_max = 0.0016984004930552115
+│   U_TOA_max = 0.00035477124441539643
+└   U_BOA_max = 0.01167230924629743
+┌ Info: Case C: running solar_tester vector [GaussLegQuad/Float32/GPU]
+│   sza = 35.0
+└   raz = 10.0
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.GPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (36, 36, 1)
+Looping over layers ...   9%|██▍                         |  ETA: 0:00:19[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+┌ Info:   geom=1 TOA-up I
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = 0.0696648f0
+│   truth = 0.0696249
+└   rel_err = 0.000572
+┌ Info:   geom=1 BOA-dn I
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = 0.0992271f0
+│   truth = 0.0992248
+└   rel_err = 2.28e-5
+┌ Info:   geom=1 TOA-up Q
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = 0.0127887f0
+│   truth = 0.0127849
+└   rel_err = 0.000296
+┌ Info:   geom=1 BOA-dn Q
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = 0.00274925f0
+│   truth = 0.00274801
+└   rel_err = 0.00045
+┌ Info:   geom=1 TOA-up U
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = 0.00370068f0
+│   truth = 0.00369954
+└   rel_err = 0.000306
+┌ Info:   geom=1 BOA-dn U
+│   sza = 35.0
+│   vza = 10.0
+│   raz = 10.0
+│   modeled = -0.00156727f0
+│   truth = -0.00156682
+└   rel_err = 0.000283
+┌ Info:   geom=4 TOA-up I
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = 0.0677458f0
+│   truth = 0.0677094
+└   rel_err = 0.000536
+┌ Info:   geom=4 BOA-dn I
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = 0.155699f0
+│   truth = 0.155536
+└   rel_err = 0.00105
+┌ Info:   geom=4 TOA-up Q
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = 0.0181658f0
+│   truth = 0.0181627
+└   rel_err = 0.000171
+┌ Info:   geom=4 BOA-dn Q
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = -0.00073192f0
+│   truth = -0.000733138
+└   rel_err = 0.00166
+┌ Info:   geom=4 TOA-up U
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = 0.00456593f0
+│   truth = 0.00456512
+└   rel_err = 0.000178
+┌ Info:   geom=4 BOA-dn U
+│   sza = 35.0
+│   vza = 20.0
+│   raz = 10.0
+│   modeled = -0.000169522f0
+│   truth = -0.000168238
+└   rel_err = 0.00762
+┌ Info:   geom=7 TOA-up I
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = 0.0664454f0
+│   truth = 0.0664358
+└   rel_err = 0.000145
+┌ Info:   geom=7 BOA-dn I
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = 0.352854f0
+│   truth = 0.353021
+└   rel_err = 0.000473
+┌ Info:   geom=7 TOA-up Q
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = 0.0279698f0
+│   truth = 0.0279706
+└   rel_err = 3.05e-5
+┌ Info:   geom=7 BOA-dn Q
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = -0.00250915f0
+│   truth = -0.00251204
+└   rel_err = 0.00115
+┌ Info:   geom=7 TOA-up U
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = 0.00618472f0
+│   truth = 0.00618501
+└   rel_err = 4.63e-5
+┌ Info:   geom=7 BOA-dn U
+│   sza = 35.0
+│   vza = 40.0
+│   raz = 10.0
+│   modeled = -5.50559f-5
+│   truth = -5.45485e-5
+└   rel_err = 0.00926
+┌ Info: Case C maxima
+│   TOA_I_max = 0.0005720926512906369
+│   BOA_I_max = 0.001045333531572824
+│   Q_TOA_max = 0.0002964038187386647
+│   Q_BOA_max = 0.0016603081083545863
+│   U_TOA_max = 0.000306343079846877
+└   U_BOA_max = 0.009261918140475526
+Testing read_hitran...
+Testing absorption_cross_section_hitran...
+Testing absorption_cross_section_wavelengths...
+Testing wing-cutoff admission window (wavenumber vs wavelength units)...
+Testing absorption_cross_section_interpolator...
+Testing GPU vs CPU cross-section match...
+Test Summary: | Pass  Total     Time
+Absorption    |  116    116  1m44.3s
+Test Summary:                 | Pass  Total  Time
+Absorption column integration |   35     35  8.7s
+Test Summary:       | Pass  Total  Time
+H2O self broadening |   12     12  5.7s
+Testing NAI2 and PCW equivalence...
+  δBGE fᵗ (full domain): 0.330444
+Test Summary: | Pass  Total   Time
+Scattering    |   47     47  20.2s
+compute_aerosol_extinction_nodes vs full API timing (standard node set, nquad=300): t_ext=0.004593596s  t_full=0.333100589s  speedup(full/ext)=72.51x
+NativeFloat32 vs Float64 CPU reference -- MEASURED accuracy:
+  standard set   (nquad=300): k relerr=8.114656362083295e-8  ω̃ relerr=7.753014356941077e-8  Greek maxabs=0.004967025079646413
+  wide TOMAS set (n=65):     k relerr=7.250680770608149e-9  ω̃ relerr=1.8948728151792644e-8  Greek maxabs=0.004294728385371943
+Real-CUDA (NVIDIA A100-PCIE-40GB) precision-policy timings (nquad=300, standard set):
+  full API:        NativeFloat64=0.076456997s  DSEmulated=0.211657109s  NativeFloat32=0.022021911s
+  extinction-only: NativeFloat64=0.007943183s  DSEmulated=0.006977307s  NativeFloat32=0.00163315s
+NativeFloat32 polarized phase-matrix validation -- MEASURED (0-180°, 1° steps):
+  standard  : P11 maxabs=1.0002179309958876 (max relerr=0.008942229112624848)
+    P12/P11: raw max=0.00016055758713984236  P11-weighted RMS=6.59589247173847e-6  |Δf12|/peak(P11)=4.3872708406345756e-7
+    P33/P11: raw max=0.014047713776403792  P11-weighted RMS=0.0003313113133111911  |Δf33|/peak(P11)=0.0054622907768810255
+    P34/P11: raw max=0.00030618958286532383  P11-weighted RMS=1.4577829542489623e-5  |Δf34|/peak(P11)=1.250354290075944e-6
+  wide TOMAS: P11 maxabs=0.07521632919178955 (max relerr=0.0018639654586168745)
+    P12/P11: raw max=0.00025341926418487315  P11-weighted RMS=6.058344115842482e-6  |Δf12|/peak(P11)=1.381545347511935e-7
+    P33/P11: raw max=0.037522189082704493  P11-weighted RMS=0.0007794307262606225  |Δf33|/peak(P11)=9.172437411877228e-5
+    P34/P11: raw max=0.0002761504467246878  P11-weighted RMS=9.840890547979617e-6  |Δf34|/peak(P11)=9.47605469753106e-7
+Test Summary:       | Pass  Broken  Total   Time
+Mie caller-node API |  205       2    207  32.0s
+batched fixture: n_max_per_ensemble = [4, 44, 4, 95, 8, 38, 5, 120]  -> 7 distinct nmax groups
+Gate 5 benchmark: n_max group histogram (nmax => n_ensembles), 133 distinct groups:
+  nmax=2  n_ensembles=6
+  nmax=3  n_ensembles=50
+  nmax=4  n_ensembles=50
+  nmax=5  n_ensembles=38
+  nmax=6  n_ensembles=42
+  nmax=7  n_ensembles=29
+  nmax=8  n_ensembles=23
+  nmax=9  n_ensembles=28
+  nmax=10  n_ensembles=19
+  nmax=11  n_ensembles=16
+  nmax=12  n_ensembles=15
+  nmax=13  n_ensembles=13
+  nmax=14  n_ensembles=18
+  nmax=15  n_ensembles=13
+  nmax=16  n_ensembles=12
+  nmax=17  n_ensembles=6
+  nmax=26  n_ensembles=2
+  nmax=27  n_ensembles=10
+  nmax=28  n_ensembles=7
+  nmax=29  n_ensembles=3
+  nmax=30  n_ensembles=7
+  nmax=31  n_ensembles=6
+  nmax=32  n_ensembles=9
+  nmax=33  n_ensembles=10
+  nmax=34  n_ensembles=8
+  nmax=35  n_ensembles=8
+  nmax=36  n_ensembles=11
+  nmax=37  n_ensembles=5
+  nmax=38  n_ensembles=8
+  nmax=39  n_ensembles=4
+  nmax=40  n_ensembles=9
+  nmax=41  n_ensembles=7
+  nmax=42  n_ensembles=6
+  nmax=43  n_ensembles=1
+  nmax=44  n_ensembles=3
+  nmax=45  n_ensembles=6
+  nmax=46  n_ensembles=6
+  nmax=47  n_ensembles=4
+  nmax=48  n_ensembles=6
+  nmax=49  n_ensembles=2
+  nmax=50  n_ensembles=1
+  nmax=51  n_ensembles=4
+  nmax=52  n_ensembles=1
+  nmax=53  n_ensembles=1
+  nmax=54  n_ensembles=7
+  nmax=55  n_ensembles=3
+  nmax=56  n_ensembles=1
+  nmax=57  n_ensembles=4
+  nmax=58  n_ensembles=1
+  nmax=59  n_ensembles=4
+  nmax=60  n_ensembles=3
+  nmax=61  n_ensembles=2
+  nmax=62  n_ensembles=3
+  nmax=63  n_ensembles=3
+  nmax=64  n_ensembles=1
+  nmax=65  n_ensembles=1
+  nmax=66  n_ensembles=3
+  nmax=67  n_ensembles=2
+  nmax=68  n_ensembles=4
+  nmax=69  n_ensembles=2
+  nmax=70  n_ensembles=1
+  nmax=71  n_ensembles=6
+  nmax=72  n_ensembles=1
+  nmax=73  n_ensembles=4
+  nmax=74  n_ensembles=1
+  nmax=75  n_ensembles=3
+  nmax=76  n_ensembles=2
+  nmax=78  n_ensembles=2
+  nmax=79  n_ensembles=2
+  nmax=80  n_ensembles=2
+  nmax=81  n_ensembles=2
+  nmax=82  n_ensembles=2
+  nmax=85  n_ensembles=2
+  nmax=86  n_ensembles=1
+  nmax=87  n_ensembles=2
+  nmax=90  n_ensembles=2
+  nmax=91  n_ensembles=2
+  nmax=92  n_ensembles=2
+  nmax=93  n_ensembles=2
+  nmax=94  n_ensembles=1
+  nmax=95  n_ensembles=2
+  nmax=96  n_ensembles=1
+  nmax=97  n_ensembles=1
+  nmax=98  n_ensembles=3
+  nmax=99  n_ensembles=1
+  nmax=100  n_ensembles=2
+  nmax=101  n_ensembles=1
+  nmax=102  n_ensembles=2
+  nmax=103  n_ensembles=1
+  nmax=105  n_ensembles=1
+  nmax=107  n_ensembles=1
+  nmax=108  n_ensembles=4
+  nmax=109  n_ensembles=3
+  nmax=110  n_ensembles=2
+  nmax=111  n_ensembles=1
+  nmax=112  n_ensembles=1
+  nmax=113  n_ensembles=1
+  nmax=114  n_ensembles=1
+  nmax=115  n_ensembles=3
+  nmax=116  n_ensembles=3
+  nmax=118  n_ensembles=1
+  nmax=119  n_ensembles=3
+  nmax=120  n_ensembles=5
+  nmax=122  n_ensembles=1
+  nmax=123  n_ensembles=3
+  nmax=124  n_ensembles=1
+  nmax=125  n_ensembles=1
+  nmax=127  n_ensembles=1
+  nmax=131  n_ensembles=1
+  nmax=132  n_ensembles=1
+  nmax=134  n_ensembles=2
+  nmax=135  n_ensembles=1
+  nmax=137  n_ensembles=1
+  nmax=138  n_ensembles=1
+  nmax=139  n_ensembles=1
+  nmax=141  n_ensembles=1
+  nmax=142  n_ensembles=2
+  nmax=143  n_ensembles=1
+  nmax=147  n_ensembles=1
+  nmax=148  n_ensembles=1
+  nmax=149  n_ensembles=2
+  nmax=151  n_ensembles=1
+  nmax=153  n_ensembles=1
+  nmax=155  n_ensembles=1
+  nmax=156  n_ensembles=1
+  nmax=157  n_ensembles=2
+  nmax=158  n_ensembles=1
+  nmax=159  n_ensembles=2
+  nmax=160  n_ensembles=1
+  nmax=161  n_ensembles=2
+  nmax=162  n_ensembles=1
+  nmax=164  n_ensembles=2
+  nmax=168  n_ensembles=181
+Gate 5 benchmark: Threads.nthreads() = 4
+Gate 5 benchmark timings (nquad=96, E=882):
+  CPU (Threads.@threads, 4 threads): 2.327722413 s
+  KA-CPU grouped batched (portable backend):             1.847488036 s
+  Real CUDA (NVIDIA A100-PCIE-40GB) grouped batched:                  0.390249522 s
+  Real CUDA (NVIDIA A100-PCIE-40GB) serial single-call loop:         1.890617667 s
+  speedup, grouped batched vs serial single-call (CUDA): 4.84x
+  speedup, grouped batched (CUDA) vs 4-thread CPU:      5.96x
+  Real CUDA (NVIDIA A100-PCIE-40GB) grouped batched, DSEmulated: 0.318175748 s
+  Real CUDA (NVIDIA A100-PCIE-40GB) grouped batched, NativeFloat32: 0.273226556 s
+Test Summary:               | Pass  Total     Time
+Mie caller-node batched API |  978    978  1m01.0s
+size(R) = (16, 4, 2)
+size(R) = (16, 4, 2)
+size(R) = (16, 4, 2)
+size(R) = (16, 4, 2)
+size(R) = (16, 4, 2)
+size(R) = (16, 4, 2)
+size(R) = (16, 4, 2)
+Test Summary: | Pass  Total     Time
+CoreRT        |   17     17  1m06.2s
+Test Summary:   | Pass  Total  Time
+Batched Kernels |   13     13  4.3s
+Verifying planck function correctness...
+Test Summary: | Pass  Total  Time
+SolarModel    |    9      9  0.6s
+============================================================
+Forward Model Smoke Test (noRS)
+============================================================
+CUDA available for GPU tests: true
+Configuration loaded: 2 band(s)
+
+Building forward model (CPU)...
+  4.449753 seconds (4.81 M allocations: 1006.709 MiB, 8.71% gc time, 56.36% compilation time)
+Model built successfully.
+  Layers: 5
+  Quadrature points: 6
+
+  Running RT for band 1...
+  6.337563 seconds (10.43 M allocations: 546.330 MiB, 0.59% gc time, 98.65% compilation time)
+  Output shape: ((2, 3, 17))
+  nStokes=3, nVza=2, nSpec=17
+  I: min=0.08101474517745448, max=0.08401265726746601, mean=0.08365307797151823
+  Q: min=0.0003166715620072748, max=0.0024901715777062602
+
+  Running RT for band 2...
+  0.165445 seconds (328.50 k allocations: 18.665 MiB, 86.11% compilation time)
+  Output shape: ((2, 3, 6))
+  nStokes=3, nVza=2, nSpec=6
+  I: min=0.006863344901540807, max=0.05466467609930068, mean=0.04427281608291909
+  Q: min=8.510886816893115e-6, max=0.00028475866224244087
+
+Building forward model (GPU)...
+ 40.051293 seconds (67.83 M allocations: 3.815 GiB, 1.83% gc time, 1 lock conflict, 83.26% compilation time: <1% of which was recompilation)
+  GPU forward noRS smoke: PASS
+
+============================================================
+Forward noRS smoke test complete.
+============================================================
+Test Summary: | Pass  Total   Time
+Forward noRS  |   64     64  54.3s
+Test Summary:        | Pass  Total     Time
+Multi-sensor heights |  227    227  1m57.1s
+Test Summary:           | Pass  Total  Time
+Rayleigh/Cabannes Raman |   38     38  0.6s
+Setting up base model (with Mie)...
+  R: (2, 1, 4), dR: (2, 1, 4, 14), Nparams=14
+  nλ=4, nVZA=2, nStokes=1, Nparams=14
+  ✓ Mie interpolation outputs are finite and bounded
+  Surface albedo: max_rel=5.82e-6, mean_rel=5.72e-6
+  τ_ref: max_rel=2.37e-5, mean_rel=1.42e-5
+  p₀: max_rel=0.0607, mean_rel=0.0352
+  nᵣ: max_rel=0.00758, mean_rel=0.00673
+  σ_dist: max_rel=0.0173, mean_rel=0.0123
+
+All Jacobian unit tests complete.
+Test Summary: | Pass  Total   Time
+Jacobian Unit |   36     36  34.1s
+Test Summary:     | Pass  Total   Time
+Batched Jacobians |  416    416  14.1s
+Test Summary:             | Pass  Total   Time
+Tabulated phase Jacobians |  656    656  34.7s
+Test Summary:                | Pass  Total  Time
+Batched Lambertian Jacobians | 1536   1536  9.7s
+Test Summary:       | Pass  Total   Time
+Selective Jacobians |   42     42  29.0s
+============================================================
+Type Stability Tests
+============================================================
+
+============================================================
+Type stability tests complete.
+============================================================
+Test Summary:  | Pass  Total  Time
+Type Stability |   55     55  3.9s
+  Float32 vs Float64: max_rel=0.0003207718, mean_rel=7.30886e-5
+Test Summary:       | Pass  Total   Time
+Float32 Consistency |    7      7  10.5s
+Test Summary: | Pass  Total   Time
+Quality Gates |   20     20  28.4s
+Test Summary: | Pass  Total   Time
+Aqua          |    9      9  12.4s
+JET found 281 report(s) (baseline = 232):
+  MethodErrorReport(no matching method found `polarization_type(::vSmartMOM.Architectures.CPU)`, `polarization_type(::vSmartMOM.Architectures.GPU)` (2/3 union split): pol_type = (CoreRT).polarization_type::typeof(vSmartMOM.CoreRT.polarization_type)(model::Any))
+  UndefVarErrorReport(local variable `accumulated_data#2198` may be undefined: accumulated_data#2198::TimerOutputs.TimeData)
+  UndefVarErrorReport(local variable `accumulated_data#742` may be undefined: accumulated_data#742::TimerOutputs.TimeData)
+  UndefVarErrorReport(local variable `accumulated_data#748` may be undefined: accumulated_data#748::TimerOutputs.TimeData)
+  UndefVarErrorReport(local variable `accumulated_data#754` may be undefined: accumulated_data#754::TimerOutputs.TimeData)
+  UndefVarErrorReport(local variable `accumulated_data#760` may be undefined: accumulated_data#760::TimerOutputs.TimeData)
+  UndefVarErrorReport(local variable `accumulated_data#766` may be undefined: accumulated_data#766::TimerOutputs.TimeData)
+  UndefVarErrorReport(local variable `accumulated_data#772` may be undefined: accumulated_data#772::TimerOutputs.TimeData)
+  UndefVarErrorReport(local variable `accumulated_data#778` may be undefined: accumulated_data#778::TimerOutputs.TimeData)
+  UndefVarErrorReport(local variable `accumulated_data#2204` may be undefined: accumulated_data#2204::TimerOutputs.TimeData)
+  UndefVarErrorReport(local variable `accumulated_data#878` may be undefined: accumulated_data#878::TimerOutputs.TimeData)
+  UndefVarErrorReport(local variable `accumulated_data#884` may be undefined: accumulated_data#884::TimerOutputs.TimeData)
+  UndefVarErrorReport(local variable `accumulated_data#890` may be undefined: accumulated_data#890::TimerOutputs.TimeData)
+  UndefVarErrorReport(local variable `accumulated_data#896` may be undefined: accumulated_data#896::TimerOutputs.TimeData)
+  UndefVarErrorReport(local variable `accumulated_data#902` may be undefined: accumulated_data#902::TimerOutputs.TimeData)
+  UndefVarErrorReport(local variable `accumulated_data#908` may be undefined: accumulated_data#908::TimerOutputs.TimeData)
+  UndefVarErrorReport(local variable `accumulated_data#854` may be undefined: accumulated_data#854::TimerOutputs.TimeData)
+  UndefVarErrorReport(local variable `accumulated_data#860` may be undefined: accumulated_data#860::TimerOutputs.TimeData)
+  UndefVarErrorReport(local variable `accumulated_data#866` may be undefined: accumulated_data#866::TimerOutputs.TimeData)
+  UndefVarErrorReport(local variable `accumulated_data#872` may be undefined: accumulated_data#872::TimerOutputs.TimeData)
+  ... (261 more reports not shown)
+Test Summary: | Pass  Total     Time
+JET           |    1      1  1m26.3s
+Test Summary: | Pass  Total  Time
+IO Exports    |   28     28  3.2s
+Test Summary:    | Pass  Total   Time
+Parameter Parser |   63     63  12.0s
+Test Summary: | Pass  Total   Time
+IO Validation |   39     39  11.4s
+Test Summary:  | Pass  Total   Time
+Canopy Surface |   66     66  17.4s
+Test Summary:      | Pass  Total  Time
+QuadPoints streams |   91     91  2.2s
+Test Summary:      | Pass  Total  Time
+External solar SFI |   73     73  8.2s
+Test Summary:            | Pass  Total     Time
+Forward/lin m_max parity |   34     34  5m59.9s
+Test Summary:       | Pass  Total  Time
+Fourier convergence |   47     47  3.1s
+Test Summary:          | Pass  Total  Time
+Component m_max traits |   27     27  0.5s
+Test Summary: | Pass  Total  Time
+Schema docs   |   64     64  0.8s
+Test Summary: | Pass  Total   Time
+Truncation    |  139    139  10.2s
+Test Summary:      | Pass  Total  Time
+Inelastic VS smoke |    8      8  0.7s
+  CPU albedo Jacobian: max rel err = 5.82e-6
+  GPU vs CPU: R and dR match.
+  GPU Forward: matches CPU.
+  ForwardDiff Mie ab: Jacobian computed successfully, shape=(2, 2)
+  ∂C_sca/∂nᵣ: AD=4265.8, FD=4265.8, rel_err=1.1e-7
+
+Hybrid AD tests complete.
+Test Summary: | Pass  Total     Time
+Hybrid AD     |   12     12  1m05.0s
+Test Summary:    | Pass  Total  Time
+Cox-Munk Surface |  154    154  4.7s
+Test Summary:       | Pass  Total   Time
+Lambertian surfaces |   53     53  20.3s
+Test Summary: | Pass  Total   Time
+Surface split |   64     64  23.6s
+Test Summary:      | Pass  Total   Time
+Lambertian closure |   60     60  14.8s
+Test Summary:  | Pass  Total  Time
+Scenario sweep |   54     54  8.8s
+Phase-0 in-place correctness: done
+Test Summary:    | Pass  Total  Time
+Phase 0 in-place |   31     31  2.5s
+fused doubling kernel tests: done
+Test Summary:  | Pass  Total  Time
+Fused doubling |   31     31  8.8s
+fused interaction tests: done
+Test Summary:     | Pass  Total  Time
+Fused interaction |   61     61  6.9s
+test_sparse_combine: done
+Test Summary:          | Pass  Total  Time
+Sparse aerosol combine |   10     10  1.4s
+test_z_tables: done
+Test Summary:   | Pass  Total  Time
+Z-moment tables |  168    168  4.0s
+test_m_invariant_dtau: done
+Test Summary:        | Pass  Total  Time
+m-invariant dτ cache |    4      4  0.6s
+Test Summary:       | Pass  Total  Time
+Fourier convergence |   47     47  1.5s
+Test Summary:     | Pass  Total     Time
+TMS SS correction |   26     26  2m40.8s
+Test Summary:           | Pass  Total   Time
+Phase 1b RRS regression |   12     12  42.9s
+Test Summary:              | Pass  Total   Time
+External-solar RRS columns |    9      9  43.3s
+Test Summary:      | Pass  Total   Time
+Phase 1c SS driver |   30     30  17.0s
+Test Summary: | Pass  Total     Time
+StandaloneSS  |  262    262  1m30.8s
+
+============================================================
+Aerosol module test suite completed
+============================================================
+Test Summary: | Pass  Total  Time
+Aerosols      |   69     69  2.5s
+Test Summary:               | Pass  Total  Time
+Phase 1e perturb_parameters |   12     12  0.6s
+Test Summary: | Pass  Total  Time
+Phase 3a SIF  |   21     21  5.7s
+Test Summary:        | Pass  Total  Time
+Phase 6 script ports |   28     28  1.1s
+============================================================
+BatchContext / update_model! tests
+============================================================
+
+Loading parameters from test_parameters/JacobianTestFast.yaml ...
+paramsA: T ∈ [217.0, 285.8] K, p_surf = 1005.0 hPa
+paramsB: T ∈ [219.0, 287.8] K, p_surf = 1015.05 hPa
+
+Building modelA (ground truth A) ...
+  0.298820 seconds (167.65 k allocations: 356.445 MiB, 45.71% gc time)
+Building modelB (ground truth B) ...
+  0.257636 seconds (165.64 k allocations: 356.357 MiB, 38.00% gc time)
+
+Building BatchContext from paramsA ...
+  1.038507 seconds (922.26 k allocations: 581.975 MiB, 17.55% gc time, 13.82% compilation time: 100% of which was recompilation)
+  ctx.n_bands     = 1
+  ctx.n_aerosols  = 1
+  ctx.Nz          = 5
+  ctx.profile_reduction_n = 5
+  cached abs models per band: [1]
+  k_ref per aerosol: [1.63582091081107e-9]
+
+  Test 1: update to scene B and compare against fresh modelB
+  1.186845 seconds (2.48 M allocations: 119.540 MiB, 99.78% compilation time: 28% of which was recompilation)
+  Band 1 τ_abs:  max|Δ| = 0.0
+  Band 1 τ_rayl: max|Δ| = 0.0
+  Band 1 τ_aer:  max|Δ| = 0.0
+
+  Test 2: update back to scene A (round-trip)
+  0.001763 seconds (33.68 k allocations: 913.016 KiB)
+
+  Test 3: rt_run(ctx.model) ≈ rt_run(modelB) for scene B
+  Band 1 rt_run: max|ΔR|/|R_ref| = 0.0
+
+  Test 4: error-path guard rails
+  All guard-rail errors fired correctly.
+
+  Bonus: partial update — only T
+
+============================================================
+Phase 2: aerosol loading + microphysics tests
+============================================================
+
+Building Phase-2 BatchContext from paramsA ...
+  0.895370 seconds (816.01 k allocations: 576.493 MiB, 22.90% gc time)
+
+  L1: update_aerosol_loading! τ_ref=0.3 vs fresh model
+  0.423960 seconds (165.64 k allocations: 356.357 MiB, 63.24% gc time)
+  Band 1 τ_aer: max|Δ| = 0.0
+
+  L2: rt_run(ctx2.model) ≈ rt_run(modelL_ref) after loading update
+  Band 1 rt_run: max|ΔR|/|R_ref| = 0.0
+
+  L3: restore τ_ref=0.04 (round-trip)
+
+  L4: guard rails for update_aerosol_loading!
+
+  M1: update_aerosol_microphysics! with larger reff vs fresh model
+  0.275875 seconds (165.77 k allocations: 356.913 MiB, 26.09% gc time)
+  0.803280 seconds (904.28 k allocations: 384.379 MiB, 15.10% gc time, 67.59% compilation time)
+  m_max_bands: ctx2=[4]  ref=[4]
+  l_max:       ctx2=[5]  ref=[5]
+  Band 1 τ_aer: max|Δ| = 0.0
+  Band 1 rt_run: max|ΔR|/|R_ref| = 0.0
+
+  M2: round-trip microphysics A→B→A
+  0.295896 seconds (102.46 k allocations: 345.937 MiB, 51.32% gc time)
+  k_ref: ctx2=1.63582091081107e-9  original=1.63582091081107e-9
+
+  M2b: SolverConfig l_max change with NoTruncation
+  l_max before (small reff): [895]
+  l_max after  (large reff): [895]
+  l_max ref   (large reff): [895]
+  Band 1 rt_run (NoTrunc): max|ΔR|/|R_ref| = 0.0
+
+  M3: guard rails for update_aerosol_microphysics!
+
+  Regression gate: Phase-1 update_model! still correct after Phase-2
+  Phase-1 regression gate: PASSED
+
+============================================================
+Phase 3: state-machine regression tests (B1–B4)
+============================================================
+
+  B1: q≡0 at construction, then update_model!(q=wet)
+  Band 1 τ_abs: max|Δ| = 0.0
+  B1: dry→wet H2O line absorption now applied (was silently skipped).
+
+  B2: CIA consumes new_profile.vmr (scene-updated O2)
+  scene O2 = 0.1   config O2 = 0.21
+  max|τ_cia(scene) - τ_cia(config)| = 0.33614773505514783
+  τ_cia ratio = 0.22675736961451254  (expected ≈ 0.2267573696145125)
+  B2: CIA call site now consumes scene-updated VMRs.
+
+  B3: update(vmr=B) then update(T=C) ⇒ both stick
+  Band 1 τ_abs: max|Δ| = 0.0
+  B3: sequential partial updates now compose incrementally.
+
+  B4: update_aerosol_loading!(τ_ref=X) then update_model!(T=...)
+  Band 1 τ_aer: max|Δ| = 0.0
+  B4: aerosol loading update now persists across update_model!.
+
+============================================================
+BatchContext / update_model! tests complete.
+============================================================
+Test Summary:              | Pass  Broken  Total   Time
+BatchContext update_model! |   62       1     63  23.3s
+Test Summary:  | Pass  Total   Time
+Sources (v0.6) |   86     86  13.2s
+Test Summary:                  | Pass  Total  Time
+ThermalEmission (v0.7 Phase A) |   91     91  4.7s
+
+Case A — Siewert 2000 IIA [GaussLegQuad/Float64/CPU], TOA-upwelling rel-error:
+    az    stokes    median       max
+      0.0       I     5.02e-5     5.96e-5
+      0.0       Q     1.94e-5      5.5e-5
+     90.0       I     6.65e-5     7.15e-5
+     90.0       Q     9.35e-5    0.000167
+     90.0       U     6.83e-5     0.00014
+     90.0       V    0.000109      0.0002
+    180.0       I      7.1e-5     7.65e-5
+    180.0       Q    0.000153    0.000326
+
+Case A — Siewert 2000 IIA [GaussLegQuad/Float64/GPU], TOA-upwelling rel-error:
+    az    stokes    median       max
+      0.0       I     5.02e-5     5.96e-5
+      0.0       Q     1.94e-5      5.5e-5
+     90.0       I     6.65e-5     7.15e-5
+     90.0       Q     9.35e-5    0.000167
+     90.0       U     6.83e-5     0.00014
+     90.0       V    0.000109      0.0002
+    180.0       I      7.1e-5     7.65e-5
+    180.0       Q    0.000153    0.000326
+
+Case A — Siewert 2000 IIA [GaussLegQuad/Float32/CPU], TOA-upwelling rel-error:
+    az    stokes    median       max
+      0.0       I    0.000217     0.00197
+      0.0       Q    0.000183     0.00183
+     90.0       I    0.000125      0.0022
+     90.0       Q    0.000391     0.00216
+     90.0       U    0.000514      0.0772
+     90.0       V    0.000432         0.1
+    180.0       I     0.00101     0.00298
+    180.0       Q     0.00182     0.00505
+
+Case A — Siewert 2000 IIA [GaussLegQuad/Float32/GPU], TOA-upwelling rel-error:
+    az    stokes    median       max
+      0.0       I    0.000214     0.00197
+      0.0       Q     0.00019     0.00184
+     90.0       I    0.000122      0.0022
+     90.0       Q    0.000389     0.00216
+     90.0       U    0.000495      0.0772
+     90.0       V    0.000449         0.1
+    180.0       I       0.001     0.00298
+    180.0       Q     0.00182     0.00505
+
+Case B [GaussLegQuad/Float64/CPU] — solar_tester Task 1, sza=35.0 raz=0.0:
+  TOA-up: median=0.000472  max=0.000481
+  BOA-dn: median=0.000582  max=0.000611
+
+Case B [GaussLegQuad/Float64/GPU] — solar_tester Task 1, sza=35.0 raz=0.0:
+  TOA-up: median=0.000472  max=0.000481
+  BOA-dn: median=0.000582  max=0.000611
+
+Case B [GaussLegQuad/Float32/CPU] — solar_tester Task 1, sza=35.0 raz=0.0:
+  TOA-up: median=0.000704  max=0.000734
+  BOA-dn: median=0.000511  max=0.000867
+
+Case B [GaussLegQuad/Float32/GPU] — solar_tester Task 1, sza=35.0 raz=0.0:
+  TOA-up: median=0.00011  max=0.000269
+  BOA-dn: median=0.00035  max=0.000353
+
+Case C [GaussLegQuad/Float64/CPU] — solar_tester vector Task 1, sza=35.0 raz=10.0:
+  TOA-up I: median=0.000475  max=0.000487
+  BOA-dn I: median=0.000573  max=0.000608
+  TOA-up Q: median=0.000348  max=0.00035
+  BOA-dn Q: median=0.000817  max=0.00114
+  TOA-up U: median=0.000352  max=0.000356
+  BOA-dn U: median=0.00062  max=0.00121
+
+Case C [GaussLegQuad/Float64/GPU] — solar_tester vector Task 1, sza=35.0 raz=10.0:
+  TOA-up I: median=0.000475  max=0.000487
+  BOA-dn I: median=0.000573  max=0.000608
+  TOA-up Q: median=0.000348  max=0.00035
+  BOA-dn Q: median=0.000817  max=0.00114
+  TOA-up U: median=0.000352  max=0.000356
+  BOA-dn U: median=0.00062  max=0.00121
+
+Case C [GaussLegQuad/Float32/CPU] — solar_tester vector Task 1, sza=35.0 raz=10.0:
+  TOA-up I: median=0.000536  max=0.000623
+  BOA-dn I: median=0.000724  max=0.000752
+  TOA-up Q: median=0.00033  max=0.000351
+  BOA-dn Q: median=0.0015  max=0.0017
+  TOA-up U: median=0.000345  max=0.000355
+  BOA-dn U: median=0.00192  max=0.0117
+
+Case C [GaussLegQuad/Float32/GPU] — solar_tester vector Task 1, sza=35.0 raz=10.0:
+  TOA-up I: median=0.000536  max=0.000572
+  BOA-dn I: median=0.000473  max=0.00105
+  TOA-up Q: median=0.000171  max=0.000296
+  BOA-dn Q: median=0.00115  max=0.00166
+  TOA-up U: median=0.000178  max=0.000306
+  BOA-dn U: median=0.00762  max=0.00926
+Test Summary:    | Pass  Total     Time
+VLIDORT baseline |   74     74  1m36.1s

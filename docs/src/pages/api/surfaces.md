@@ -26,4 +26,5 @@ vSmartMOM.CoreRT.water_refractive_index
 vSmartMOM.CoreRT.fresnel_coefficients
 vSmartMOM.CoreRT.fresnel_mueller
 vSmartMOM.CoreRT.stokes_rotation_matrix
+vSmartMOM.CoreRT.invalidate_canopy_cache!
 ```

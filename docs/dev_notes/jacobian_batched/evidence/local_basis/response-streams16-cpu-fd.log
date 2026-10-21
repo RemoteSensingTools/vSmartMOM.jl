@@ -1,0 +1,18 @@
+RESPONSE_METHOD source
+RESPONSE_SCENE streams=16 operator_size=57 layers=6 wavelengths=2
+RESPONSE_PARITY nparams=1 field=R error=0.0
+RESPONSE_PARITY nparams=1 field=T error=0.0
+RESPONSE_PARITY nparams=1 field=dR error=5.551115123125783e-17
+RESPONSE_PARITY nparams=1 field=dT error=1.1102230246251565e-16
+RESPONSE_TIME nSpec=2 layers=6 nparams=1 combined=(median = 0.413200087, samples = [0.460913011, 0.413200087, 0.386630273]) ratio=4.185085159780279
+CORE_LOCAL nSpec=2 layers=6 pol=3 nparams=1 local_directions=3 combined=(median = 0.382098405, samples = [0.387141477, 0.382098405, 0.365265839]) ratio=3.8700726709702136 speedup=0.5352450947812777
+CORE_MEASURE nSpec=2 pol=3 nparams=1 forward=(median = 0.098731584, samples = [0.098731584, 0.096341159, 0.106804602]) combined=(median = 0.204516297, samples = [0.204516297, 0.211323856, 0.202716253]) ratio=2.0714374135838844
+CORE_FD_PASS nparams=1 all_columns=true endpoints=R,T azimuth=[0.0, 37.0]
+RESPONSE_PARITY nparams=18 field=R error=0.0
+RESPONSE_PARITY nparams=18 field=T error=0.0
+RESPONSE_PARITY nparams=18 field=dR error=2.7755575615628914e-17
+RESPONSE_PARITY nparams=18 field=dT error=5.551115123125783e-17
+RESPONSE_TIME nSpec=2 layers=6 nparams=18 combined=(median = 0.416659891, samples = [0.412525098, 0.416659891, 0.424003819]) ratio=3.8740659796583867
+CORE_LOCAL nSpec=2 layers=6 pol=3 nparams=18 local_directions=3 combined=(median = 0.598909549, samples = [0.59817588, 0.598909549, 0.604054823]) ratio=5.568606815272862 speedup=2.854594605904338
+CORE_MEASURE nSpec=2 pol=3 nparams=18 forward=(median = 0.107551057, samples = [0.096060603, 0.132590763, 0.107551057]) combined=(median = 1.709643968, samples = [1.708803568, 1.709971915, 1.709643968]) ratio=15.896114977280046
+CORE_FD_PASS nparams=18 all_columns=true endpoints=R,T azimuth=[0.0, 37.0]

@@ -17,6 +17,92 @@ function interlayer_flux_helper!(RS_type::noRS,
     otuwJ .= tmpR ⊠ (ibotJ₀⁻ .+ ibotR⁻⁺ ⊠ itopJ₀⁺)
 end
 
+"""
+    interlayer_flux_helper!(::noRS, I_static,
+        topR⁺⁻, botR⁻⁺, topJ₀⁺, botJ₀⁻, dwJ, uwJ,
+        topṘ⁺⁻, botṘ⁻⁺, topJ̇₀⁺, botJ̇₀⁻, dwJ̇, uwJ̇)
+
+Compute the elastic interlayer downwelling/upwelling fields and their
+Jacobians. The fourth dimension of every dotted array is the physical
+parameter dimension.
+
+For the downwelling field, with `A = topR⁺⁻`, `B = botR⁻⁺`, and
+`G = (I - A·B)⁻¹`, the tangent of the inverse is evaluated analytically as
+
+```math
+\\dot G = G\\,(\\dot A\\,B + A\\,\\dot B)\\,G.
+```
+
+The mirror-direction solve uses the corresponding `(I - B·A)⁻¹` identity.
+Both forward inverses are therefore computed once and reused for every
+parameter column; no AD is applied through `batch_inv!`.
+"""
+function interlayer_flux_helper!(RS_type::noRS,
+    I_static::AbstractArray{FT2},
+    itopR⁺⁻::AbstractArray{FT,3}, ibotR⁻⁺::AbstractArray{FT,3},
+    itopJ₀⁺::AbstractArray{FT,3}, ibotJ₀⁻::AbstractArray{FT,3},
+    otdwJ::AbstractArray{FT,3}, otuwJ::AbstractArray{FT,3},
+    itopṘ⁺⁻::AbstractArray{FT,4}, ibotṘ⁻⁺::AbstractArray{FT,4},
+    itopJ̇₀⁺::AbstractArray{FT,4}, ibotJ̇₀⁻::AbstractArray{FT,4},
+    otdwJ̇::AbstractArray{FT,4}, otuwJ̇::AbstractArray{FT,4}) where {FT<:Real,FT2}
+
+    Nparams = size(itopṘ⁺⁻, 4)
+    size(ibotṘ⁻⁺, 4) == Nparams || throw(DimensionMismatch(
+        "top and bottom reflectance Jacobians must have the same parameter dimension"))
+    size(itopJ̇₀⁺, 4) == Nparams || throw(DimensionMismatch(
+        "top source and reflectance Jacobians must have the same parameter dimension"))
+    size(ibotJ̇₀⁻, 4) == Nparams || throw(DimensionMismatch(
+        "bottom source and reflectance Jacobians must have the same parameter dimension"))
+    size(otdwJ̇, 4) == Nparams || throw(DimensionMismatch(
+        "downwelling output Jacobian has the wrong parameter dimension"))
+    size(otuwJ̇, 4) == Nparams || throw(DimensionMismatch(
+        "upwelling output Jacobian has the wrong parameter dimension"))
+
+    # Allocate one inverse-tangent and one source-tangent workspace, then reuse
+    # them for every parameter and for both propagation directions. All arrays
+    # remain on the architecture selected by the caller.
+    G = similar(itopR⁺⁻)
+    Ġ = similar(itopR⁺⁻)
+    rhs = similar(itopJ₀⁺)
+    rhṡ = similar(itopJ₀⁺)
+
+    # Downwelling: D = (I - A B)⁻¹ (a + A b).
+    batch_inv!(
+        G, I_static .- itopR⁺⁻ ⊠ ibotR⁻⁺)
+    rhs .= itopJ₀⁺ .+ itopR⁺⁻ ⊠ ibotJ₀⁻
+    otdwJ .= G ⊠ rhs
+
+    @inbounds for iparam in 1:Nparams
+        @views begin
+            Ġ .= G ⊠ (itopṘ⁺⁻[:, :, :, iparam] ⊠ ibotR⁻⁺ .+
+                         itopR⁺⁻ ⊠ ibotṘ⁻⁺[:, :, :, iparam]) ⊠ G
+            rhṡ .= itopJ̇₀⁺[:, :, :, iparam] .+
+                    itopṘ⁺⁻[:, :, :, iparam] ⊠ ibotJ₀⁻ .+
+                    itopR⁺⁻ ⊠ ibotJ̇₀⁻[:, :, :, iparam]
+            otdwJ̇[:, :, :, iparam] .= Ġ ⊠ rhs .+ G ⊠ rhṡ
+        end
+    end
+
+    # Upwelling: U = (I - B A)⁻¹ (b + B a).
+    batch_inv!(
+        G, I_static .- ibotR⁻⁺ ⊠ itopR⁺⁻)
+    rhs .= ibotJ₀⁻ .+ ibotR⁻⁺ ⊠ itopJ₀⁺
+    otuwJ .= G ⊠ rhs
+
+    @inbounds for iparam in 1:Nparams
+        @views begin
+            Ġ .= G ⊠ (ibotṘ⁻⁺[:, :, :, iparam] ⊠ itopR⁺⁻ .+
+                         ibotR⁻⁺ ⊠ itopṘ⁺⁻[:, :, :, iparam]) ⊠ G
+            rhṡ .= ibotJ̇₀⁻[:, :, :, iparam] .+
+                    ibotṘ⁻⁺[:, :, :, iparam] ⊠ itopJ₀⁺ .+
+                    ibotR⁻⁺ ⊠ itopJ̇₀⁺[:, :, :, iparam]
+            otuwJ̇[:, :, :, iparam] .= Ġ ⊠ rhs .+ G ⊠ rhṡ
+        end
+    end
+
+    return nothing
+end
+
 
 function interlayer_flux_helper!(RS_type::RRS, 
         I_static::AbstractArray{FT2},
@@ -199,4 +285,27 @@ function compute_interlayer_flux!(RS_type::noRS,
     
     synchronize_if_gpu()
     
+end
+
+"""Compute elastic interlayer fields and their analytic parameter Jacobians."""
+function compute_interlayer_flux!(RS_type::noRS,
+                        I_static::AbstractArray{FT2},
+                        itopR⁺⁻::AbstractArray{FT,3}, ibotR⁻⁺::AbstractArray{FT,3},
+                        itopJ₀⁺::AbstractArray{FT,3}, ibotJ₀⁻::AbstractArray{FT,3},
+                        otdwJ::AbstractArray{FT,3}, otuwJ::AbstractArray{FT,3},
+                        itopṘ⁺⁻::AbstractArray{FT,4}, ibotṘ⁻⁺::AbstractArray{FT,4},
+                        itopJ̇₀⁺::AbstractArray{FT,4}, ibotJ̇₀⁻::AbstractArray{FT,4},
+                        otdwJ̇::AbstractArray{FT,4}, otuwJ̇::AbstractArray{FT,4},
+                        arr_type) where {FT<:Real,FT2}
+
+    interlayer_flux_helper!(RS_type, I_static,
+        itopR⁺⁻, ibotR⁻⁺,
+        itopJ₀⁺, ibotJ₀⁻,
+        otdwJ, otuwJ,
+        itopṘ⁺⁻, ibotṘ⁻⁺,
+        itopJ̇₀⁺, ibotJ̇₀⁻,
+        otdwJ̇, otuwJ̇)
+
+    synchronize_if_gpu()
+    return nothing
 end

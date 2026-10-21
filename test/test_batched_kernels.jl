@@ -1,4 +1,34 @@
+using Test, LinearAlgebra
+using vSmartMOM: CoreRT
+import NNlib
 using KernelAbstractions
+
+@testset "Batched solve/inverse mutation contract" begin
+    A = reshape(Float64[
+        3, 1, 1, 2,
+        4, 1, 2, 3,
+    ], 2, 2, 2)
+    B = reshape(Float64[
+        1, 2, 3, 4,
+        2, 1, 4, 3,
+    ], 2, 2, 2)
+    A_original = copy(A)
+    B_original = copy(B)
+
+    X = similar(B)
+    @test CoreRT.batch_solve!(X, copy(A), B) === X
+    @test B == B_original
+    for k in axes(A, 3)
+        @test X[:, :, k] ≈ A_original[:, :, k] \ B_original[:, :, k]
+    end
+
+    Ainv = copy(A_original)
+    Xinv = similar(Ainv)
+    @test CoreRT.batch_inv!(Xinv, Ainv) === Xinv
+    for k in axes(Ainv, 3)
+        @test Xinv[:, :, k] ≈ inv(A_original[:, :, k])
+    end
+end
 
 @testset "Portable KA batched kernels" begin
     FT = Float32
@@ -135,4 +165,17 @@ end
         @info "Skipping local Metal batched-kernel smoke on non-Mac or without Metal.jl in the active environment."
         @test true
     end
+end
+
+@testset "Package-owned batched multiplication and NNlib coexistence" begin
+    @test CoreRT.batched_mul !== NNlib.batched_mul
+    for FT in (Float32, Float64, ComplexF64), (a, b) in ((3, 1), (1, 3), (3, 3), (1, 1))
+        A = reshape(FT.(1:4a), 2, 2, a)
+        B = reshape(FT.(1:4b), 2, 2, b)
+        expected = cat([A[:, :, min(k,a)] * B[:, :, min(k,b)]
+                        for k in 1:max(a,b)]...; dims=3)
+        @test NNlib.batched_mul(A, B) ≈ expected
+        @test CoreRT.batched_mul(A, B) ≈ expected
+    end
+    @test_throws DimensionMismatch CoreRT.batched_mul(ones(2, 2, 3), ones(2, 2, 2))
 end

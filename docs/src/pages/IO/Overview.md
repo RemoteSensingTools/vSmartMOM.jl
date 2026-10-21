@@ -1,5 +1,11 @@
 # IO Overview
 
+**For:** users who need the `read_parameters` / `Dict` / TOML API surface —
+what dispatches on what, and the safety maps behind string-based config
+fields.
+
+**Next:** [Configure a Scene (step by step)](ConfigurationGuide.md), [Input Schema](Schema.md).
+
 The IO submodule centralizes loading and validation of simulation inputs, decoupled from the CoreRT solvers.
 
 Use `read_parameters` as the user-facing entry point. It dispatches on the input type:
@@ -11,7 +17,13 @@ Use `read_parameters` as the user-facing entry point. It dispatches on the input
 
 The explicit aliases `parameters_from_file`, `parameters_from_dict`, and `parameters_from_source` remain available when code wants the call site to state the input kind. `parameters_from_yaml` is also supported for YAML files.
 
-- `read_atmos_profile(path|dict)` loads an atmospheric profile only.
+- `read_atmos_profile(path)` loads a standalone YAML atmospheric profile;
+  `read_atmos_profile_dict(dict)` loads the same mapping from memory. The
+  mapping holds `T`, `p_half` (or hybrid `ak`, `bk`, `p_surf`), and optional
+  `q` and `vmr` at its top level; it is not a scene file, whose
+  `atmospheric_profile` block names the interfaces `p`. Both
+  profile readers accept `FT=Float32` when a single-precision standalone
+  profile is wanted; the default is `Float64`.
 - Format registry: `IO.Formats` selects a loader based on source/extension (YAML and TOML supported).
 - Safe parsing: enums and types are parsed with explicit maps. Surfaces (BRDF) and spectral band ranges are parsed without `eval`.
 
@@ -33,17 +45,22 @@ cfg = Dict(
     "quadrature_type" => "GaussLegQuad()",
     "polarization_type" => "Stokes_I()",
     "max_m" => 3,
-    "Δ_angle" => 2.0,
     "l_trunc" => 20,
     "depol" => 0.0,
     "float_type" => "Float64",
     "architecture" => "default_architecture",
   ),
-  "geometry" => Dict("sza"=>60, "vza"=>[60,45,30,15,0,15,30,45,60], "vaz"=>[180,180,180,180,0,0,0,0,0], "obs_alt"=>1000.0),
+  "geometry" => Dict("sza"=>60, "vza"=>[60,45,30,15,0,15,30,45,60], "vaz"=>[180,180,180,180,0,0,0,0,0], "obs_alt"=>[0.0]),
   "atmospheric_profile" => Dict("T"=>fill(260.0,34), "p"=>collect(range(0.14, stop=1005.0, length=35)), "profile_reduction"=>-1),
 )
 params2 = read_parameters(cfg)
 ```
+
+`obs_alt` uses geometric km above BOA. `[0]` requests the standard TOA and
+BOA outputs; scalar `0` requests BOA only, while an interior scalar height
+requests upwelling and downwelling radiances at that exact atmospheric
+interface. See the [`geometry` schema](Schema/geometry.md) for all scalar and
+vector forms.
 
 ## Formats
 
@@ -54,10 +71,20 @@ params2 = read_parameters(cfg)
 
 - Quadrature: `RadauQuad`, `GaussLegQuad`
 - Polarization: `Stokes_I`, `Stokes_IQ`, `Stokes_IQU`, `Stokes_IQUV`
-- Architecture: `CPU`, `GPU`, `default_architecture`
+  (`Stokes_IQ` parses, but RT model builds reject it)
+- Architecture: `CPU`, `GPU`, `MetalGPU`, `default_architecture` (an `Architectures.` prefix is accepted for `CPU()`, `GPU()` and `MetalGPU()`, not for `default_architecture`)
 - Decomposition: `NAI2`, `PCW`
 - Broadening: `Voigt`, `Lorentz`, `Doppler`
 - Complex error function: `HumlicekWeidemann32SDErrorFunction`
-- Surfaces (BRDF): LambertianSurfaceScalar, LambertianSurfaceSpectrum, LambertianSurfaceLegendre, LambertianSurfaceSpline, rpvSurfaceScalar, RossLiSurfaceScalar, CoxMunkSurface, CanopySurface
+- Surfaces (BRDF): LambertianSurfaceScalar, LambertianSurfaceSpectrum, LambertianSurfaceLegendre, rpvSurfaceScalar, RossLiSurfaceScalar, CoxMunkSurface
+- Truncation: `auto`, `NoTruncation()`, `NoTruncation(l_max=N)`, `δBGE(l_max, Δ_angle)` (the retired `Δ_angle` is forced to 0)
 
 All are passed in as strings in the YAML and mapped safely without `eval`.
+`CanopySurface` is not a surface string: it is built from the top-level
+`canopy` block, which wraps each band's surface as soil.
+`LambertianSurfaceSpline` has no string form; construct it in Julia.
+
+Keys the parser does not read at the top level or in the `radiative_transfer`
+and `geometry` blocks produce a one-time warning per key and session (they are
+not errors), so a misspelled optional key is reported instead of silently
+leaving its default in effect.

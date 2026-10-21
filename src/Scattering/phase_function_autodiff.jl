@@ -50,21 +50,18 @@ method, compute architecture, GPU precision policy) is read off the model.
     * `NAI2` + `CPU()` → the analytic CPU implementation
       ([`compute_aerosol_optical_properties`](@ref) 2-arg method).
     * `NAI2` + a GPU architecture with a Mie pipeline (`has_gpu_mie` true,
-      i.e. CUDA `GPU()`) → the KernelAbstractions GPU pipeline
+      CUDA `GPU()` or Float32 `MetalGPU()`) → the KernelAbstractions GPU pipeline
       ([`compute_aerosol_optical_properties_gpu`](@ref)).
     * `NAI2`/`PCW` + a non-CPU architecture **without** a GPU Mie pipeline
-      (e.g. `MetalGPU()`) → one-time `@warn` then CPU fallback (Mie on CPU; RT
+      → one-time `@warn` then CPU fallback (Mie on CPU; RT
       arrays still run on that architecture).
     * `PCW` + GPU → one-time `@warn` then CPU fallback (no GPU PCW kernel).
     * `PCW` + `CPU()` → the analytic PCW implementation.
-- `autodiff=true`: computes the Jacobian with respect to the 4 aerosol
-  parameters ``\mathbf{x}=[r_m,\sigma,n_r,n_i]`` using ForwardDiff. AD always
-  runs on the CPU analytic kernel (Dual numbers do not flow through the GPU
-  kernels).
+- `autodiff=true` is retired and raises an error. For aerosol Jacobians use
+  `compute_aerosol_optical_properties(LinMode(), model, FT)`, which returns
+  forward and hand-linearized optics. Its native size coordinates are the
+  lognormal distribution parameters, not median radius/geometric width.
 
-The AD Jacobian is stored in `AerosolOptics.derivs` with shape
-`(6L + 2, 4)`, where `L` is the Greek coefficient length and rows are stacked as
-`[α; β; γ; δ; ϵ; ζ; ω̃; k]`.
 """
 function compute_aerosol_optical_properties(model::MieModel ; autodiff=false)
     # NOTE (2026-06): the aerosol Mie ForwardDiff autodiff path is stale/unused and

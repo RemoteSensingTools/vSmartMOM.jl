@@ -1,0 +1,25 @@
+BENCH_BEGIN cuda-n10000-t4
+BENCH_PHASE reference parity only
+Precompiling packages...
+    vSmartMOM Being precompiled by another process (pid: 2416854, pidfile: /home/cfranken/.julia/compiled/v1.12/vSmartMOM/bplNx_BLbwW.ji.pidfile)
+  25196.9 ms  ✓ vSmartMOM
+    vSmartMOM → vSmartMOMCUDAExt Being precompiled by another process (pid: 2416854, pidfile: /home/cfranken/.julia/compiled/v1.12/vSmartMOMCUDAExt/55o5k_BLbwW.ji.pidfile)
+  11686.4 ms  ✓ vSmartMOM → vSmartMOMCUDAExt
+  2 dependencies successfully precompiled in 39 seconds. 274 already precompiled.
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:39[KLooping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:07[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:28[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+BENCH_PHASE enabled=true kind=full
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:08[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:06[K
+BENCH_PHASE enabled=true kind=selected
+BENCH_PHASE kind=forward
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:08[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:05[K
+SELECTED_PARITY dR=0.0
+MODEL backend=cuda nSpec=10000 operator=18 full_columns=14 selected_columns=4
+PARITY R=3.8163916471489756e-17 T=3.122502256758253e-17 dR=5.447031714567174e-16 dT=6.661338147750939e-16 forward_R=5.898059818321144e-17
+MEASURE enabled=true kind=full median_seconds=7.131469116 median_bytes=3.635031e9 median_gpu_bytes=1.20995382006e11 samples=[(time = 7.505077793, bytes = 3635022536, gctime = 1.412779074, gpu_bytes = 120995382006), (time = 7.030668511, bytes = 3635031000, gctime = 0.873202648, gpu_bytes = 120995382006), (time = 7.131469116, bytes = 3635044968, gctime = 0.823185928, gpu_bytes = 120995382006)]
+MEASURE enabled=true kind=selected median_seconds=1.872606794 median_bytes=1.296859624e9 median_gpu_bytes=2.6941241396e10 samples=[(time = 1.889977943, bytes = 1296854168, gctime = 0.069589734, gpu_bytes = 26941241396), (time = 1.872385228, bytes = 1296862104, gctime = 0.055537863, gpu_bytes = 26941241396), (time = 1.872606794, bytes = 1296859624, gctime = 0.054905184, gpu_bytes = 26941241396)]
+FORWARD median_seconds=0.572516585
+BENCH_DONE cuda-n10000-t4

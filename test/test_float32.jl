@@ -1,5 +1,6 @@
 using vSmartMOM
 using Test
+import YAML
 
 @testset "Float32 Consistency" begin
 
@@ -13,7 +14,7 @@ using Test
         # Keep `truncation` in sync with the mutated `l_trunc` — model_from_parameters
         # no longer auto-rebuilds the default δBGE so that explicit user truncation
         # (e.g. NoTruncation()) isn't silently overwritten.
-        params64.truncation = vSmartMOM.Scattering.δBGE{Float64}(10, params64.Δ_angle)
+        params64.truncation = vSmartMOM.Scattering.δBGE{Float64}(10)
         params64.architecture = vSmartMOM.CPU()
         model64 = model_from_parameters(params64)
         R64, _, _, _, _, _, _ = rt_run(model64)
@@ -26,7 +27,7 @@ using Test
         params32 = vSmartMOM.parameters_from_yaml(yaml32)
         params32.max_m = 2
         params32.l_trunc = 10
-        params32.truncation = vSmartMOM.Scattering.δBGE{Float32}(10, params32.Δ_angle)
+        params32.truncation = vSmartMOM.Scattering.δBGE{Float32}(10)
         params32.architecture = vSmartMOM.CPU()
         model32 = model_from_parameters(params32)
         R32, _, _, _, _, _, _ = rt_run(model32)
@@ -42,7 +43,7 @@ using Test
         # Keep `truncation` in sync with the mutated `l_trunc` — model_from_parameters
         # no longer auto-rebuilds the default δBGE so that explicit user truncation
         # (e.g. NoTruncation()) isn't silently overwritten.
-        params64.truncation = vSmartMOM.Scattering.δBGE{Float64}(10, params64.Δ_angle)
+        params64.truncation = vSmartMOM.Scattering.δBGE{Float64}(10)
         params64.architecture = vSmartMOM.CPU()
         model64 = model_from_parameters(params64)
         R64, _, _, _, _, _, _ = rt_run(model64)
@@ -50,7 +51,7 @@ using Test
         params32 = vSmartMOM.parameters_from_yaml(yaml32)
         params32.max_m = 2
         params32.l_trunc = 10
-        params32.truncation = vSmartMOM.Scattering.δBGE{Float32}(10, params32.Δ_angle)
+        params32.truncation = vSmartMOM.Scattering.δBGE{Float32}(10)
         params32.architecture = vSmartMOM.CPU()
         model32 = model_from_parameters(params32)
         R32, _, _, _, _, _, _ = rt_run(model32)
@@ -62,5 +63,18 @@ using Test
         
         println("  Float32 vs Float64: max_rel=$max_rel, mean_rel=$mean_rel")
         @test max_rel < 0.01  # 1% relative tolerance
+    end
+end
+
+@testset "Float32 LinMode tangents use the model float type" begin
+    # A Float64 CO2 entry in absorption.vmr must not leave Float64 tangent
+    # arrays in a Float32 model (they are coerced to the model float type).
+    d = YAML.load_file("test_parameters/JacobianTestFast.yaml")
+    d["radiative_transfer"]["float_type"] = "Float32"
+    d["absorption"]["vmr"]["CO2"] = 400e-6
+    model, lin = model_from_parameters(LinMode(), read_parameters(d))
+    @test eltype(model.optics.τ_abs[1]) == Float32
+    for field in (:τ̇_abs, :τ̇_aer, :τ̇_rayl_psurf, :τ̇_abs_psurf, :τ̇_aer_psurf)
+        @test eltype(first(getfield(lin, field))) == Float32
     end
 end

@@ -33,6 +33,25 @@ Determine the `ScatteringInterface` type for layer `iz` based on previous interf
 end
 
 """
+    surface_scattering_interface(atmosphere_interface)
+
+`ScatteringInterface` for adding the surface below the complete atmosphere,
+given the interface of the LAST atmospheric layer. The surface is always a
+reflecting added layer (a surface-parameter tangent can be nonzero even when
+its reflectance is zero), and the composite above it scatters iff ANY
+atmospheric layer scatters, i.e. iff `atmosphere_interface` is not `_00`:
+
+- column scatters → `ScatteringInterface_11`
+- column non-scattering → `ScatteringInterface_01`
+
+Reusing the last layer's own interface instead drops surface–atmosphere
+coupling whenever the lowest (or every upper) layer does not scatter.
+"""
+@inline surface_scattering_interface(atmosphere_interface) =
+    atmosphere_interface isa ScatteringInterface_00 ?
+        ScatteringInterface_01() : ScatteringInterface_11()
+
+"""
     doubling_number(dτ_max, τ_end)
 
 Compute elemental optical depth and doubling count for the adding-doubling method.
@@ -88,23 +107,38 @@ Stokes-scaled indices for quadrature point `iμ`. Returns `(st_iμ, istart, iend
     return st_iμ, istart, iend
 end
 
+"Allocate and zero RT storage on its target backend, without a host-sized temporary."
+_backend_zeros(FT, AT, dims...) = fill!(similar(AT(FT[]), dims...), zero(FT))
+
 """Allocate zero matrix for RT reflection/transmission: `[nμ, nμ, nSpec]`."""
-@inline default_matrix(FT, arr_type, dims, nSpec) = arr_type(zeros(FT, (dims[1], dims[2], nSpec)))
+@inline default_matrix(FT, arr_type, dims, nSpec) = _backend_zeros(FT, arr_type, dims[1], dims[2], nSpec)
 "Default matrix in ieRT calculation (zeros)"
 @inline default_matrix_ie(FT, arr_type, dims, nSpec, nRaman) = arr_type(zeros(FT, (dims[1], dims[2], nSpec, nRaman)))
 
 "Default J matrix in RT calculation (zeros)"
-@inline default_J_matrix(FT, arr_type, dims, nSpec) = arr_type(zeros(FT, (dims[1], 1, nSpec)))
+@inline default_J_matrix(FT, arr_type, dims, nSpec) = _backend_zeros(FT, arr_type, dims[1], 1, nSpec)
 "Default J matrix in ieRT calculation (zeros)"
 @inline default_J_matrix_ie(FT, arr_type, dims, nSpec, nRaman) = arr_type(zeros(FT, (dims[1], 1, nSpec, nRaman)))
 
+@inline function default_solar_columns(FT, arr_type, dims, nStokes, nSpec)
+    make_column() = _backend_zeros(FT, arr_type, dims[1], nStokes, nSpec)
+    SolarColumnOperators(R₀⁻⁺=make_column(), R₀⁺⁻=make_column(),
+                         T₀⁺⁺=make_column(), T₀⁻⁻=make_column())
+end
+
+@inline function default_raman_solar_columns(FT, arr_type, dims, nStokes, nSpec, nRaman)
+    make_column() = arr_type(zeros(FT, dims[1], nStokes, nSpec, nRaman))
+    RamanSolarColumnOperators(ieR₀⁻⁺=make_column(), ieR₀⁺⁻=make_column(),
+                              ieT₀⁺⁺=make_column(), ieT₀⁻⁻=make_column())
+end
+
 "Default matrix in RT calculation (zeros) — multi-sensor variant"
-@inline default_matrix(FT, arr_type, NSens, dims, nSpec) = [arr_type(zeros(FT, (dims[1], dims[2], nSpec))) for _ in 1:NSens]
+@inline default_matrix(FT, arr_type, NSens, dims, nSpec) = [_backend_zeros(FT, arr_type, dims[1], dims[2], nSpec) for _ in 1:NSens]
 "Default matrix in ieRT calculation (zeros) — multi-sensor variant"
 @inline default_matrix_ie(FT, arr_type, NSens, dims, nSpec, nRaman) = [zeros(FT, (dims[1], dims[2], nSpec, nRaman)) for _ in 1:NSens]
 
 "Default J matrix in RT calculation (zeros) — multi-sensor variant"
-@inline default_J_matrix(FT, arr_type, NSens, dims, nSpec) = [arr_type(zeros(FT, (dims[1], 1, nSpec))) for _ in 1:NSens]
+@inline default_J_matrix(FT, arr_type, NSens, dims, nSpec) = [_backend_zeros(FT, arr_type, dims[1], 1, nSpec) for _ in 1:NSens]
 "Default J matrix in ieRT calculation (zeros) — multi-sensor variant"
 @inline default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, nRaman) = [zeros(FT, (dims[1], 1, nSpec, nRaman)) for _ in 1:NSens]
 
@@ -121,7 +155,9 @@ SFI and surface SIF use the legacy `j₀⁺/j₀⁻` fields, so they don't get a
 separate slot. Empty prepared-sources → empty NT, bit-equal to pre-A.2a.
 """
 function make_added_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec;
-                          prepared_sources::AbstractSource = NoSource())
+                          prepared_sources::AbstractSource = NoSource(),
+                          external_solar::Bool = false,
+                          nStokes::Int = 1)
     t1 = default_matrix(FT, arr_type, dims, nSpec)
     t2 = default_matrix(FT, arr_type, dims, nSpec)
     t1_ptr = batched_pointer_cache(t1)
@@ -139,7 +175,11 @@ function make_added_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, n
         dbl_gp_refl = default_matrix(FT, arr_type, dims, nSpec),
         dbl_j₁⁺ = default_J_matrix(FT, arr_type, dims, nSpec),
         dbl_j₁⁻ = default_J_matrix(FT, arr_type, dims, nSpec),
+        dbl_v1  = default_J_matrix(FT, arr_type, dims, nSpec),
+        dbl_v2  = default_J_matrix(FT, arr_type, dims, nSpec),
         j₀_by_src = j₀_by_src,
+        solar_columns = external_solar ?
+            default_solar_columns(FT, arr_type, dims, nStokes, nSpec) : nothing,
     )
 end
 
@@ -213,7 +253,8 @@ variant but ignored here. Source payloads are applied later by the RT driver:
 solar F₀ is copied into `RS_type.F₀`, while surface emission enters through
 `SurfaceSIF` dispatch."""
 make_added_layer(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus}, FT, arr_type, dims, nSpec;
-                 prepared_sources::AbstractSource = NoSource())  = AddedLayerRS(
+                 prepared_sources::AbstractSource = NoSource(),
+                 external_solar::Bool=false, nStokes::Int=1)  = AddedLayerRS(
                                                 default_matrix(FT, arr_type, dims, nSpec), 
                                                 default_matrix(FT, arr_type, dims, nSpec), 
                                                 default_matrix(FT, arr_type, dims, nSpec),
@@ -225,7 +266,11 @@ make_added_layer(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus}, FT, arr_type, 
                                                 default_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman),
                                                 default_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman),
                                                 default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman),
-                                                default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman)
+                                                default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman),
+                                                external_solar ? default_solar_columns(
+                                                    FT, arr_type, dims, nStokes, nSpec) : nothing,
+                                                external_solar ? default_raman_solar_columns(
+                                                    FT, arr_type, dims, nStokes, nSpec, RS_type.n_Raman) : nothing
                                                 )
                                                          
 
