@@ -47,6 +47,56 @@ review of General's sequential-version rule.
   runs change in every Stokes component, including I when there is a
   scattering atmosphere** (up to ~3e-3 relative in a Rayleigh test case);
   `Stokes_I` runs and vacuum intensity are unchanged by this item.
+- Cox–Munk water refractive index: `n_water = nothing` now uses the
+  Segelstein (1981) pure-water index (25 °C) at every spectral point, with n
+  and k linear in wavelength (table in `src/CoreRT/Surfaces/data/`, from the
+  refractiveindex.info database, CC0). It used to take n = 1.328 at 550 nm
+  from a built-in table that departs from Segelstein and Hale & Querry above
+  about 900 nm. A vector `n_water` is used element-wise and must have one
+  entry per spectral point (it used to use its first element); a scalar is
+  unchanged bit for bit. The per-point reflection operator is computed
+  exactly at a few knot indices and interpolated in n (within 1e-7 of the
+  reflectance in Float64 for water at 17 bands from 0.25 to 3.9 µm, and
+  within 1e-6 in Float32 at 0.55, 1.6, 2.06 and 2.8 µm), and the TOA exact
+  glint uses each point's own index. Single-wavelength helpers
+  (`coxmunk_brdf_mueller`, `reflectance`, …) now throw when the surface's
+  `n_water` is `nothing` or a vector with differing entries (they fell back
+  to 550 nm or to the first element), and `water_refractive_index` throws
+  outside 34 nm–10 m instead of clamping. **Ocean radiances change**: TOA I
+  in the glint view (U = 5 m/s, SZA 30°) changes by +3.6 % at 0.55 µm,
+  −0.5 % at 0.76 µm, −9.3 % at 1.6 µm and −16.9 % at 2.06 µm. A standalone
+  `CoxMunkSSSurface(n_water = nothing)` built without a model keeps its
+  documented 1.34.
+- Ross–Li: `RossLiSurfaceScalar(fvol, fgeo, fiso; zenith_cap_deg = 80)`.
+  `zenith_cap_deg = nothing` (`nothing` or `null` in YAML/TOML surface
+  strings) gives the MODIS/VLIDORT kernels without the 80° zenith cap. The
+  default and the three-argument form are unchanged bit for bit. With the
+  cap off vSmartMOM matches uncapped VLIDORT 2.8.3 (Case D) to ≤ 7e-5
+  relative in I; there the cap changes I by up to 0.8 % at TOA and 1.1 % at
+  BOA. Ross–Li surface strings that combine positional and keyword arguments
+  now keep the positional values (they were dropped).
+- Documentation: the exact Cox–Munk glint correction is applied at TOA only;
+  interior observer levels keep the Fourier-truncated glint. For a
+  canopy, `bhr_dw` is diffuse only, and the forward BOA radiance at the solar
+  ordinate has no direct beam (the canopy sets j₀⁺ = 0; the linearized solver
+  adds it).
+- Mie radius quadrature fixed per run: the nodes lie on `[r_min, r_max]`, with
+  a new optional `scattering.r_min` (µm; default `Scattering.DEFAULT_R_MIN` =
+  1e-3 µm), instead of starting at each size distribution's 1e-8 quantile.
+  That quantile moved the nodes with μ_logr/σ_logr while the analytic size
+  tangents assume fixed nodes. The μ_logr/σ_logr Jacobians now equal finite
+  differences of the forward model at any `nquad_radius`. Before, max |analytic
+  − FD| / max |FD| of the TOA Jacobian was up to 18 % for a 0.2 µm,
+  σ_g = 1.6 mode on JacobianTestFast settings and 26 % for the organic mode of
+  an OCO-like three-mode scene at 300 nodes (O₂ A band). Forward aerosol
+  optics change by the radius-quadrature error at the configured node count:
+  TOA I by ≤ 1e-5 relative in that OCO-like scene and by 3.4e-4 in a two-mode
+  test scene at 100 nodes. NAI2 (forward, linearized, GPU) and PCW use the
+  same nodes. At a fixed `nquad_radius` the nodes span a wider range of ln r
+  (1.2–1.6× for the tested modes), so check convergence, in particular for
+  coarse modes. `MieModel` has an `r_min` field, `make_mie_model` an `r_min`
+  keyword and `ScatteringParameters` a trailing `r_min`; the old constructor
+  forms use the default.
 - The standalone line-by-line model (`make_hitran_model`, `HitranModel`) is
   deprecated (removal in 3.0) with a one-time notice giving the
   AtmosphericAbsorption calls and their convention differences. The LUT
@@ -325,7 +375,13 @@ review of General's sequential-version rule.
 - A reused `RS_type` no longer keeps the solar F₀ that an earlier call
   wrote into it (a call with `sources=SolarBeam(F₀=2F)` made later default
   calls return 2×). Precedence is the `sources=` keyword, then a user-preset
-  `RS_type.F₀`, then `model.sources`.
+  `RS_type.F₀`, then `model.sources`. A `sources=` keyword applies to its
+  call only: `rt_run`, `rt_run_ss`, `rt_run_toa(rs::RRS, …)` and the
+  linearized `rt_run` restore `RS_type.F₀` and its driver-write record
+  afterwards, also when the call throws, so a preset F₀ survives. The call's
+  own results are unchanged. Split solves with TMS take the TMS beam from the
+  captured `surface_F₀` instead of reading `RS_type.F₀` back (same values; no
+  result changes).
 - HDR, BHR (up and down) and `rt_run_ss`'s `hem_T` no longer double-count
   the direct beam when μ₀ is a weighted quadrature node (Gauss with the SZA
   on a node, every Radau run): e.g. vacuum Lambertian HDR was 1 + w_μ₀ too
@@ -336,8 +392,29 @@ review of General's sequential-version rule.
   ordinate (in the worst sampled case TOA jumped by ≈ 9 % and HDR by ≈ 14 %);
   within
   that window the output now equals the on-node result, and other grids are
-  unchanged. Just outside it the elemental 1/(μᵢ − μ₀) cancellation remains
-  (≈ 4e-4 relative at 5·eps in Float64).
+  unchanged. Just outside it the elemental factors are now evaluated in
+  limit form (next item).
+- The elemental t⁺⁺/J₀⁺ factor μⱼ/(μᵢ − μⱼ)(e^{−τ/μᵢ} − e^{−τ/μⱼ}) and its
+  Raman and canopy analogues are evaluated as a divided difference of e^{−x}
+  (`expdiff_ratio`, exact at μᵢ = μⱼ) in every elemental kernel (forward,
+  linearized, canopy and Raman; CPU and GPU). In the tested cases away from
+  coincident ordinates (pure Rayleigh IQUV, Radau, `rt_run_ss`, the
+  JacobianTestFast linearized and forward runs, a canopy) results change by
+  about 5e-15 relative in Float64 and up to 6e-6 in Float32; the Phase 1b RRS
+  band (Float32) changes by up to 1.8e-6 elementwise, because the former
+  Raman 1e-8/1e-6 coincidence windows are gone. The VS and VS `_plus`
+  kernels were checked against BigFloat at kernel level only (no RT-level
+  comparison). Near a node results are now
+  accurate: in the quickstart Rayleigh scene (Stokes_IQU, Gauss nstreams 3,
+  μ₀ = 0.5 + δ) the TOA radiance differed from the on-node result by 7.7e-5
+  (max-normalized) at δ = 5·eps in Float64 and by 1.5e-4 at δ ≈ 1e-6 in
+  Float32; with the limit form these are 2.1e-15 and 1.7e-6, the physical
+  change (≈ 1.7·δ). With one aerosol in that scene and δ = 1e-12, the
+  aerosol τ_ref column of the TOA Jacobian differs from a central difference
+  by 2.5e-9 relative (was 1.2e-2), and a Radau nadir view at SZA 1e-5° from
+  2.2e-6 to 8.8e-12 against SZA 0. Canopies with horizontal leaves (G ∝ μ) no
+  longer hit 0/0. `rt_close_tol` and `rt_loose_tol` are kept but no longer
+  used by live code.
 - TMS (`ss_correction`) is evaluated per band in combined-band solves (it
   raised a `BoundsError`) and is rejected with `rt_run_streams`/stream
   callbacks, whose reconstruction it broke. Stream exports do not include

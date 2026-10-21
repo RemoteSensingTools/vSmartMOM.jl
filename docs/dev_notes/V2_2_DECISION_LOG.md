@@ -142,20 +142,20 @@ Taken one by one by Suniti; implementation status is tracked in §3/§3.1.
 | 6 | R3: VS elastic phase matrix vs SSA | Make them consistent (Cabannes in both). Not implemented: no VS mode redistributes rotational Raman, so a Cabannes-only SSA would lose its energy; options in §3. |
 | 7 | R4–R8 | Fix all as cleanup (done). |
 | 8 | VS `_plus` builder | Use the resolved depolarization; do not mutate `params` (done; follows `rayleigh_anisotropy` like the standard builder). |
-| 9 | Cox–Munk water refractive index | Segelstein (1981), interpolated per spectral point; a vector `n_water` is used element-wise. |
-| 10 | Ross–Li 80° zenith cap | Make it a parameter, default 80°; off reproduces MODIS/VLIDORT. |
-| 11 | NAI2 size-parameter Jacobians | Fixed radius grid (nodes independent of the distribution parameters). |
+| 9 | Cox–Munk water refractive index | Segelstein (1981), interpolated per spectral point; a vector `n_water` is used element-wise (done). |
+| 10 | Ross–Li 80° zenith cap | Make it a parameter, default 80°; off reproduces MODIS/VLIDORT (done: `zenith_cap_deg`). |
+| 11 | NAI2 size-parameter Jacobians | Fixed radius grid (nodes independent of the distribution parameters) (done: `scattering.r_min`, default 1e-3 µm). |
 | 12 | p_surf tangent of `depol: -1` | Document as neglected (~1e-5 relative) (done, `jacobians.md`). |
 | 13a | O₂ King factor | Keep 1.09 (He et al. 2021) (done; cited, with the 1.096 alternative). |
 | 13b | Refractive-index fits beyond 468/546 nm | Switch to fits valid through the NIR where the current ones are extrapolated (done: Peck & Khanna 1966 for N₂, Egan 2026 for O₂, continuous joins). |
 | 13c | Anisotropy γ | Add the wavelength dependence (N₂, O₂) (done: `DispersiveAnisotropy()`, default for `depol: -1` and `UsingPolTen()`; Raman side unchanged, see §3). |
 | 13d | `UsingPolTen` default T | Keep 288.15 K (done; reasons documented). |
 | 13e | H₂ refractive-index check | Add a test (done: Peck & Huang 1977 and Raj et al. 2018). |
-| 14a | Solar F₀ precedence | Keep kwarg > preset > `model.sources`; a `sources=` call no longer overwrites the preset. |
-| 14b | `rt_run_ss` `hem_T` | Keep diffuse-only. |
-| 14c | Interior upwelling glint | Keep the Fourier-truncated glint; document that the exact glint is TOA-only. |
-| 14d | Canopy BHR-down | Keep (no direct beam); document. |
-| 14e | 1/(μᵢ − μ₀) cancellation | Implement a limit form in the elemental kernels. |
+| 14a | Solar F₀ precedence | Keep kwarg > preset > `model.sources`; a `sources=` call no longer overwrites the preset (done). |
+| 14b | `rt_run_ss` `hem_T` | Keep diffuse-only (documented). |
+| 14c | Interior upwelling glint | Keep the Fourier-truncated glint; document that the exact glint is TOA-only (documented). |
+| 14d | Canopy BHR-down | Keep (no direct beam); document (documented). |
+| 14e | 1/(μᵢ − μ₀) cancellation | Implement a limit form in the elemental kernels (done: `expdiff_ratio`). |
 | 15 | Sign of ε in B_l | Docs follow the papers' printed form (Sanghavi & Stephens 2015, Eq. 22; Siewert's form, used by the vSmartMOM paper): −ε at [3,4], with the mapping to the code's stored γ, ε; no numerical change. |
 | 16 | Q-sign wording in `conventions.md` §1 | Confirmed. |
 
@@ -270,11 +270,10 @@ decided after comparing the pilot with Round 7 (§3.1).
   is Q = |E_φ|² − |E_θ|², U = 2Re(E_φE_θ*), V = 2Im(E_φE_θ*), i.e. Q > 0
   *perpendicular* to the meridian plane. The page now states this; please
   confirm the wording.
-- [ ] **For Suniti (surface definition):** vSmartMOM's Ross–Li caps both zenith
-  angles at 80° inside the kernels; VLIDORT does not (its Li-sparse kernel
-  turns strongly negative at grazing quadrature nodes). The cap changes TOA
-  intensity by 0.35–0.84 % in the VLIDORT comparison (BOA by up to 1.1 %).
-  Keep the cap (physical, non-negative BRDF) or follow the MODIS definition?
+- [x] **Ross–Li zenith cap (decision 10).** `RossLiSurfaceScalar(...;
+  zenith_cap_deg = 80)`, `nothing` gives the MODIS/VLIDORT kernels. VLIDORT
+  Case D also checks the uncapped references (≤ 7e-5 in I); the cap changes
+  I by 0.34–0.81 % at TOA and 0.39–1.07 % at BOA in that comparison.
 - [ ] ExoOptics audit item 16 (`_read_hitran2024`): delegate to
   AtmosphericAbsorption's `load_lines(HitranPort(path))`, not to vSmartMOM's
   legacy `read_hitran` (the standalone line engine is deprecated in 2.2).
@@ -324,18 +323,35 @@ The audit findings that are code defects with a clear reference were fixed
 in reviewed commits (see `CHANGELOG.md`). The items below change scientific
 results or definitions and wait for a decision.
 
-- [ ] **Solver-entry conventions (fix/rt-entry-guards).** (1) Solar F₀
-  precedence is kwarg > user-preset `RS_type.F₀` > `model.sources` (as the
-  code always did; older comments said `model.sources` beats a preset); a
-  `sources=` call still overwrites a preset permanently. (2) `rt_run_ss`
-  `hem_T` is now diffuse-only (the alternative is to always add
-  μ₀F₀e^(−τ/μ₀)). (3) Interior upwelling levels keep only the
-  Fourier-truncated glint (forward and linearized consistent). (4) Canopy
-  BHR-down omits the direct beam (canopy sets j₀⁺ = 0). (5) The
-  1/(μᵢ − μ₀) cancellation outside the 4·eps merge window remains (≈ 5e-19/δ
-  in Float64, ≈ 2.4e-10/δ in Float32); a full fix needs a limit form in the
-  elemental kernels. Radau's own near-coincident sub-interval nodes are
-  still merged only when exactly equal.
+- [x] **Solver-entry conventions (decisions 14a–14e).** (1) Solar F₀
+  precedence stays `sources=` > user-preset `RS_type.F₀` > `model.sources`;
+  a `sources=` keyword now applies to its call only (14a, done:
+  `_with_call_scoped_F₀` around `rt_run`, `rt_run_ss`, `rt_run_toa(rs::RRS)`
+  and the linearized `rt_run`). (2) `rt_run_ss` `hem_T` stays diffuse-only
+  (14b, documented). (3) Interior upwelling levels keep only the
+  Fourier-truncated glint (14c, documented: the exact glint is TOA-only).
+  (4) Canopy BHR-down omits the direct beam (14d, documented). (5) The
+  elemental factors are evaluated in limit form, `expdiff_ratio` /
+  `elem_trans_factor[_dτ]`, in every live forward, linearized, canopy and
+  Raman kernel (14e, done; `StandaloneSS._τ_integral` is not an elemental
+  kernel, see the follow-ups). The 4·eps merge window is
+  kept for exact on-node results but is no longer needed for accuracy, and
+  Radau's exact-equality node merge is sufficient (nadir view at SZA 1e-5°:
+  2.2e-6 → 8.8e-12).
+- [ ] **For Suniti (solver follow-ups of decision 14):**
+  (1) `StandaloneSS._τ_integral` (`src/StandaloneSS/kernels.jl:62-71`) has
+  the same cancellation with a 1e-10 trapezoid fallback (a Float32 case
+  returns 0 instead of 0.0082): use Δτ·`expdiff_ratio` in a follow-up
+  (recommended) or leave it?
+  (2) Removing the VS_plus window also replaced an assignment (`=`) by an
+  accumulation (`+=`) in that branch; the arrays are zeroed first and each
+  entry is written once per launch, so results do not change (note only).
+  (3) The VS (non-plus) and canopy kernels set t⁺⁺[i,j] = 0 for i ≠ j at
+  equal μ (Stokes cross terms), while the elastic, RRS and VS_plus kernels
+  use the limit; pre-existing, left untouched. Separate review
+  (recommended) or leave?
+  (4) Metal (no Float64) is not verified with the new series helpers: one
+  Metal smoke test before release (recommended)?
 - [x] **Sign of ε in the Greek matrix B_l (decision 15).** `conventions.md`
   §2 and `concepts/03b_scattering.md` show B_l and Π_l^m as printed by
   Sanghavi & Stephens (2015, Eqs. 21–22), in Siewert's form, which the
@@ -409,19 +425,57 @@ results or definitions and wait for a decision.
   (4) Accept the in-test Phase 1b correction, or regenerate the reference?
   (5) R7 changes RRS_XCO2 inelastic radiances in structured spectra: check one
   truth-map member on v2.2 before mixing new and archived products.
-- [ ] **Water refractive index for Cox–Munk.** The built-in table departs from
-  Hale & Querry/Segelstein above ~900 nm (n 1.255 vs 1.317 at 1.6 µm), and
-  `n_water = nothing` always uses the 550 nm value instead of a spectral
-  lookup; a vector `n_water` uses its first element. Glint in the SWIR is
-  ~6 % high. Choose the reference data and whether to look up per band or
-  per spectral point.
-- [ ] **NAI2 size-parameter Jacobians.** `r_min = quantile(dist, 1e-8)` moves
-  the radius nodes with μ_logr/σ_logr while the analytic tangent assumes
-  fixed nodes; size Jacobians are accurate only when `nquad_radius` is
-  converged. Radiance Jacobians were off by 33–115 % with 100 nodes
-  (`r_max = 50`, the JacobianTestFast settings); the optical-property
-  derivatives agree to ≈1e-7 with 1600 nodes (`r_max = 5`). Fix the radius
-  grid, differentiate it, or document a minimum `nquad_radius`.
+- [x] **Water refractive index for Cox–Munk (decision 9).** Segelstein (1981)
+  pure-water table, n and k linear in wavelength at every spectral point; a
+  vector `n_water` element-wise; the per-point operator from a few knot
+  indices interpolated in n (≤ 1e-7 in Float64 for water at 17 bands from
+  0.25 to 3.9 µm, ≤ 1e-6 in Float32 at 0.55, 1.6, 2.06 and 2.8 µm); exact TOA
+  glint per point.
+  Glint TOA I (U = 5 m/s, SZA 30°): +3.6 % at 0.55 µm, −9.3 % at 1.6 µm,
+  −16.9 % at 2.06 µm (the audit's −6 % estimate at 1.6 µm used Hale &
+  Querry's n = 1.317; Segelstein gives 1.3096).
+- [ ] **For Suniti (surface follow-ups of decisions 9, 10, 14d):**
+  (1) Segelstein is pure water at 25 °C, with no salinity: keep it
+  (recommended) or add a seawater correction later? (For reference, Hale &
+  Querry's pure-water n is 1.317 at 1.6 µm, Segelstein's 1.3096.)
+  (2) Knot interpolation in n as the reading of "per spectral point"
+  (≤ 1e-7 in Float64, ≤ 1e-6 in Float32 at the tested bands; exact
+  evaluation at every point
+  costs about nSpec/knots times the surface work): keep (recommended)?
+  (3) A standalone `CoxMunkSSSurface(n_water = nothing)` built without a model
+  keeps its documented 1.34 (the model adapter passes the per-point index):
+  keep documented (recommended) or throw?
+  (4) Canopy: the forward BOA radiance at the solar ordinate has no direct
+  beam (j₀⁺ = 0) while the linearized solver adds it; documented per 14d.
+  Add the direct beam to the forward solver in a follow-up (recommended)?
+  (5) Single-wavelength Cox–Munk helpers now throw for `n_water = nothing` or
+  a vector with differing entries: keep (recommended) or return to a
+  documented 550 nm fallback?
+- [ ] Bug (pre-existing, found during decision 9): `rt_run(model; i_band = 4)`
+  fails on a model with more than three bands, because the default `noRS`
+  `ϖ_Cabannes` has three entries (`Inelastic/types.jl:191`, indexed per band
+  in `compEffectiveLayerProperties.jl`).
+- [x] **NAI2 size-parameter Jacobians (decision 11).** Fixed `[r_min, r_max]`
+  radius grid, `scattering.r_min` default 1e-3 µm, also for PCW. Size
+  tangents equal central differences to ~1e-10 (optics); TOA Jacobians to
+  3e-8 (audit mode on JacobianTestFast settings) and ≤ 6e-6 (OCO-like scene),
+  metric max |analytic − FD| / max |FD|. Before: 7–18 % with the audit's
+  0.2 µm, σ_g = 1.6 mode and 26 % for the OCO organic mode at 300 nodes.
+  Accuracy against the converged integral still depends on `nquad_radius` and
+  needs a convergence check (the TMS ordering test moved to 400 nodes for its
+  1 µm mode). The PCW reference test and the 7acab570 golden test pin
+  `r_min` to the old quantile.
+- [ ] **For Suniti (radius-grid follow-ups of decision 11):**
+  (1) Default `r_min`: 1e-3 µm (recommended; truncates nothing physical) or
+  5e-3 µm (node density closer to the old grids)?
+  (2) A legacy quantile option for exact reproduction of archived multi-mode
+  runs (RRS_XCO2 moves ≤ 1e-5 in TOA): no (recommended)?
+  (3) Coarse modes at about 100 nodes: raise `nquad_radius` in the
+  JacobianTestFast-style configs, or document only (done, recommended)?
+  (4) Downstream: `uni_vSmartMOM_v2-2/.../generate_truth_map.jl:219` rebuilds
+  `ScatteringParameters` with 6 arguments and would drop a configured
+  `r_min` (none is set today); pass `FT(sp.r_min)` when that workflow is next
+  edited.
 - [x] **Surface-pressure Jacobian with `depol: -1` (decision 12).** The
   automatic depolarization (Rayleigh Greek coefficients and, through the King
   factor, τ_Rayleigh) depends on the column-mean temperature, which moves

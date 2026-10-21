@@ -9,12 +9,13 @@
 #     [exp(-τ₁/μᵢ) - exp(-τ₀/μⱼ)] / (μᵢ/μⱼ - τ₁/τ₀)                (Raman)
 #
 # Dividing an exponential difference by the cosine difference amplifies the
-# rounding of τ/μ by μ/|μᵢ - μⱼ|: about 5e-19/δ in Float64 and 2e-10/δ in
-# Float32 at the RT output (δ = |μᵢ - μ₀|), outside the 4·eps window in which
-# `rt_set_streams` merges ordinates. The kernels now evaluate both forms as a
-# divided difference of exp(-x) (`expdiff_ratio`, midpoint form
-# exp(-s)·sinh(x)/x for |b - a| ≤ 2), which never divides by the difference
-# (decision 14e). These tests check, in Float64 and Float32:
+# rounding of τ/μ by μ/|μᵢ - μⱼ|: up to about 5e-19/δ in Float64 and 2e-10/δ
+# in Float32 at the RT output (δ = |μᵢ - μ₀|; an estimate, scene-dependent),
+# outside the 4·eps window in which `rt_set_streams` merges ordinates. The
+# kernels now evaluate both forms as a divided difference of exp(-x)
+# (`expdiff_ratio`, midpoint form exp(-s)·sinh(x)/x for |b - a| ≤ 2), which
+# never divides by the difference (decision 14e). These tests check, in
+# Float64 and Float32:
 #   (i)   accuracy against BigFloat for δ from 1e-12 to 1e-1, for the helpers
 #         and for every elastic, linearized, canopy and Raman kernel that
 #         carries the factor;
@@ -411,8 +412,8 @@ quiet(f) = with_logger(f, ConsoleLogger(stderr, Logging.Warn))
 @testset "TOA continuity across the merge window (ii)" begin
     # nstreams = 3 Gauss has a weighted node at μ = 0.5 (SZA 60° on-node).
     # Within 4 eps the SZA is merged onto the node; just outside it the
-    # radiance must continue smoothly (it changed by ≈ 4e-4 at 5 eps in
-    # Float64 with the former expression).
+    # radiance must continue smoothly (with the former expression it differed
+    # from the on-node result by ≈ 8e-5 at 5 eps in Float64, max-normalized).
     for FT in (Float64, Float32)
         e = eps(FT)
         model(μ₀) = quiet(() -> model_from_parameters(

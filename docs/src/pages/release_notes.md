@@ -51,7 +51,15 @@ the repository's `CITATION.bib`, with their original publication author order.
   (reference planes, argument order, Fourier storage sign, V terms) was
   corrected against VLIDORT 2.8.3. The incident spectrum scales the correction, and full
   Jacobians include its wind/optical-depth derivatives. The direct-glint
-  correction requires unpolarized incident illumination.
+  correction requires unpolarized incident illumination. Without an explicit
+  `n_water` (default `nothing`) the water refractive index is now the
+  Segelstein (1981) pure-water index at every spectral point instead of a
+  fixed 550 nm value,
+  which changes the SWIR glint most (TOA glint −9 % at 1.6 µm, −17 % at
+  2.06 µm in a 5 m/s test case).
+- Ross–Li keeps its 80° zenith cap by default;
+  `RossLiSurfaceScalar(fvol, fgeo, fiso; zenith_cap_deg = nothing)` gives the
+  uncapped MODIS/VLIDORT kernels.
 - Surface-pressure Jacobians include pressure-induced line-shape and LUT
   changes at fixed final-grid temperature/composition. By default
   (`FixedPressureGrid()`) only the bottom pressure interface moves; the opt-in
@@ -81,12 +89,13 @@ the repository's `CITATION.bib`, with their original publication author order.
   of each distribution's `1e-8` quantile. Analytic aerosol size Jacobians
   (`μ_logr`, `σ_logr`) are now the exact derivatives of the forward model at
   any `nquad_radius`; with nodes that moved with the size parameters they
-  could differ from finite differences by tens of per cent, and up to ~100 %,
-  at under-resolved node counts. Forward aerosol optics change by the
+  could differ from finite differences at under-resolved node counts by up to
+  18–26 % of the TOA Jacobian (max |analytic − FD| / max |FD| in the tested
+  scenes; larger pointwise). Forward aerosol optics change by the
   radius-quadrature error at the configured `nquad_radius` (e.g. ≤ 1e-5
   relative in TOA radiance for an OCO-like three-mode scene with 300 nodes).
-  At a given `nquad_radius` the nodes now span a 1.2–1.6× wider range of
-  `ln r`; check convergence, in particular for coarse modes at ~100 nodes.
+  At a given `nquad_radius` the nodes now span a wider range of `ln r`
+  (1.2–1.6× for the tested modes); check convergence, in particular for coarse modes at ~100 nodes.
   To reproduce a single-mode result
   of an earlier version exactly, set `r_min` to that distribution's `1e-8`
   quantile (or to `1e-6 r_max` if that is larger).
