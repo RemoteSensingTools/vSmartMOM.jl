@@ -67,14 +67,16 @@ review of General's sequential-version rule.
   −0.5 % at 0.76 µm, −9.3 % at 1.6 µm and −16.9 % at 2.06 µm. A standalone
   `CoxMunkSSSurface(n_water = nothing)` built without a model keeps its
   documented 1.34.
-- Ross–Li: `RossLiSurfaceScalar(fvol, fgeo, fiso; zenith_cap_deg = 80)`.
-  `zenith_cap_deg = nothing` (`nothing` or `null` in YAML/TOML surface
-  strings) gives the MODIS/VLIDORT kernels without the 80° zenith cap. The
-  default and the three-argument form are unchanged bit for bit. With the
-  cap off vSmartMOM matches uncapped VLIDORT 2.8.3 (Case D) to ≤ 7e-5
-  relative in I; there the cap changes I by up to 0.8 % at TOA and 1.1 % at
-  BOA. Ross–Li surface strings that combine positional and keyword arguments
-  now keep the positional values (they were dropped).
+- **Ross–Li results change against v2.1.0**: the kernels cap both zenith
+  angles at 80° (`e2c1ad5b`; v2.1.0 had no cap), which changes I by up to 0.8
+  % at TOA and 1.1 % at BOA in the VLIDORT Case D comparison.
+  `RossLiSurfaceScalar(fvol, fgeo, fiso; zenith_cap_deg = 80)` makes the cap a
+  parameter: `zenith_cap_deg = nothing` (`nothing` or `null` in YAML/TOML
+  surface strings) gives the uncapped MODIS/VLIDORT kernels, which match
+  uncapped VLIDORT 2.8.3 (Case D) to ≤ 7e-5 relative in I. The default and the
+  three-argument form are unchanged against the v2.2 pre-releases. Ross–Li
+  surface strings that combine positional and keyword arguments now keep the
+  positional values (they were dropped).
 - Documentation: the exact Cox–Munk glint correction is applied at TOA only;
   interior observer levels keep the Fourier-truncated glint. For a
   canopy, `bhr_dw` is diffuse only, and the forward BOA radiance at the solar
@@ -159,6 +161,27 @@ review of General's sequential-version rule.
   to 2 µm), τ_Rayleigh changes by −0.31 % at 400 nm and −0.09 % at 760 nm,
   and the RRS share 1 − ϖ_Cabannes falls by about 6 % at 400 nm and 2 % at
   760 nm.
+- **Raman (RRS and VS `_plus`) results change in absorbing bands** (Suniti
+  Sanghavi, `817d93cb`): the Rayleigh fraction that weights the inelastic
+  source (`fscattRayl`) is the Rayleigh share of the total layer extinction,
+  τ_Rayl/(τ_Rayl + τ_aer + τ_abs), where τ_aer is the δ-M-scaled aerosol
+  extinction ((1 − fᵗϖ) times the unscaled one). The RRS and VS `_plus` elemental kernels
+  attenuate with the total dτ and do not multiply by ϖ, so the fraction must
+  be taken over the total extinction. v2.1.0 left gas absorption out of the
+  denominator: at incident wavelengths inside absorption lines each layer's
+  Raman source was too large by (τ_Rayl + τ_aer + τ_abs)/(τ_Rayl + τ_aer).
+  noRS runs, and Raman runs without gas absorption, are unchanged.
+- **Raman runs with `depol: -1` change slightly**: the Cabannes depolarization
+  inverts Z_Rayl = ϖ_Cab·Z_Cab + (1 − ϖ_Cab)·Z_RRS (γ_RRS = 3/4) exactly
+  (Suniti Sanghavi, `817d93cb`). v2.1.0's `compute_γ_mol_Cabannes!` used the
+  denominator (1 + 2γ_R)(1 − ϖ) + 5 instead of (3 + 2ϖ) − 4γ_R(1 − ϖ), which
+  agrees only as ϖ_Cab → 1. With the current molecular constants (2π pole) at
+  300 K, the Cabannes γ rises by 1.5 % (N₂), 4.2 % (O₂) and 2.5 % (air) at 395
+  nm, and by 1.6 %, 4.5 % and 2.7 % at 760 nm. The air Cabannes depolarization
+  2γ/(1+γ) at 760 nm becomes 0.00737 (v2.1.0 formula, same constants:
+  0.00718), and the factor (1−γ)/(1+2γ) of its Greek coefficients changes by
+  −2.8e-4. It enters only the Cabannes Greek coefficients of RRS and VS runs;
+  noRS runs do not use it.
 - Raman: each per-J Q-branch line (ΔJ = 0) weights the anisotropy by the
   Placzek–Teller coefficient b_JJ instead of b_JJ², so Q + S + O lines sum to
   the Rayleigh (or vibrational-band) total for every J and the summed Cabannes
@@ -261,6 +284,39 @@ review of General's sequential-version rule.
   `default_parameters()` and of GEOS-Chem-generated configurations
   (`geoschem_to_dict`, `GeosChemSource`), which start from these defaults,
   change.
+- **Aerosol results change for altitude-form profiles** (`z₀`, `σ₀`; Suniti
+  Sanghavi, `b5f6e425`): the log-normal height distribution is integrated
+  over the geometric layer interfaces (CDF differences, normalized over the
+  model column) in the forward and linearized constructors. v2.1.0's
+  forward constructor evaluated the density at the layer pressures in hPa as
+  if they were heights in km (`pdf(LogNormal(log z₀, σ₀), p_full)·Δz`),
+  which put the aerosol in the topmost model layers: for
+  `ParamsEMIT_MODTRANcomp.yaml` (z₀ = 2 km, σ₀ = 0.4, model top 20 hPa) the
+  forward AOD-weighted mean height moves from 24.7 km, with 99.997 % of the
+  AOD in the top layer (20–40 hPa), to 2.2 km.
+- **Linearized aerosol profiles match the forward model** (Suniti Sanghavi,
+  `ee21b857`): v2.1.0's linearized constructor rebuilt every profile as a
+  pressure Gaussian from the distribution's mean and standard deviation and
+  weighted it by Δp, while the forward constructor weighted the layer-centre
+  density by Δz. Linearized radiances and profile Jacobians of pressure-form
+  profiles (`p₀`, `σp`) therefore change and now equal the forward model's.
+  For altitude-form profiles the log-normal's moments were used as `p₀` and
+  `σp` in hPa (in the Float32 configuration above every weight underflowed
+  to zero and the profile was NaN); the aerosol's two profile Jacobian
+  columns are now ∂/∂z₀ and ∂/∂σ₀.
+- **Results change for runs with `profile_reduction: n`** (Suniti Sanghavi,
+  `4c0758e7`): T, q and the VMR profiles are interpolated in log pressure on
+  the actual input layer pressures (flat extrapolation), and the H₂O ratio is
+  recomputed from the interpolated q. v2.1.0 interpolated them as if the input
+  layer centres were evenly spaced in pressure between the shallowest and the
+  deepest one. Without interior observer heights the reduced pressure levels
+  are the same as in v2.1.0; the reduced layers' geometric thicknesses now
+  come from the full-resolution profile (interpolated in log p) instead of a
+  hydrostatic recomputation with the reduced T. For the
+  `DefaultParameters.yaml` profile reduced to 5, 12 or 16 layers, layer
+  temperatures differ by up to 53–55 K (n = 12: 274.0 K in v2.1.0 against
+  218.6 K now at 209.5 hPa). A target of at least the input layer count now
+  leaves the profile unchanged instead of failing an assertion.
 - `remake_geometry` keeps the resolved observer heights, the TOA/BOA output
   selection, and the external-solar representation when it changes the solar
   or viewing angles. Previously it dropped interior observers and the TOA
@@ -271,12 +327,36 @@ review of General's sequential-version rule.
   `model_from_parameters`. Code written for cores that defaulted to `true`,
   such as the HWO/ExoOptics core, must pass `external_solar = true` when
   building the model before calling `rt_run_toa` on the external-solar path.
+- **Radiances change for runs with a non-unit or spectral solar `F₀`** (Suniti
+  Sanghavi, `817d93cb`): the direct solar beam at the surface is the solve's
+  `F₀` attenuated by exp(−τ/μ₀) for every Lambertian flavour and the analytic
+  BRDFs (RPV, Ross–Li, Cox–Munk), in `rt_run`, `rt_run_ss` and the Raman
+  solvers. v2.1.0 applied `F₀` to atmospheric scattering but used a unit,
+  I-only beam for the surface's direct-beam source terms, so the directly
+  reflected surface term and the BOA direct beam were computed for F₀ = 1:
+  with a spectrally flat F₀ = c they were a factor c too small relative to the
+  rest of the radiance, and with a solar spectrum they had none of its
+  Fraunhofer structure. (`LambertianSurfaceLegendre`/`Spline` used the unit
+  beam for their reflected term but had no BOA direct beam, and
+  `LambertianSurfaceSpectrum` failed; see the Lambertian scaffold item below.)
+  Runs with the default unit beam are unchanged by this item. The v2.1.0
+  linearized Lambertian and Cox–Munk layers already used `F₀`, so forward and
+  linearized radiances now agree for non-unit F₀.
 - `CanopySurface` leaf scattering now uses the solar Stokes vector `F₀` of
-  the solve, as the soil below it already did. It used a unit beam, so canopy
-  radiances were not proportional to a spectral solar irradiance or a
-  `SolarBeam(F₀=…)` scaling (e.g. R(2F₀)/R(F₀) was 1.34–1.45 instead of 2),
-  and a zero solar beam still gave leaf-scattered radiance. Runs with the
-  default unit beam are unchanged.
+  the solve, as its soil now does (previous item). It used a unit beam, so
+  canopy radiances were not proportional to a spectral solar irradiance or a
+  `SolarBeam(F₀=…)` scaling (e.g. R(2F₀)/R(F₀) was 1.34–1.45 instead of 2,
+  measured with the soil already using F₀), and a zero solar beam still gave
+  leaf-scattered radiance. Runs with the default unit beam are unchanged.
+- **BOA downwelling radiance and the downward BHR change for
+  `LambertianSurfaceLegendre` and `LambertianSurfaceSpline`** (shared
+  Lambertian scaffold, `e6af91f1`; `t⁺⁺ = I` also Suniti Sanghavi,
+  `817d93cb`): for m > 0 the surface layer passes the downwelling field
+  (`t⁺⁺ = I`; v2.1.0 used 0, so BOA output kept only the m = 0 azimuthal
+  mean), and `j₀⁺` carries the attenuated direct beam (v2.1.0 used 0, so BOA
+  output and the downward BHR omitted it), as for `LambertianSurfaceScalar`.
+  TOA radiances are unchanged. A single-coefficient Legendre albedo no longer
+  fails.
 - StandaloneSS `truncated_ss_path2` no longer halves the m = 0 Cox–Munk
   Fourier term (the azimuthal mean), matching the CoreRT correction to the
   glint residual; the truncated series now converges to `run_exact_ss`, and
@@ -288,6 +368,13 @@ review of General's sequential-version rule.
   Henyey–Greenstein and synthetic polarized Henyey–Greenstein phase
   functions; those elements truncate to zero. The linearized form rejects a
   nonzero tangent of such an element, for which the fit has no derivative.
+- **Polarized results with δBGE-truncated aerosols change** (`85e46b94`):
+  the truncated γ and ϵ Greek coefficients are divided by c₀ = 1 − fᵗ, as β,
+  α, δ and ζ already were (Sanghavi & Stephens 2015, Eq. 8), in the forward
+  and linearized truncation. v2.1.0 omitted the division, so f₁₂/f₁₁ and
+  f₃₄/f₁₁ of the truncated aerosol phase matrix were too small by the factor
+  1 − fᵗ (29 % at fᵗ = 0.29). `Stokes_I` runs and untruncated aerosols are
+  unchanged.
 - `update_aerosol_microphysics!` (BatchContext) uses the constructor's
   anchor wavelengths, reference-wavelength node rule and interpolation
   endpoints for multi-wavelength bands. In Float32 it previously inserted an
@@ -298,6 +385,36 @@ review of General's sequential-version rule.
   blocks, the sections the schema closes; a misspelled optional key such as
   `nstream` previously left the default in effect silently. Such keys remain
   non-fatal.
+- Configuration and API changes:
+  - New `radiative_transfer.greek_beta_cutoff` (Suniti Sanghavi,
+    `b5f6e425`). Omitting it keeps the full Mie series, but configurations
+    with aerosols that omit it now log a migration warning.
+  - Setting both legacy `max_m` and `m_max` raises an error (`90d8788c`;
+    v2.1.0 accepted both).
+  - `compute_aerosol_optical_properties(model; autodiff=true)` is retired
+    and raises an error (`a332d6d8`); use
+    `compute_aerosol_optical_properties(LinMode(), …)`.
+  - Raman solvers warn once when an explicit `depol ≥ 0` is set, because it
+    is then used for Rayleigh, Cabannes and τ_Rayleigh alike (Suniti
+    Sanghavi, `817d93cb`).
+  - `build_sif_source(SIF₀::AbstractMatrix, ν_model, ν_sif, jSIF)` fills a
+    matrix for `SurfaceSIF` (Suniti Sanghavi, `817d93cb`).
+  - Parsed HITRAN line lists are cached per process (`ee0a8722`, `505dffcf`):
+    after replacing a file at the same path by means other than
+    `fetch_hitran`/`artifact`, call `clear_spectroscopy_cache!()`.
+  - New forward `ThermalEmission` per-layer Planck source (Suniti Sanghavi,
+    `3212b3f4`).
+  - New `rt_run_streams` / `streams_callback` per-Fourier-moment
+    quadrature-stream export (Suniti Sanghavi, `51307d14`, `d6051b7b`).
+- **Breaking for positional Jacobian indexing** (Suniti Sanghavi,
+  `5ba80c51`, `f1efc5ff`): the column order is `[p_surf, 7 per aerosol,
+  gas columns per layer (species-major, TOA to BOA), surface, optional SIF,
+  canopy]`; v2.1.0 had `[7 per aerosol, one column per gas, surface,
+  canopy]`. The positional `NGas` of the linearized `rt_run`
+  (`size(lin_model.τ̇_abs[1], 1)`) now counts one column per species and
+  layer. Code that hard-codes offsets (e.g. `1:7` for the first aerosol) must
+  use `ParameterLayout` (`psurf_index`, `aerosol_range`, `gas_profile_range`,
+  `surface_range`) or `result.layout`.
 - **Breaking for some linearized callers:** gas-abundance Jacobian columns
   are the native partial ∂τ/∂VMR = σ·N_dry
   with cross sections, CIA and MT_CKD held fixed (except the ABSCO
@@ -342,6 +459,20 @@ review of General's sequential-version rule.
   coincident nodes are merged and μ₀ is kept.
 - Cox–Munk BRDFs return 0 instead of NaN at extreme grazing in Float32,
   where the slope PDF and the weight denominator underflow together.
+- Edge-case numerical fixes:
+  - RPV and Ross–Li surfaces no longer produce intermittent NaNs (`311198c2`,
+    `faf31d2d`). The Fourier accumulator is zero-filled (v2.1.0 multiplied
+    uninitialized memory by 0), and `acos`/`sqrt` arguments are clamped.
+    Finite results are unchanged.
+  - Linearized elemental layers keep their ϖ and phase partials where ϖ or
+    the projected Z·F₀ entry is zero (Suniti Sanghavi, `35a3495d`); v2.1.0
+    set them to zero there.
+  - Interpolation-model cross sections requested on a wavelength grid
+    (`wavelength_flag=true`) are returned in the caller's order (Suniti
+    Sanghavi, `092ff2c1`); v2.1.0 returned them reversed. The RT path uses
+    wavenumber grids and is unaffected.
+  - `mol_name(mol, iso)` and `HumlicekErrorFunction` no longer raise a
+    `MethodError` (`3d86651d`).
 - Tests: the Jacobian/forward helpers are one `VSmartMOMTestSupport` module
   (`run_linearized_rt`, `linearized_R`, `run_forward_rt`, `forward_R`,
   fail-closed `rel_errors`); NaN-tolerant accuracy checks now require finite
@@ -433,12 +564,34 @@ review of General's sequential-version rule.
   Linearized runs on surfaces without a linearized layer (Spectrum, Spline,
   RPV, Ross–Li) now fail up front with a clear `ArgumentError` instead of a
   deep `MethodError` (new trait `supports_linearized_surface`).
+- **H₂O continuum, CIA and humid-layer columns change** (Suniti Sanghavi,
+  `4774afd4`): the H₂O/dry-air molar ratio r is converted to the moist-air
+  mole fractions x_H₂O = r/(1+r) and x_dry = 1/(1+r) before the hydrostatic
+  column is split (v2.1.0 used r and 1 − r). At q = 0.0125 (0.025) the H₂O
+  column falls by 2.0 % (4.0 %) and the dry column rises by 0.03 % (0.11 %).
+  MT_CKD uses the hydrostatic H₂O column with the partial pressures p·r/(1+r)
+  and p/(1+r), instead of n·Δz with p·r and p(1 − r). Before the separate
+  T_ref/T change below, the self continuum falls by 4.0 % (7.8 %) and the
+  foreign continuum by 2.0 % (3.9 %). Dry–dry CIA uses the dry number density
+  and the hydrostatic dry column instead of n_air²·Δz: −4.0 % (−7.8 %). The
+  continuum and CIA percentages are for thin layers: v2.1.0's midpoint column
+  n·Δz exceeds the hydrostatic one by the factor p̄·ln(p₂/p₁)/Δp (1.0009 for
+  900–1000 hPa, 1.040 for 500–1000 hPa, where the self continuum then falls by
+  7.6 % at q = 0.0125). Line-by-line H₂O receives the layer's moist mole
+  fraction, so its self-broadening is included (v2.1.0 passed no H₂O
+  abundance).
+- CIA and MT_CKD input (`4774afd4`): CIA files can select HITRAN reference
+  families (`reference_codes`) and a `negative_policy`. Overlapping reference
+  families without `reference_codes`, and negative cross sections on the
+  model grid, now raise errors. `load_mtckd` requires the file's `Title` and
+  `Version_description` attributes.
 - MT_CKD H₂O continuum: the self and foreign terms now carry the
   number-density ratio `(p/p_ref)(T_ref/T)` of AER's `mt_ckd_h2o` (4.3);
   only the pressure ratio was applied. **Continuum optical depths increase
   by T_ref/T − 1 per layer** (≈ +3 % at 288 K, ≈ +36 % at a 217 K
-  tropopause; ≈ +6.7 % for a 33-layer US-standard column at 1.6 and 2.0 µm);
-  runs at 296 K are unchanged.
+  tropopause; ≈ +6.7 % for a 33-layer US-standard column at 1.6 and 2.0 µm).
+  This factor is 1 at 296 K; against v2.1.0 the continuum also changes
+  through the moist-air columns and partial pressures of the previous item.
 - **Breaking:** the RT solvers reject `Stokes_IQ` (forward, linearized,
   `remake_geometry` and Raman model builds raise an `ArgumentError`; use
   `Stokes_IQU`). Neglecting U in multiple scattering can cause intensity
@@ -451,8 +604,36 @@ review of General's sequential-version rule.
 - HITRAN, partition-sum, HAPI, CIA and MT_CKD references added to
   `CITATION.bib`, the References page and the README, with guidance on which
   HITRAN edition a calculation used.
-- Shared aerosol reference normalization and spectral angular-cache sizing
-  fixes restore constructor parity and avoid spectral-quadratic cache growth.
+- **Forward Mie aerosol optics change** (`e46281d2`; anchor grids, the λ_ref
+  node and per-node truncation by Suniti Sanghavi, `b524a0d8`, `b5f6e425`,
+  `7ef84106`): each
+  aerosol's Mie calculation uses its own refractive index in every band.
+  v2.1.0 wrote `n_ref` into the `Aerosol` object it then reused for the band
+  loop, so every band's Mie used `n_ref`, by default the first aerosol's
+  index. Scenes whose aerosols have different indices, or an explicit
+  `n_ref` that differs from an aerosol's index, change at first order; a
+  single aerosol with the default `n_ref` does not change through this. In
+  bands with more than one spectral point the optics now vary across the
+  band: Mie runs at the band (or `aerosol_anchor_bands`) endpoints, and at
+  λ_ref when it lies inside the band; each node is truncated separately; and
+  k_ext, k_sca (ϖ = k_sca/k_ext), fᵗ and the Greek coefficients are
+  interpolated in wavenumber (v2.1.0: one Mie calculation at the band
+  centre). **Breaking for code that indexes `model.τ_aer[iBand]`**: it is
+  `[iAer, nSpec, iZ]` (v2.1.0: `[iAer, iZ]`).
+- **Aerosol nᵣ, nᵢ and size Jacobian columns change** (Suniti Sanghavi,
+  `7ef84106`): the reference extinction k_ref is computed with the configured
+  `n_ref` and held fixed with respect to nᵣ and nᵢ (its size derivatives are
+  kept), so the nᵣ and nᵢ columns no longer contain ∂k_ref/∂n. v2.1.0 computed
+  each aerosol's k_ref with its own index and differentiated it, which held
+  that aerosol's AOD at λ_ref fixed, and its linearized AOD normalization
+  differed from the forward one whenever `n_ref` was not the aerosol's index.
+  Forward and linearized constructors now use the same k_ref. The
+  size-distribution tangents are divided by the quadrature sum S of the size
+  distribution over the radius nodes: dw = (du − w·Σdu)/S. v2.1.0 divided by
+  the already normalized sum, so its size columns were scaled by S (S ≈ 1
+  unless `r_max` cuts the distribution; the radius nodes themselves changed
+  later, see the fixed radius grid item).
+- The spectral angular cache is sized to avoid spectral-quadratic growth.
 - The experimental aerosol ingestion adapter now rejects calls that previously
   returned placeholder optics. Production Mie calculations remain in `Scattering`.
 - Numerical conversion and CUDA inverse dispatch ambiguities are resolved;
@@ -497,11 +678,21 @@ review of General's sequential-version rule.
   [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl)
   package (TIPS-2021 partition sums).  The internal `Absorption` module remains
   the standalone σ(ν, T, p) API (TIPS-2017).  High-temperature results
-  (> ~500 K) may differ slightly from earlier releases.
+  (> ~500 K) may differ slightly from earlier releases. The parsed
+  `broadening_function`/`CEF` fields hold AtmosphericAbsorption types
+  (`Voigt()`, `Lorentz()`, `Doppler()`, `HumlicekWeideman32()`; `cfa632b6`);
+  parameters built in code must use these instead of the
+  `vSmartMOM.Absorption` types.
 
 - **GPU Mie dispatch (10.7–12.9×).** `make_mie_model(...; architecture=GPU())`
   now runs NAI-2 Mie on GPU automatically. Metal supports the native
-  Float32 policy; PCW retains its CPU path.
+  Float32 policy; PCW retains its CPU path. With `architecture: GPU()` the
+  forward `model_from_parameters` computes the in-band NAI2 Mie on the GPU
+  (`995ea3e0`, `13bfb968`; the reference extinction stays on the CPU), with
+  the precision policy following the float type: `NativeFloat64` for
+  Float64, `DSEmulated` for Float32. The linearized constructor keeps CPU
+  Mie, so forward and linearized aerosol optics from one GPU configuration
+  can differ at GPU/CPU Mie precision.
 
 - **`BatchContext` batch API.** `BatchContext` / `update_model!` /
   `update_aerosol_loading!` / `update_aerosol_microphysics!` enable efficient
@@ -516,9 +707,14 @@ review of General's sequential-version rule.
   - Nonzero δBGE `Δ_angle` is retired: it warns and is forced to zero so
     forward and linearized truncation share one angular domain.
   - `LambertianSurfaceSpectrum` surface layer now works (missing
-    `create_surface_layer!` method added, including Lambertian scaffold).
-  - Mie Dₙ recurrence: Dual-number-safe initialization restores correct
-    `ForwardDiff` derivatives through Mie.
+    `create_surface_layer!` method added, `e6af91f1`; see the Lambertian
+    scaffold item under Consolidated release).
+  - Mie Dₙ recurrence: `ForwardDiff.Dual` refractive indices run the
+    downward recursion in native arithmetic (v2.1.0 cast it to
+    `Complex{Float64}`, a `MethodError` for Duals); plain complex indices
+    keep the Float64-stabilized recursion. The `autodiff=true` keyword of
+    `compute_aerosol_optical_properties` is retired (see the configuration
+    and API item).
 
 - **Performance work.** Flat-Z zero-copy path; m-invariant Fourier-loop cache;
   GPU sync stripping (~19.5% faster forward RT on O₂-A test case).

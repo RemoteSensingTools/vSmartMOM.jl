@@ -57,7 +57,8 @@ the repository's `CITATION.bib`, with their original publication author order.
   fixed 550 nm value,
   which changes the SWIR glint most (TOA glint −9 % at 1.6 µm, −17 % at
   2.06 µm in a 5 m/s test case).
-- Ross–Li keeps its 80° zenith cap by default;
+- Ross–Li caps both kernel zenith angles at 80° by default (new since v2.1.0;
+  up to ~1 % in I in the VLIDORT comparison);
   `RossLiSurfaceScalar(fvol, fgeo, fiso; zenith_cap_deg = nothing)` gives the
   uncapped MODIS/VLIDORT kernels.
 - Surface-pressure Jacobians include pressure-induced line-shape and LUT
@@ -116,8 +117,13 @@ the repository's `CITATION.bib`, with their original publication author order.
   unverified file. `hitran_is_cached(molecule[, edition])` reports exactly
   this condition.
 - Revalidate columns with non-scattering layers (τϖ ≤ 2eps, common in Float32
-  and wherever Rayleigh is zeroed), `RadauQuad` runs at SZA = 0, and canopy
-  runs with a non-unit solar `F₀`: these radiances were wrong and change.
+  and wherever Rayleigh is zeroed), `RadauQuad` runs at SZA = 0, and runs with
+  a non-unit or spectral solar `F₀` (Lambertian, analytic-BRDF and canopy
+  surfaces): these radiances were wrong and change.
+- **Breaking for positional indexing:** Jacobian columns are `[p_surf,
+  7 per aerosol, gas columns per layer, surface, optional SIF, canopy]` (use
+  `ParameterLayout` or `result.layout`), and `model.τ_aer[iBand]` is
+  `[iAer, nSpec, iZ]` (it was `[iAer, iZ]`).
 - Retrievals with fixed pressure can disable its upstream derivatives with
   `requires_pressure_jacobians(::MyFlavor) = false` or the constructor keyword
   `compute_pressure_jacobians=false`. Such plans must omit pressure; full-layout
@@ -344,11 +350,13 @@ elemental, doubling, and interaction kernels, and the interlayer coupling uses
 the closed-form tangent of the batched matrix inverse.
 
 Forward and linearized model construction now use the same normalized aerosol
-profile discretization: layer-centre probability density weighted by geometric
-layer thickness. This keeps aerosol optical depths identical on height-anchored
-grids and makes interior direct-beam and diffuse-radiance Jacobians agree with
-independently rebuilt finite differences. Profile-shape columns are `(p₀, σp)`
-for `Normal` and `(z₀, σ₀)` for `LogNormal` profiles.
+profile discretization: for pressure-form profiles the layer-centre
+probability density weighted by geometric layer thickness, for altitude-form
+profiles the log-normal integrated over the layer interfaces. This keeps
+aerosol optical depths identical on height-anchored grids and makes interior
+direct-beam and diffuse-radiance Jacobians agree with independently rebuilt
+finite differences. Profile-shape columns are `(p₀, σp)` for `Normal` and
+`(z₀, σ₀)` for `LogNormal` profiles.
 
 Forward strict-interior outputs retain their existing `SolarBeam`/`NoSource`
 source restriction and continue to reject `CanopySurface`. Linearized
@@ -656,12 +664,14 @@ the current codebase.
   will produce numerically different VS Raman spectra.  Rotational Raman (RRS)
   is unaffected.
 
-- **Mie Dₙ recurrence: Dual-number-safe initialization.**
-  The downward Dₙ recurrence used in Mie coefficient computation started from
-  a hard-coded `Float64` initial value, causing a type-promotion error when
-  the refractive index was a `ForwardDiff.Dual` number (AD path).  The
-  initializer is now type-generic, restoring correct analytic derivatives for
-  Mie-sensitive parameters via `compute_aerosol_optical_properties(LinMode(), …)`.
+- **Mie Dₙ recurrence: Dual-number-safe recursion.**
+  The downward Dₙ recurrence used in Mie coefficient computation was cast to
+  `Complex{Float64}`, which failed when the refractive index was a
+  `ForwardDiff.Dual` number. Dual inputs now use native arithmetic; plain
+  complex inputs keep the Float64-stabilized recursion. The `autodiff=true`
+  keyword of `compute_aerosol_optical_properties` is retired and raises an
+  error; analytic aerosol Jacobians come from
+  `compute_aerosol_optical_properties(LinMode(), …)`.
 
 ## Dependencies
 
@@ -675,8 +685,9 @@ the current codebase.
 - **GPU Mie dispatch** — CUDA architecture now runs Mie coefficient computation
   on-GPU via `make_mie_model(...; architecture = GPU())`.  Measured speedup:
   **10.7–12.9×** vs CPU for typical aerosol grids (1 500 quadrature points,
-  NAI2 decomposition).  `NativeFloat64` is the default precision policy;
-  `DSEmulated` is available for extended-precision Float32 accumulation.
+  NAI2 decomposition).  The default precision policy follows the model float
+  type: `NativeFloat64` for Float64 and `DSEmulated` (double-single Dₙ
+  recursion) for Float32.
   Metal also implements NAI2 Mie for Float32 with `NativeFloat32`; other
   architectures without a Mie pipeline fall back to CPU. Metal hardware was
   not available for this release-candidate validation.
