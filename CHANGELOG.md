@@ -79,7 +79,8 @@ review of General's sequential-version rule.
   joins and numbers: `docs/dev_notes/molecular_rayleigh_dispersion.md`.
 - **Results change for every `depol: -1` model** built by
   `model_from_parameters(params)`, `model_from_parameters(LinMode(), params)`
-  or `update_model!` (the VS `_plus` builder still takes `depol` as given). The
+  or `update_model!`. The VS `_plus` builder follows the same selection; its
+  `depol: -1` handling is new (see the VS `_plus` builder item below). The
   N₂/O₂ polarizability anisotropy now varies with wavelength
   (`DispersiveAnisotropy()`, implied by the refractive-index fits and King
   factors). It is the default of `UsingPolTen()` and of the automatic
@@ -96,8 +97,8 @@ review of General's sequential-version rule.
   fits have no switch. The
   Raman and Cabannes quantities (ϖ_Cabannes, the Cabannes depolarization,
   RRS and VS cross sections) keep the constant Raman-module tensor of the
-  published tables. Paired noRS/RRS runs (Ring or filling-in spectra) should
-  set `ConstantAnisotropy()` until the Raman side is decided.
+  published tables. Paired noRS/Raman runs (RRS or VS; Ring or filling-in
+  spectra) should set `ConstantAnisotropy()` until the Raman side is decided.
 - Molecular constants of `depol: -1` and of the Cabannes fraction (Suniti
   Sanghavi, `817d93cb`): the N₂/O₂ constants are evaluated at the
   dry-column-weighted mean temperature of the profile instead of 300 K, and
@@ -117,6 +118,52 @@ review of General's sequential-version rule.
   path; RRS, Rayleigh and all noRS/RRS results are unchanged. Derivation and
   references:
   `docs/dev_notes/raman_q_branch_placzek_teller.md`.
+- Raman (RRS): `getRamanSSProp!` throws an `ArgumentError` for a band that
+  holds no N₂/O₂ rotational line (the smallest shifts are ±11.9 cm⁻¹ for N₂
+  and ±14.3 cm⁻¹ for O₂). Such a band used to get `n_Raman = 0` and lose the
+  Raman share 1 − ϖ_Cabannes (3.2 % at 395 nm) without notice. RRS weights
+  that sum to zero (an RRS object never filled) are rejected instead of
+  giving NaN.
+- Raman (RRS): each rotational line is shared between its two neighbouring
+  grid points by linear interpolation, with shifts measured from the grid
+  point nearest the reference wavelength and the source offsets explicitly
+  negated; a reference wavelength outside the band grid is an
+  `ArgumentError`. Results no longer depend on the parity of the band grid.
+  Elastic results are unchanged. In the Phase 1b band (762–765 nm, 103
+  points, flat F₀) the inelastic radiance changes by ≤ 2.1e-6 (relative)
+  where every source lies inside the band, and by up to 12 % (≤ 0.17 % of I)
+  at the six points where a line's source crosses the band edge. With a
+  structured F₀ (60 %-deep features every 3.7 cm⁻¹) points whose sources all lie
+  inside the band change by up to 3.9 % of the inelastic part on that
+  odd-length grid (0.20 % of I) and up to 12 % on an even-length one (0.38 %
+  of I). The VS, VS `_plus` and stellar H₂ paths share the line-splitting
+  routine, so their sub-grid placement changes in the same way.
+- Removed `getRamanSSProp!(::RRS, depol, λ, ν)`, which swapped Stokes and
+  anti-Stokes (use `getRamanSSProp!(rs, λ, ν)`), and
+  `getRamanSSProp!(::Union{VS_0to1, VS_1to0}, …)`, which could not run.
+  Nothing in vSmartMOM, uni_vSmartMOM or ExoOptics called either.
+- `VS_0to1_plus` depletes its source band (band 1, the incident wavelength)
+  by f = (σ_VRS + σ_RVRS)/σ_Rayleigh (8.7e-4 at 395 nm) and no longer the
+  target bands (it had ϖ_Cabannes = [1, 1 − f, 1 − f]), as `VS_1to0_plus`
+  already did. Band-1 I changes by −1.3e-3 to −1.5e-3 (relative) at 395 nm
+  over four viewing directions.
+- The VS Q-branch phase matrix uses the population-weighted ⟨b_JJ⟩ of its
+  lines instead of the whole-band depolarization: ρ goes 0.157 → 0.046 (N₂)
+  and 0.290 → 0.100 (O₂) at 300 K. The band-summed inelastic I changes by
+  −4.1 % to +4.1 % over four viewing directions (`VS_0to1_plus`, 395 nm,
+  SZA 45°).
+- VS `_plus` model builder: the Rayleigh and Cabannes depolarizations are
+  resolved as in the standard builder. With `depol: -1` it used to pass −1
+  itself, which gave τ_Rayleigh 0.22× the correct value and β₂ = 2 in
+  `greek_rayleigh` (negative radiances from noRS on a VS model); band-1 I at
+  nadir goes 7.59e-3 → 3.34e-2 (395 nm, pure Rayleigh, SZA 45°, constant
+  anisotropy). With an
+  explicit `depol` ≥ 0 the Cabannes Greek coefficients now use that value
+  too (before, they came from the molecular constants for any `depol`), so
+  those VS runs change as well. `params` is no longer modified, and line-by-line
+  absorption and Float32 builds work. The VS `_plus` forward run works again
+  (its kernel and interaction had fallen behind workspace changes; no physics
+  change).
 - Documentation: the Greek matrix B_l is shown as printed by Sanghavi &
   Stephens (2015, Eq. 22) in Siewert's form, which the vSmartMOM paper uses by
   reference (−ε at [3,4]), with the exact mapping to the code's stored γ and ε;

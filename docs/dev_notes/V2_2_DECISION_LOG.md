@@ -137,11 +137,11 @@ Taken one by one by Suniti; implementation status is tracked in §3/§3.1.
 | 3b | Re-running earlier rounds | Re-run all rounds on v2.2, with 4-D ABSCO and truth maps regenerated with the 4-D tables. |
 | 3c | Desert solves at the 7-iteration limit | Raise the limit for the reruns and repeat the five solves. |
 | 3d | "Release adds dσ/dp" wording | Correct it: dσ/dp is in the core since `36e7d1e0`; it is confirmed absent in Round 4 and Round 3 SIF-on, and very likely absent in the unpinned earlier runs (done; the claim was only in the working notes). |
-| 4 | R1: RRS band without rotational lines | Raise an `ArgumentError`. |
+| 4 | R1: RRS band without rotational lines | Raise an `ArgumentError` (done). |
 | 5 | R2: VS Q-branch Placzek–Teller factor | After the reference check: Placzek–Teller weight b_JJ to first power (applied; `raman_q_branch_placzek_teller.md`). |
-| 6 | R3: VS elastic phase matrix vs SSA | Make them consistent (Cabannes in both). |
-| 7 | R4–R8 | Fix all as cleanup. |
-| 8 | VS `_plus` builder | Use the resolved depolarization; do not mutate `params`. |
+| 6 | R3: VS elastic phase matrix vs SSA | Make them consistent (Cabannes in both). Not implemented: no VS mode redistributes rotational Raman, so a Cabannes-only SSA would lose its energy; options in §3. |
+| 7 | R4–R8 | Fix all as cleanup (done). |
+| 8 | VS `_plus` builder | Use the resolved depolarization; do not mutate `params` (done; follows `rayleigh_anisotropy` like the standard builder). |
 | 9 | Cox–Munk water refractive index | Segelstein (1981), interpolated per spectral point; a vector `n_water` is used element-wise. |
 | 10 | Ross–Li 80° zenith cap | Make it a parameter, default 80°; off reproduces MODIS/VLIDORT. |
 | 11 | NAI2 size-parameter Jacobians | Fixed radius grid (nodes independent of the distribution parameters). |
@@ -376,17 +376,39 @@ results or definitions and wait for a decision.
   not help. Every RT model build now rejects `Stokes_IQ`
   (`_require_rt_polarization` in `rt_set_streams`); the parser, the
   Scattering-level type and StandaloneSS `ExactSSConfig` runs keep it.
-- [ ] **Raman.** (R2 done 2026-10-19: Q-branch weight b_JJ, see
-  `raman_q_branch_placzek_teller.md`.) R1: a narrow RRS band with no
-  rotational line inside gets
-  `n_Raman = 0` and loses the Raman energy silently (warn/error?). R2: the VS
-  Q-branch Placzek–Teller factor uses `(α′/(b γ′))²` where `α′²/(b γ′²)`
-  appears intended (Q-branch low by 5.6 % N₂, 11.7 % O₂). R3: VS uses the
-  RRS-free Cabannes Greek coefficients for the elastic part while keeping RRS
-  in the elastic SSA (probable inconsistency). R4–R8 minor (band-depolarized
-  Q-branch phase, VS_0to1_plus applies no source depletion (~8e-4 of the
-  energy goes to VRS with ϖ_Cabannes = 1), unused/dead overloads,
-  RRS line offsets from an off-grid mean ν).
+- [x] **Raman** (decisions 4, 5, 7; decision 6 open below, decision 8 has its
+  own item). R2 done 2026-10-19 (Q-branch weight b_JJ,
+  `raman_q_branch_placzek_teller.md`). R1 (`ArgumentError` for a band without
+  rotational lines), R4 (VS Q-branch phase from ⟨b_JJ⟩), R5 (`VS_0to1_plus`
+  source depletion), R6/R8 (dead overloads removed) and R7 (linear
+  interpolation from the reference grid point) done 2026-10-20. The Phase 1b
+  RRS reference is corrected in-test for the line placement (data
+  unchanged).
+- [ ] **For Suniti (Raman follow-ups):**
+  (1) R3 is not implemented: no VS mode carries rotational Raman
+  inelastically (VS_plus weights are VRS/RVRS only; `VS_0to1`/`VS_1to0` cannot
+  run), so a Cabannes-only SSA would lose 1 − ϖ_Cab = 3.2 % at 395 nm.
+  Options, with effects vs noRS measured for `VS_0to1_plus` at 395 nm (pure
+  Rayleigh, one layer, SZA 45°, flat F₀; TOA at nadir, VZA 45° Δφ 0° and
+  180°, VZA 60° Δφ 90°; constant anisotropy, i.e. before `f8211b00`, which
+  moves the noRS phase by about 0.2 % in β₂; scripts and logs in
+  `vsmartmom-release-evidence/2026-10-20/raman_vs_r3/`):
+  (a) Rayleigh phase with the Rayleigh-minus-VRS SSA (closure ≤ 4.9e-4
+  relative in TOA, ≤ 1.4e-4 in BOA; recommended), (b) Cabannes-only SSA as
+  decided (I −3.7 % to −6.4 % relative), (c) a combined RRS+VS mode (new
+  development), (d) keep (DOLP 3.6–5.3 % relative too high over the four
+  directions; 0.2776 vs 0.2681 at nadir).
+  (2) RRS bands that hold only some lines: energy is conserved by scaling the
+  captured lines (×13.4 in Phase 1b, 7.4 % of σ_RRS), which makes the nearest
+  ghosts 13× too strong. Keep and document (done in `08_inelastic.md`), warn
+  below ~95 % capture (recommended), error, or extend the grid internally?
+  (3) Stellar H₂ paths (`sol_RRS`, `sol_VS_plus`; not run by CoreRT today)
+  have the R6/R7/R4/R8 analogues (Stokes/anti-Stokes swap, off-grid ν₀ with
+  one array reused for both line sets, whole-band ρ, dead method): apply the
+  same fixes in a follow-up?
+  (4) Accept the in-test Phase 1b correction, or regenerate the reference?
+  (5) R7 changes RRS_XCO2 inelastic radiances in structured spectra: check one
+  truth-map member on v2.2 before mixing new and archived products.
 - [ ] **Water refractive index for Cox–Munk.** The built-in table departs from
   Hale & Querry/Segelstein above ~900 nm (n 1.255 vs 1.317 at 1.6 µm), and
   `n_water = nothing` always uses the 550 nm value instead of a spectral
@@ -406,9 +428,9 @@ results or definitions and wait for a decision.
   with `p_surf` under `FixedPressureGrid()` (not under `FixedAltitudeGrid()`);
   that term (~1e-5 relative) has no tangent. Documented as neglected in
   `jacobians.md`.
-- [ ] **VS `_plus` builder** uses the raw `params.depol` (with `depol: -1`
-  τ_Rayleigh ≈ 0.22× the correct value) and mutates `params.spec_bands` and
-  `params.brdf` (probable, from reading the code).
+- [x] **VS `_plus` builder** (decision 8): resolves the depolarization as the
+  standard builder does (including `rayleigh_anisotropy`), works on a copy of
+  `params`; line-by-line absorption and Float32 builds work.
 - [ ] **Round 7_altgrd pilot** (report in the RRS_XCO2 round7_altgrd output
   directory): no-aerosol scenes match Round 7 (mean ΔXCO2 +0.001 ppm), aerosol
   scenes are 0.49 ppm lower on average (up to 1.52 ppm); five desert solves

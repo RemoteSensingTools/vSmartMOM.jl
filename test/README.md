@@ -106,7 +106,7 @@ CPU; they do not add cases.
 | `test_ray_cab_raman.jl` | active | Rayleigh/Cabannes/RRS identities |
 | `test_raman_placzek_teller.jl` | active | Placzek–Teller sum rule of the per-J Q/S/O lines; per-J Cabannes depolarization |
 | `test_raman_rrs_lines.jl` | active | RRS line weights on the band grid: a band without rotational lines is rejected; linear-interpolation line placement; offsets from the reference grid point; removed `getRamanSSProp!` overloads |
-| `test_raman_vs_plus.jl` | active | `VS_0to1_plus` / `VS_1to0_plus` forward runs over concatenated bands (pure Rayleigh, one layer) |
+| `test_raman_vs_plus.jl` | active | `VS_0to1_plus` forward run over concatenated bands (pure Rayleigh, one layer); source-band depletion of both VS `_plus` modes; VS `_plus` builder against the standard builder for both `rayleigh_anisotropy` settings, `params` untouched, Float32 and line-by-line absorption |
 | `test_rt_entry_guards.jl` | active | Solve-boundary guards: reused-RS F₀, HDR/BHR direct beam, TMS streams/bands, multisensor Cox–Munk TOA, U/V beams, thermal paths, linearized surfaces |
 | `test_scenario_sweep.jl` | active | Scenario sweeps vs monolithic `rt_run` |
 | `test_schema_docs.jl` | active | Schema documentation invariants |

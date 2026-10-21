@@ -92,12 +92,14 @@ end
     # Decision 8: the builder uses the depolarization resolved as in the
     # standard model_from_parameters (depol: -1 → molecular constants) for
     # τ_Rayleigh and the Rayleigh/Cabannes Greek coefficients, and works on a
-    # copy of the parameters.
-    for depol in (-1.0, 0.0)
+    # copy of the parameters. With depol: -1 the Rayleigh depolarization
+    # follows params.rayleigh_anisotropy, as in the standard builder.
+    for depol in (-1.0, 0.0), anisotropy in (DispersiveAnisotropy(), ConstantAnisotropy())
         p = _vs_params()
         p.spec_bands = p.spec_bands[1:1]
         p.brdf = p.brdf[1:1]
         p.depol = depol
+        p.rayleigh_anisotropy = anisotropy
         spec_before = deepcopy(p.spec_bands)
         brdf_before = p.brdf
         rs, model, _ = _vs_model(IS.VS_0to1_plus; params = p)
@@ -111,6 +113,7 @@ end
         q.spec_bands = [collect(rs.grid_in[1])]
         q.brdf = q.brdf[1:1]
         q.depol = depol
+        q.rayleigh_anisotropy = anisotropy
         ref = model_from_parameters(q)
         @test model.τ_rayl[1] ≈ ref.τ_rayl[1] rtol = 1e-12
         @test model.greek_rayleigh[1].β ≈ ref.greek_rayleigh[1].β rtol = 1e-12
@@ -118,6 +121,22 @@ end
         @test model.greek_cabannes[1].β ≈ ref.greek_cabannes[1].β rtol = 1e-12
         @test model.ϖ_Cabannes[1] ≈ ref.ϖ_Cabannes[1] rtol = 1e-12
     end
+    # The anisotropy selection reaches the VS builder (τ_Rayleigh differs by
+    # ≈ 0.25 % at 395 nm between the two formulations); with an explicit depol
+    # it is ignored.
+    τ_by_anisotropy = map((DispersiveAnisotropy(), ConstantAnisotropy())) do anisotropy
+        p = _vs_params()
+        p.rayleigh_anisotropy = anisotropy
+        _vs_model(IS.VS_0to1_plus; params = p)[2].τ_rayl[1]
+    end
+    @test !isapprox(τ_by_anisotropy[1], τ_by_anisotropy[2]; rtol = 1e-4)
+    τ_explicit = map((DispersiveAnisotropy(), ConstantAnisotropy())) do anisotropy
+        p = _vs_params()
+        p.depol = 0.0
+        p.rayleigh_anisotropy = anisotropy
+        _vs_model(IS.VS_0to1_plus; params = p)[2].τ_rayl[1]
+    end
+    @test τ_explicit[1] == τ_explicit[2]
 
     # Float32 model (builder only).
     p = _vs_params()

@@ -803,7 +803,8 @@ Fill the vibrational Raman state of `rs` for the incident wavelength `λ₀`
 (nm) and build the `RTModel` on its bands (the incident wavelength and the
 N₂/O₂ target bands). Rayleigh and Cabannes depolarizations follow the
 standard `model_from_parameters` (`depol: -1` takes them from the molecular
-constants). `params` is not modified.
+constants, the Rayleigh one with `params.rayleigh_anisotropy`). `params` is
+not modified.
 """
 function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                     λ₀,
@@ -854,7 +855,9 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     # Rayleigh optical depth (at each band centre) and per-band Rayleigh and
     # Cabannes greek coefficients. Same depolarization rule as the standard
     # `model_from_parameters`: depol < 0 ("auto") takes both depolarizations
-    # from the N₂/O₂ molecular constants, depol ≥ 0 uses it for both.
+    # from the N₂/O₂ molecular constants (the Rayleigh one with
+    # params.rayleigh_anisotropy, see _auto_molecular_depolarizations),
+    # depol ≥ 0 uses it for both.
     FT_vrs = params.float_type
     τ_rayl = [zeros(FT_vrs, 1, length(profile.p_full)) for i=1:n_bands];
     greek_rayleigh = Vector{Scattering.GreekCoefs{FT_vrs}}()
@@ -874,13 +877,9 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         # inelastic fractions.
         νₘ = 0.5 * (params.spec_bands[i_band][1] + params.spec_bands[i_band][end])
         λₘ = 1.0e7 / νₘ
-        _n2, _o2 = InelasticScattering.getRamanAtmoConstants(1.0e7 / λₘ, effT)
-        ϖ_Cab = InelasticScattering.compute_ϖ_Cabannes(λₘ, _n2, _o2)
-        γ_air_Cab, _ = InelasticScattering.compute_γ_air_Cabannes!(λₘ, _n2, _o2)
-        γ_air_Ray, _ = InelasticScattering.compute_γ_air_Rayleigh!(λₘ, _n2, _o2)
+        ϖ_Cab, depol_air_Cab, depol_air_Ray = _auto_molecular_depolarizations(
+            params.rayleigh_anisotropy, λₘ, effT)
         ϖ_Cabannes[i_band] = FT_vrs(ϖ_Cab)
-        depol_air_Cab = 2γ_air_Cab / (1 + γ_air_Cab)
-        depol_air_Ray = 2γ_air_Ray / (1 + γ_air_Ray)
         depol_use_Cab = params.depol < 0 ? FT_vrs(depol_air_Cab) : FT_vrs(params.depol)
         depol_use_Ray = params.depol < 0 ? FT_vrs(depol_air_Ray) : FT_vrs(params.depol)
         push!(greek_cabannes, Scattering.get_greek_rayleigh(depol_use_Cab))
