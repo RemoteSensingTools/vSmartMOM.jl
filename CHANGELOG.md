@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.2.0 — release candidate (unreleased)
+## 2.2.0 — 2026-10-21
 
 Scientific authorship of the linearization and Raman work, including the
 formulations, analytic derivatives, and retrieval methodology, is credited to
@@ -11,11 +11,10 @@ and the published references in `CITATION.bib`.
 
 ### Consolidated release
 
-This candidate combines the surface/multisensor integration, Suniti's updated
+This release combines the surface/multisensor integration, Suniti's updated
 retrieval workflows, and the validated Jacobian improvements. It preserves the
 published `v2.1.0` tag. The migration baseline for registry users is **1.1.0**;
-2.0/2.1 were not registered in General. Registration of 2.2.0 will require
-review of General's sequential-version rule.
+2.0/2.1 were not registered in General.
 
 - Named endpoint/interior radiance results retain tuple-style iteration.
 - Retrieval-selected, local-optical, and equivalent-source analytic Jacobians
@@ -725,9 +724,6 @@ review of General's sequential-version rule.
 - **Compat widenings.** LogExpFunctions `0.3`; Parameters.jl `0.13`.
 
 - **Folded PRs #222–#225.**
-
-Release publication is to be coordinated with S. Sanghavi after the candidate
-passes the release gates; no tag or registration is implied by this entry.
 
 ---
 

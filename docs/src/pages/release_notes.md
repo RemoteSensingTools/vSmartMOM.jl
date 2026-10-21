@@ -1,12 +1,11 @@
 # Release Notes and Migration
 
 **For:** users upgrading from registered vSmartMOM 1.1.0 or the public 2.1.0
-tag to the 2.2.0 release candidate.
+tag to 2.2.0.
 
 **Next:** [Quick Start](quickstart.md), [Configure a Scene (step by step)](IO/ConfigurationGuide.md), [Compute Jacobians](jacobians.md).
 
-This page summarizes the user-visible changes in 2.2.0. The version is a
-release candidate until registration and publication are complete.
+This page summarizes the user-visible changes in 2.2.0.
 
 ## Scientific development and contributions
 
@@ -184,7 +183,7 @@ edition you used — HITRAN2016 for the default artifacts, the current edition
 (HITRAN2024 at the time of writing) for data downloaded from hitran.org. See
 [References](vSmartMOM/References.md) and `CITATION.bib`.
 
-The release candidate temporarily pins AtmosphericAbsorption to 0.1.2 because
+Version 2.2.0 pins AtmosphericAbsorption to 0.1.2 because
 line-pressure tangents use its internal prepared-line interface. Updating this
 dependency requires pressure regressions until an upstream public derivative
 API replaces that coupling. Development checkouts must also record their exact
@@ -690,7 +689,7 @@ the current codebase.
   recursion) for Float32.
   Metal also implements NAI2 Mie for Float32 with `NativeFloat32`; other
   architectures without a Mie pipeline fall back to CPU. Metal hardware was
-  not available for this release-candidate validation.
+  not available for this release's validation.
 
 - **Flat-Z zero-copy path** — Rayleigh-only and analytic-phase-function layers
   share a single pre-computed Z matrix across all Fourier moments rather than

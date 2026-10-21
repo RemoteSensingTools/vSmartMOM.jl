@@ -34,7 +34,7 @@ Wavelengths are in micrometers. `get_refractive_index` interpolates the real and
 
 ## Current Caveats
 
-- The module is public but still WIP; names and configuration details may be cleaned up before registration.
+- The module is public but still WIP; names and configuration details may be cleaned up in a later release.
 - TOMAS-15 and two-moment support are present; additional schemes should be added through new `AerosolScheme` subtypes rather than one large parser branch.
 - Heavy NetCDF fixtures are not part of the unit-test path.
 
