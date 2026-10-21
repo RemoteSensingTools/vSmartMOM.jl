@@ -159,9 +159,47 @@ This module enables scattering phase-function calculation of atmospheric aerosol
 
 ## Citing
 
-If you use vSmartMOM.jl, please cite the software paper (Jeyaram, Sanghavi &
-Frankenberg 2022, [doi:10.21105/joss.04575](https://doi.org/10.21105/joss.04575))
-and the method papers relevant to your work. BibTeX for all of them is in
+If you use vSmartMOM.jl, please cite the vSmartMOM model paper and the
+software paper:
+
+- Sanghavi, S., Davis, A. B., & Eldering, A. (2014). vSmartMOM: A vector matrix
+  operator method-based radiative transfer model linearized with respect to
+  aerosol properties. *JQSRT*, 133, 412–433.
+  [doi:10.1016/j.jqsrt.2013.09.004](https://doi.org/10.1016/j.jqsrt.2013.09.004)
+- Jeyaram, R., Sanghavi, S., & Frankenberg, C. (2022). vSmartMOM.jl: An
+  open-source Julia package for atmospheric radiative transfer and remote
+  sensing tools. *Journal of Open Source Software*, 7(80), 4575.
+  [doi:10.21105/joss.04575](https://doi.org/10.21105/joss.04575)
+
+For rotational Raman scattering (RRS), please also cite:
+
+- Sanghavi, S. (2022). Raman scattering in the Earth's atmosphere, Part I:
+  Optical properties. *JQSRT*, 291, 108328.
+  [doi:10.1016/j.jqsrt.2022.108328](https://doi.org/10.1016/j.jqsrt.2022.108328)
+- Sanghavi, S., & Frankenberg, C. (2023). Raman scattering in the Earth's
+  atmosphere, Part II: Radiative transfer modeling for remote sensing
+  applications. *JQSRT*, 311, 108791.
+  [doi:10.1016/j.jqsrt.2023.108791](https://doi.org/10.1016/j.jqsrt.2023.108791)
+- Sanghavi, S. (2026). Isolating Cabannes and rotational Raman scattering to
+  determine forward modeling error due to Rayleigh scattering in the Earth's
+  atmosphere. *JQSRT*, 363, 110077.
+  [doi:10.1016/j.jqsrt.2026.110077](https://doi.org/10.1016/j.jqsrt.2026.110077)
+
+For exoplanets and brown dwarfs, please also cite:
+
+- Sanghavi, S., & Shporer, A. (2018). Photopolarimetric characteristics of
+  brown dwarfs. I. Uniform cloud decks. *ApJ*, 866, 28.
+  [doi:10.3847/1538-4357/aadf94](https://doi.org/10.3847/1538-4357/aadf94)
+- Sanghavi, S., & West, R. (2019). Spectropolarimetric characteristics of brown
+  dwarfs. II. Uniform clouds. *ApJ*, 877, 134.
+  [doi:10.3847/1538-4357/ab1b4e](https://doi.org/10.3847/1538-4357/ab1b4e)
+- Sanghavi, S., West, R., & Jiang, J. (2021). Cloudy atmospheres on directly
+  imaged exoplanets: The need for accurate particulate representation in
+  photopolarimetric simulations. *ApJ*, 907, 30.
+  [doi:10.3847/1538-4357/abcd99](https://doi.org/10.3847/1538-4357/abcd99)
+
+Please also cite the other method papers relevant to your work (linearization,
+truncation, Mie Fourier decomposition). BibTeX for all of them is in
 [`CITATION.bib`](CITATION.bib).
 
 vSmartMOM is open-source research software developed through substantial

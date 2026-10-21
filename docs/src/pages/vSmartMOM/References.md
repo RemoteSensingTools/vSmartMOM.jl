@@ -4,11 +4,12 @@ For BibTeX entries, use [`CITATION.bib`](https://github.com/RemoteSensingTools/v
 
 ## How To Cite
 
-If you use the package itself, cite the JOSS software paper:
+If you use vSmartMOM.jl, please cite the vSmartMOM model paper and the JOSS software paper:
 
+- Sanghavi, S., Davis, A. B., and Eldering, A. (2014). vSmartMOM: A vector matrix operator method-based radiative transfer model linearized with respect to aerosol properties. *Journal of Quantitative Spectroscopy and Radiative Transfer*, 133, 412-433. https://doi.org/10.1016/j.jqsrt.2013.09.004
 - Jeyaram, R., Sanghavi, S., and Frankenberg, C. (2022). vSmartMOM.jl: An open-source Julia package for atmospheric radiative transfer and remote sensing tools. *Journal of Open Source Software*, 7(80), 4575. https://doi.org/10.21105/joss.04575
 
-Use the method references below when your work depends on a specific solver component.
+For rotational Raman scattering (RRS), please also cite the three papers under Raman Scattering below; for exoplanets and brown dwarfs, the three papers under Exoplanets and Brown Dwarfs. Use the other method references below when your work depends on a specific solver component.
 
 ## Matrix-Operator RT and Jacobians
 
@@ -24,6 +25,13 @@ Use the method references below when your work depends on a specific solver comp
 
 - Sanghavi, S. (2022). Raman scattering in the Earth's atmosphere, Part I: Optical properties. *Journal of Quantitative Spectroscopy and Radiative Transfer*, 291, 108328. https://doi.org/10.1016/j.jqsrt.2022.108328
 - Sanghavi, S. and Frankenberg, C. (2023). Raman scattering in the Earth's atmosphere, Part II: Radiative transfer modeling for remote sensing applications. *Journal of Quantitative Spectroscopy and Radiative Transfer*, 311, 108791. https://doi.org/10.1016/j.jqsrt.2023.108791
+- Sanghavi, S. (2026). Isolating Cabannes and rotational Raman scattering to determine forward modeling error due to Rayleigh scattering in the Earth's atmosphere. *Journal of Quantitative Spectroscopy and Radiative Transfer*, 363, 110077. https://doi.org/10.1016/j.jqsrt.2026.110077
+
+## Exoplanets and Brown Dwarfs
+
+- Sanghavi, S. and Shporer, A. (2018). Photopolarimetric characteristics of brown dwarfs. I. Uniform cloud decks. *The Astrophysical Journal*, 866, 28. https://doi.org/10.3847/1538-4357/aadf94
+- Sanghavi, S. and West, R. (2019). Spectropolarimetric characteristics of brown dwarfs. II. Uniform clouds. *The Astrophysical Journal*, 877, 134. https://doi.org/10.3847/1538-4357/ab1b4e
+- Sanghavi, S., West, R., and Jiang, J. (2021). Cloudy atmospheres on directly imaged exoplanets: The need for accurate particulate representation in photopolarimetric simulations. *The Astrophysical Journal*, 907, 30. https://doi.org/10.3847/1538-4357/abcd99
 
 ## Spectroscopic Data (HITRAN and related)
 

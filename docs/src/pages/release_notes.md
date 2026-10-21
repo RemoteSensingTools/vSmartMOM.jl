@@ -626,9 +626,10 @@ The manual has been reorganized around task pages first and a module-grouped
 `checkdocs = :exports` and without `warnonly`, so exported public symbols and
 cross references are checked as part of the release gate.
 
-The repository now ships a root `CITATION.bib` with the JOSS software paper and
-the core method references. See [References](vSmartMOM/References.md) for the
-human-readable citation guide.
+The repository now ships a root `CITATION.bib` with the vSmartMOM model paper,
+the JOSS software paper, the rotational Raman and exoplanet/brown-dwarf papers,
+and the core method references. See [References](vSmartMOM/References.md) for
+the human-readable citation guide.
 
 ## Correctness Fixes
 
