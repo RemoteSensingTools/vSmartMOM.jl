@@ -238,7 +238,17 @@ decided after comparing the pilot with Round 7 (§3.1).
   depolarization differs by up to ≈10 % in the NIR). Options: keep the Raman
   constants and recommend `ConstantAnisotropy()` for paired noRS/RRS runs;
   switch the Raman cross sections too (σ_RRS −6.6 % at 760 nm, +6.3 % at
-  395 nm); or make the Rayleigh default constant again.
+  395 nm); or make the Rayleigh default constant again. Measured downstream
+  on `ee5308aa`, the dispersive default against `ConstantAnisotropy()`:
+  - **exo_Earth minimal scene** (`depol: -1`, 1 bar, disk-integrated). TOA I
+    changes by +0.127 % at 350 nm, +0.100 % at 400 nm and +0.068 % at
+    450 nm, and |Q| by −0.26 %, −0.17 % and −0.12 %. With
+    `ConstantAnisotropy()` the scene reproduces `f3ae5bdb` in I and Q to all
+    printed digits; U, below 2e-10, is round-off.
+  - **RRS_XCO2 minimal forward** (noRS, urban prior state, 7 points per
+    band). The largest pointwise relative change of TOA I is 3.87e-5 in the
+    O₂ A band, 3.94e-6 in the weak CO₂ band and 6.91e-4 in the strong CO₂
+    band, where the mean over the band is 1.0e-4.
   (2) The dispersive O₂ anisotropy follows the 1.09 King factor; Hohm (1994)
   supports 1.096 (γ 3 % higher). (3) Bodhaine Eq. 30 τ_Rayleigh is +1.0 %
   high at 1.6 µm and +3.6 % at 2.06 µm against Peck–Reeder/Ciddor
@@ -257,7 +267,17 @@ decided after comparing the pilot with Round 7 (§3.1).
   quantify embedded vs external differences on the A–D case first.
 - [ ] Fix ExoOptics provenance: `ExoEarthRunner.jl:946` records and requires
   a clean `../uni_vSmartMOM`, which is not the vSmartMOM actually loaded.
-  Use the loaded package's own path.
+  Use the loaded package's own path. Done in `ExoOptics.jl_v2-2`
+  (uncommitted, for Suniti's review). The same edit fixes
+  `_tau400_diagnostic`. That diagnostic took its 400 nm depolarization from
+  the constant tensor whatever the run's setting, so under the dispersive
+  default the recorded τ at 400 nm (1 bar) was 0.354519 instead of 0.355395
+  (−0.25 %). It now uses the run's `rayleigh_anisotropy`. In a check with a
+  band centred at 400 nm it equals `model.optics.τ_rayl` exactly for both
+  settings. Production bands centred elsewhere evaluate their depolarization
+  at the band centre, so there the diagnostic is a 400 nm reference value.
+  Production `run_case` will refuse the `_v2-2` vSmartMOM checkout until it
+  is committed and clean (`_require_clean_worktree`).
 - [ ] Move remaining workflows to `sandbox/workflows/` and update the scripts
   that reference old paths (e.g. `generate_truth_map.jl:42`).
 - [x] Fixed-altitude grid + Round 7_altgrd pilot: completed (merged in
@@ -424,7 +444,12 @@ results or definitions and wait for a decision.
   same fixes in a follow-up?
   (4) Accept the in-test Phase 1b correction, or regenerate the reference?
   (5) R7 changes RRS_XCO2 inelastic radiances in structured spectra: check one
-  truth-map member on v2.2 before mixing new and archived products.
+  truth-map member on v2.2 before mixing new and archived products. The
+  RRS_XCO2 retrieval forward is noRS. With `ConstantAnisotropy()`, its
+  minimal forward plus Jacobian is bit-identical from `f3ae5bdb` to
+  `a4b47bc7`. Of the Raman fixes, only RRS products such as the truth maps,
+  and retrievals on them, are affected. The RRS truth maps still need the
+  check above.
 - [x] **Water refractive index for Cox–Munk (decision 9).** Segelstein (1981)
   pure-water table, n and k linear in wavelength at every spectral point; a
   vector `n_water` element-wise; the per-point operator from a few knot
@@ -469,9 +494,32 @@ results or definitions and wait for a decision.
   (1) Default `r_min`: 1e-3 µm (recommended; truncates nothing physical) or
   5e-3 µm (node density closer to the old grids)?
   (2) A legacy quantile option for exact reproduction of archived multi-mode
-  runs (RRS_XCO2 moves ≤ 1e-5 in TOA): no (recommended)?
+  runs: no (recommended)? Measured in the RRS_XCO2 minimal forward (noRS,
+  urban prior state, 7 points per band, `651e94ac` → `6e3edf28`, i.e. the
+  radius-grid commits alone, with `ConstantAnisotropy()`):
+  - the largest pointwise relative change of TOA I is 1.44e-5;
+  - the aerosol τ_ref/z₀ Jacobian columns change by up to 0.76 %
+    (`organic_carbon_tau_ref`, O₂ A band), measured as max |ΔJ| / max |J|
+    over the column.
+  The CHANGELOG's "≤ 1e-5 relative in that OCO-like scene" refers to the
+  audit scene (≤ 9.4e-6), not to this forward.
   (3) Coarse modes at about 100 nodes: raise `nquad_radius` in the
   JacobianTestFast-style configs, or document only (done, recommended)?
+  The broad RRS_XCO2 organic-carbon mode (median 0.2 µm, σ_g = 1.8) is
+  under-resolved at 300 nodes too, on either grid. It was compared with a
+  3000-node reference, on which the old and new grids agree in k to about
+  1e-8:
+
+  | Nodes | k old grid | k new grid | β old grid | β new grid |
+  |---|---|---|---|---|
+  | 300 | 6.5e-4 | 1.4e-3 | 4.0e-3 | 5.2e-3 |
+  | 400 | 1.8e-4 | 1.2e-4 | 4.9e-4 | 6.4e-4 |
+
+  These are errors at 0.55 µm; the β error is max |Δβ_l| / max |β_l|. The
+  0.76 % Jacobian change above is consistent with a change in this existing
+  quadrature error. It has not been compared with a converged-node RT
+  reference. Raising RRS_XCO2's `nquad_radius` (e.g. to 600) for the v2.2
+  rerun campaign is a workflow decision.
   (4) Downstream: `uni_vSmartMOM_v2-2/.../generate_truth_map.jl:219` rebuilds
   `ScatteringParameters` with 6 arguments and would drop a configured
   `r_min` (none is set today); pass `FT(sp.r_min)` when that workflow is next
