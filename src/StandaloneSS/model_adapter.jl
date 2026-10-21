@@ -9,6 +9,9 @@ types, and any aerosol optics whose truncation factor is zero.
 If aerosol optics have already been δ-M/δ-BGE truncated (`fᵗ != 0`), the
 adapter throws instead of silently mixing truncated phase matrices with
 unmodified optical-depth state.
+
+A `CoxMunkSurface` with `n_water = nothing` is passed on with the Segelstein
+(1981) index at every spectral point of the band, as the RT solvers use it.
 """
 function exact_ss_config_from_model(model::RTModel; i_band::Integer = 1,
                                     I0 = nothing)
@@ -17,7 +20,9 @@ function exact_ss_config_from_model(model::RTModel; i_band::Integer = 1,
     I0_vec = I0 === nothing ? ones(FT, n_spec) : I0
     return ExactSSConfig(
         geometry = _ss_geometry_from_model(model, FT),
-        surface = _ss_surface_from_core(model.surfaces[i_band], FT),
+        surface = _ss_surface_from_core(
+            _resolve_spectral_surface(model.surfaces[i_band],
+                                      model.atmosphere.spec_bands[i_band]), FT),
         contributors = _ss_contributors_from_model(model, i_band, n_spec, FT),
         I0 = I0_vec,
         polarization_type = model.solver.polarization_type,

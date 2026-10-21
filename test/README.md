@@ -54,6 +54,7 @@ CPU; they do not add cases.
 | `test_coxmunk.jl` | active | Cox–Munk Fresnel and BRDF units |
 | `test_coxmunk_polarization.jl` | active | Cox–Munk Stokes convention anchors (uses `coxmunk_jones_reference.jl`) |
 | `test_coxmunk_rt_contract.jl` | active | Cox–Munk radiance and Jacobian contract (`VSMARTMOM_COXMUNK_ARCH` selects the backend) |
+| `test_coxmunk_spectral.jl` | active | Segelstein (1981) water index per spectral point: table, element-wise `n_water`, operator knots and their accuracy (0.2–4 µm, other indices, Float32), forward/linearized/split RT, exact TOA glint, canopy over a Cox–Munk soil |
 | `test_elemental_boundary_jacobians.jl` | active + flagged | Elemental derivatives at boundary inputs; CUDA arm under `GPU` |
 | `test_elemental_limit_form.jl` | active + flagged | Elemental t⁺⁺/J₀⁺ factors near coincident ordinates: BigFloat accuracy (elastic, linearized, canopy, Raman kernels), merge-window continuity, Jacobian vs FD near μ₀ ≈ μᵢ; CUDA arm under `VSMARTMOM_JACOBIAN_GPU_TEST` |
 | `test_external_solar_raman.jl` | active | External-solar RRS columns (`EXTERNAL_SOLAR_TEST_GPU=1` for GPU) |

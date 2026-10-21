@@ -56,15 +56,37 @@ instead of using a YAML/TOML string.
 - `wind_speed` *(required, m/s)* — 10 m wind. Cox & Munk (1954) give the
   total mean-square slope `⟨zx² + zy²⟩ = 0.003 + 0.00512·U`; each slope
   component has variance `σ² = ½(0.003 + 0.00512·U)`.
-- `n_water` — complex refractive index. Default `nothing` triggers the
-  built-in Segelstein 1981 spectral lookup. The YAML/TOML string form
-  accepts only a real number here (stored with zero imaginary part); set a
-  complex or spectral `n_water` in Julia.
+- `n_water` — complex refractive index `n + i k` of the water. The default
+  `nothing` uses the Segelstein (1981) table (`water_refractive_index`), at
+  the wavelength of **every spectral point**; n and k are interpolated
+  linearly in wavelength between the table rows. A scalar applies one index
+  to the whole band. In Julia, a vector gives one index per spectral point
+  and is used element-wise; its length must equal the number of spectral
+  points of the band (otherwise an `ArgumentError`). The YAML/TOML string
+  form accepts only a real number here (stored with zero imaginary part); set
+  a complex or spectral `n_water` in Julia.
 - `whitecap_albedo` *(default `0.22`)* — Lambertian whitecap albedo
   (Koepke 1984).
 - `include_whitecaps` *(default `true`)* — whether to include the
   whitecap-fraction Lambertian addend.
 - `shadowing` *(default `true`)* — Smith (1967) shadow masking.
+
+The direct-solar glint is narrow, so the solver adds the exact single-bounce
+glint minus its Fourier series (`apply_ss_correction!`) after the Fourier
+loop. This correction is applied **at TOA only**: upwelling radiances at
+interior observer heights (`obs_alt` inside the atmosphere, see
+[`geometry.md`](geometry.md)) carry the Fourier-series glint, identically in
+the forward and the linearized solvers. With a spectrally varying `n_water`
+the surface operator is evaluated exactly at a few spectral points (knots;
+3–10 for the OCO-2 bands at 0.01 cm⁻¹ sampling) and interpolated linearly in
+the refractive index between them. The knots are placed so that the
+interpolated Fresnel elements of every point match its own at 11 angles of
+incidence to 1e-7 of its reflectance; points whose index has a real part
+≤ 1 (for water only below 70 nm) are all knots. For water across
+0.25–3.9 µm the interpolated operator then agrees with the operator at each
+point's own index to better than 1e-7 (relative; 1e-6 in Float32;
+`test_coxmunk_spectral.jl`). The TOA single-bounce glint uses each point's
+own index exactly.
 
 ### Composite (canopy + soil)
 

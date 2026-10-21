@@ -66,6 +66,9 @@ physical parameters via the linearized Matrix Operator Method.
 An [`ObserverRTResultLin`](@ref). It remains iterable as the historical
 `(R, T, dR, dT)` endpoint tuple, while `result.levels` exposes forward
 radiances and Jacobians at requested strict-interior observer heights.
+Over a `CoxMunkSurface` the exact direct-solar glint correction is applied to
+the TOA radiance and Jacobian only; interior levels carry the Fourier-series
+glint, as in the forward solver.
 
 # Parameter Layout in `dR` / `dT`
 The `Nparams` derivative dimension is ordered as:
@@ -231,7 +234,11 @@ function _rt_run_lin(RS_type::AbstractRamanType,
     (; τ̇_abs, τ̇_aer, lin_aerosol_optics) = lin_model
 
     lin = LinMode()
-    brdf = get_surface(model, iBand)
+    brdf = _resolve_spectral_surface(get_surface(model, iBand),
+                                     _band_wavenumbers(model, iBand))
+    # A canopy resolves the spectral properties of its soil on this grid.
+    surface_kw = brdf isa CanopySurface ?
+        (; soil_spec_wn = _band_wavenumbers(model, iBand)) : (;)
     expected_nsurf = surface_parameter_count(brdf)
     NSurf == expected_nsurf || throw(ArgumentError(
         "NSurf=$NSurf does not match $(typeof(brdf)), which has " *
@@ -533,7 +540,7 @@ function _rt_run_lin(RS_type::AbstractRamanType,
                             source_adding ? source_workspace.surface_zero_above :
                                 arr_type(τ̇_sum_all[:,:,end]),
                             arr_type(F₀),
-                            CoreRT.architecture(model));
+                            CoreRT.architecture(model); surface_kw...);
 
         # Surface source contributions (v0.6 source-term refactor): mirror
         # the rt_run / rt_run_ss surface step. NoSource → no-op;
@@ -611,6 +618,8 @@ function _rt_run_lin(RS_type::AbstractRamanType,
     end
     _LAST_FOURIER_M_USED[] = m_used
 
+    # Exact-glint correction at TOA only; interior levels keep the
+    # Fourier-series glint (as in the forward multisensor driver).
     if brdf isa CoxMunkSurface
         @timeit "SS Correction" apply_ss_correction!(
             R, Ṙ, Array(τ̇_sum_endpoint[:,:,end]), first(surface_range(layout)),

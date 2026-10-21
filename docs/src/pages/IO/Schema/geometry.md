@@ -157,6 +157,16 @@ produce a clear error. `CanopySurface` also produces a clear error because its
 spectral setup and atmosphere-canopy interleaving are not represented in the
 legacy forward multisensor kernel.
 
+**Cox–Munk glint at interior heights.** Over a `CoxMunkSurface`, the TOA
+upwelling radiance includes the exact direct-solar glint: after the Fourier
+loop the solver adds the exact single-bounce glint minus its Fourier series
+(`apply_ss_correction!`). This correction is **TOA-only**. The upwelling
+radiance of an interior level carries the glint as resolved by the Fourier
+series (through the run's `m_max`), so close to the specular direction it
+can differ from the exact glint; increase `nstreams` there if needed. The
+forward and the linearized solvers treat interior levels the same way, so
+interior radiances and Jacobians stay consistent.
+
 ### Reading linearized height-aware results
 
 The analytic full-multiple-scatter path uses the same height convention and
@@ -213,7 +223,9 @@ include this carrier; only strict-interior records keep it separate.
 continue to write `R, T, dR, dT = rt_run_lin(...)`.
 
 Linearized interior-height radiances are currently supported on the elastic
-`noRS` path with `SolarBeam` or `NoSource`. Thermal and surface-emission
+`noRS` path with `SolarBeam` or `NoSource`. As in the forward solver, the
+exact Cox–Munk glint correction enters `toa` and `toa_jacobian` only; interior
+records carry the Fourier-series glint and its tangent. Thermal and surface-emission
 sources require linearized multisensor source-slot propagation and are
 rejected explicitly, as is `CanopySurface`. Raman-active linearization remains
 unsupported. The single-scatter driver `rt_run_ss` is still full-column-only

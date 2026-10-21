@@ -59,6 +59,10 @@ interface.  The three radiance fields mirror [`LevelRadiance`](@ref); each
 The unscattered solar beam is kept separate from the diffuse MOM field.  Use
 [`total_downwelling`](@ref) and [`total_downwelling_jacobian`](@ref) when the
 sum of both components is desired.
+
+As in the forward [`LevelRadiance`](@ref), a `CoxMunkSurface` glint enters
+`upwelling` and `upwelling_jacobian` through the Fourier series only; the
+exact-glint correction is applied at TOA only.
 """
 struct LevelRadianceLin{FT,U,D,JU,JD}
     "Geometric height in km above model BOA"

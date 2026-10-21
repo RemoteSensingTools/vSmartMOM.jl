@@ -27,7 +27,8 @@ radiative_transfer:
     - "[19417.0 19418.0]"
 
   # Cox-Munk ocean surface with 5 m/s wind
-  # The built-in Segelstein (1981) table provides n_water automatically.
+  # The built-in Segelstein (1981) table provides n_water automatically,
+  # at the wavelength of every spectral point.
   # Set include_whitecaps=false to disable the whitecap contribution.
   surface:
     - CoxMunkSurface(wind_speed=5.0)

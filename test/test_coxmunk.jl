@@ -157,12 +157,14 @@ end
         @test real(n200) > 1.35  # higher dispersion in UV
     end
 
-    @testset "Boundary clamping" begin
-        # Should not error at extremes
+    @testset "Table range" begin
+        # Segelstein (1981) spans 34 nm – 10 m; outside it is an error
+        # (test_coxmunk_spectral.jl covers the table in detail).
         n_lo = CM.water_refractive_index(100.0)
         n_hi = CM.water_refractive_index(10000.0)
         @test isfinite(real(n_lo))
         @test isfinite(real(n_hi))
+        @test_throws ArgumentError CM.water_refractive_index(10.0)
     end
 end
 

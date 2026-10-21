@@ -107,6 +107,10 @@ Radiances at one strict-interior atmospheric interface. `upwelling` and
 `unscattered_downwelling` is the separately reported attenuated collimated
 solar beam at the solar ordinate (zero for other viewing zenith angles).
 Use [`total_downwelling`](@ref) to add the diffuse and unscattered components.
+
+Over a `CoxMunkSurface`, `upwelling` carries the direct-solar glint as
+resolved by the Fourier series: the exact-glint correction
+(`apply_ss_correction!`) is applied to the TOA radiance only.
 """
 struct LevelRadiance{FT,U,D,IU,ID}
     "Geometric height in km above model BOA"
@@ -730,6 +734,9 @@ struct AtmosphereRTCache{FT, AT3, AT1, AT2, AT, PT, QT, ARCH, RS, PS, IS,
     `NoSSCorrection` (then the truncated SS is still in the snapshots and
     nothing extra is added — historical behavior)."
     tms_ss::Union{Nothing, Array{FT, 3}}
+    "Wavenumbers (cm⁻¹) of the cached spectral points; resolves spectral
+    surface properties of a replayed BRDF (e.g. the Cox–Munk water index)"
+    spec_wn::Vector{FT}
 end
 
 Base.show(io::IO, c::AtmosphereRTCache{FT}) where {FT} = print(io,
@@ -825,13 +832,20 @@ Isotropic Gaussian slope distribution with total mean-square slope
 ⟨zx² + zy²⟩ = 0.003 + 0.00512·U (Cox & Munk 1954), i.e. per-axis variance
 σ² = ½(0.003 + 0.00512·U); see `CoreRT.wind_to_sigma2`.
 
+With `n_water = nothing` the solvers use the Segelstein (1981) index
+([`water_refractive_index`](@ref)) at the wavelength of every spectral
+point; a vector `n_water` is used element-wise and must have one entry per
+spectral point of the band. The exact direct-solar glint correction
+(`apply_ss_correction!`) is applied at TOA only; interior observer levels
+carry the Fourier-series glint.
+
 # Fields
 $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef struct CoxMunkSurface{FT} <: AbstractSurfaceType
     "10-m wind speed [m/s]"
     wind_speed::FT
-    "Complex refractive index of water; nothing → built-in Segelstein 1981 lookup"
+    "Complex refractive index n + ik of water: `nothing` → Segelstein (1981) at each spectral point's wavelength; a scalar for the whole band; or a vector with one entry per spectral point"
     n_water::Union{Nothing, Complex{FT}, Vector{Complex{FT}}} = nothing
     "Whitecap Lambertian albedo (Koepke 1984)"
     whitecap_albedo::FT = 0.22
@@ -1675,6 +1689,10 @@ _check_combined_band_surface(::CanopySurface, n_spec, bands) =
         "supported for bands $bands solved together; run them separately"))
 get_surfaces(m::RTModel) = m.surfaces
 get_spec_bands(m::RTModel) = m.atmosphere.spec_bands
+
+"Wavenumber grid (cm⁻¹) of the spectral points of bands `iBand`, in solver order."
+_band_wavenumbers(m::RTModel, iBand) =
+    reduce(vcat, (collect(get_spec_bands(m)[ib]) for ib in iBand))
 
 # ── Convenience property forwarding ──────────────────────────────────────
 # Allows shorthand access (model.τ_abs, model.profile, model.obs_geom, etc.)

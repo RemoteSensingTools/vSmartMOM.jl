@@ -35,7 +35,10 @@ Equivalent to `rt_run(noRS(), model, i_band)` (no Raman scattering).
 An [`ObserverRTResult`](@ref). With the default `obs_alt: [0]`, its `toa` and
 `boa` fields contain TOA upwelling and BOA downwelling radiances,
 each shaped `[nVZA × nStokes × nSpec]`. Strict-interior outputs are stored in
-`result.levels` as [`LevelRadiance`](@ref) records.
+`result.levels` as [`LevelRadiance`](@ref) records. Over a `CoxMunkSurface`
+the exact direct-solar glint correction (`apply_ss_correction!`) is added to
+the TOA radiance only; interior upwelling levels carry the Fourier-series
+glint.
 
 The result retains the historical seven-slot iteration order, so ordinary
 endpoint code remains valid:
@@ -516,7 +519,9 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
 
     n_aer = CoreRT.n_aerosols(model)
 
-    brdf = common_band_surface(model, iBand)
+    # Per-spectral-point surface properties (e.g. the Cox–Munk water index).
+    brdf = _resolve_spectral_surface(common_band_surface(model, iBand),
+                                     _band_wavenumbers(model, iBand))
 
     if quad_points.external_solar
         toa_only || throw(ArgumentError(
@@ -1277,7 +1282,11 @@ function _rt_run_ss(RS_type::AbstractRamanType, model, iBand;
     (; quad_points) = model
     FT       = CoreRT.float_type(model)
 
-    brdf = common_band_surface(model, iBand)
+    brdf = _resolve_spectral_surface(common_band_surface(model, iBand),
+                                     _band_wavenumbers(model, iBand))
+    # A canopy resolves the spectral properties of its soil on this grid.
+    surface_kw = brdf isa CanopySurface ?
+        (; soil_spec_wn = _band_wavenumbers(model, iBand)) : (;)
 
     # Same ϖ_λ₁λ₀ normalization as rt_run (ported from sanghavi rt_run_ss:466).
     InelasticScattering.normalize_raman_weights!(RS_type, model, iBand)
@@ -1368,7 +1377,7 @@ function _rt_run_ss(RS_type::AbstractRamanType, model, iBand;
                             quad_points,
                             arr_type(τ_sum_all[:, end]),
                             arch;
-                            F₀=surface_F₀)
+                            F₀=surface_F₀, surface_kw...)
 
         # Surface-emission sources are injected only through the source system.
         # The legacy `RS_type.SIF₀` path is intentionally ignored here to avoid

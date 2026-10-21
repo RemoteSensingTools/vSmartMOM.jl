@@ -347,7 +347,8 @@ end
 """
     create_surface_layer!(canopy::CanopySurface, added_layer, SFI, m, pol_type,
                           quad_points, τ_sum, architecture;
-                          spec_bands_wn=nothing, m_max=2, F₀=nothing)
+                          spec_bands_wn=nothing, m_max=2, F₀=nothing,
+                          soil_spec_wn=spec_bands_wn)
 
 Compute the effective canopy+soil surface layer for Fourier moment `m`.
 `F₀` is the `(nStokes, nSpec)` solar Stokes vector at TOA used by both the leaf
@@ -356,14 +357,18 @@ and soil source terms (`nothing`: unit unpolarized beam).
 
 When spectral leaf optics are provided, `spec_bands_wn` (the concatenated
 computation wavenumber grid) is required for initializing the spectral cache
-on first call.
+on first call. `soil_spec_wn` (default `spec_bands_wn`) is the grid on which a
+soil with spectral properties is resolved; solvers that do not set up the
+spectral canopy cache pass only this one.
 
 Internally:
 1. Compute Z-matrices from the cached analytic stack (or coarse-grid interpolation).
 2. For each canopy sub-layer: build `CoreDirectionalScatteringOpticalProperties`,
    run `elemental!` (canopy kernel) + `doubling!`.
 3. Accumulate sub-layers via `interaction!`.
-4. Create soil surface layer and interact with the canopy composite.
+4. Create soil surface layer and interact with the canopy composite. A soil
+   with spectral properties (a `CoxMunkSurface` with `n_water = nothing`) is
+   resolved on `soil_spec_wn` first.
 5. Copy the resulting R⁻⁺ and J₀ into the output `added_layer`.
 
 # TODO: Canopy + Raman (RRS/VS) coupling is not currently implemented. The
@@ -380,7 +385,8 @@ function create_surface_layer!(canopy::CanopySurface{FT},
                                architecture;
                                spec_bands_wn::Union{Nothing, Vector{FT}}=nothing,
                                m_max::Int=2,
-                               F₀=nothing) where {FT}
+                               F₀=nothing,
+                               soil_spec_wn=spec_bands_wn) where {FT}
     arr_type = array_type(architecture)
     (; qp_μN, iμ₀) = quad_points
 
@@ -449,7 +455,9 @@ function create_surface_layer!(canopy::CanopySurface{FT},
     end
 
     τ_sum_soil = arr_type(τ_sum_curr)
-    create_surface_layer!(canopy.soil, cache.soil_added, SFI, m, pol_type,
+    soil = soil_spec_wn === nothing ? canopy.soil :
+        _resolve_spectral_surface(canopy.soil, soil_spec_wn)
+    create_surface_layer!(soil, cache.soil_added, SFI, m, pol_type,
                           quad_points, τ_sum_soil, architecture; F₀)
 
     @timeit "canopy-soil interaction" interaction!(
@@ -598,11 +606,13 @@ end
 
 """
     create_surface_layer!(RS_type, canopy::CanopySurface, added_layer, added_layer_lin,
-                          iparam, SFI, m, pol_type, quad_points, τ_sum, τ̇_sum, F₀, architecture)
+                          iparam, SFI, m, pol_type, quad_points, τ_sum, τ̇_sum, F₀, architecture;
+                          soil_spec_wn = nothing)
 
 Linearized surface dispatch for `CanopySurface`.  Computes the forward
 canopy+soil reflectance (same as the non-linearized dispatch) and the
 derivative of the soil albedo parameter at `iparam` via finite differences.
+`soil_spec_wn` is forwarded to the forward builder (spectral soil properties).
 
 Canopy-specific parameter derivatives (LAI, leaf R/T) are not yet
 implemented in the linearized path; their Jacobian slots should be populated
@@ -615,10 +625,10 @@ function create_surface_layer!(RS_type::noRS,
                                iparam::Int,
                                SFI, m::Int, pol_type, quad_points,
                                τ_sum, τ̇_sum, F₀,
-                               architecture) where {FT}
+                               architecture; soil_spec_wn = nothing) where {FT}
 
     create_surface_layer!(canopy, added_layer, SFI, m, pol_type,
-                          quad_points, τ_sum, architecture; F₀)
+                          quad_points, τ_sum, architecture; F₀, soil_spec_wn)
 
     added_layer_lin.ap_ṙ⁻⁺ .= 0
     added_layer_lin.ap_ṙ⁺⁻ .= 0
@@ -644,7 +654,7 @@ function create_surface_layer!(RS_type::noRS,
             (size(added_layer.r⁻⁺,1), size(added_layer.r⁻⁺,2)),
             size(added_layer.r⁻⁺,3))
     create_surface_layer!(perturbed, temp_added, SFI, m, pol_type,
-                          quad_points, τ_sum, architecture; F₀)
+                          quad_points, τ_sum, architecture; F₀, soil_spec_wn)
 
     ṙ = (Array(temp_added.r⁻⁺) .- r_ref) ./ ε
     added_layer_lin.ap_ṙ⁻⁺[:,:,:,iparam] .= arr_type(ṙ)

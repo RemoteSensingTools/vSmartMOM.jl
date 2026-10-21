@@ -13,7 +13,7 @@ using ..Architectures: AbstractArchitecture, CPU, GPU, MetalGPU, array_type, dev
 using ..CoreRT: CoxMunkSurface, LambertianSurfaceScalar,
                 LambertianSurfaceSpectrum, RTModel, coxmunk_brdf_mueller,
                 coxmunk_brdf_mueller_and_deriv, float_type,
-                _azimuthal_kernel
+                _azimuthal_kernel, _resolve_spectral_surface
 using ..Scattering
 
 export AbsorptionSSContributor,

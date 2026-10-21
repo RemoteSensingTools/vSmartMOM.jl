@@ -236,7 +236,7 @@ function rt_run_atmosphere(model;
         AT3[T⁺⁺...], AT3[T⁻⁻...],
         AT3[J₀⁺...], AT3[J₀⁻...],
         J0_by_src, SCI[sci_surf...],
-        τ_surf_arr, F₀_arr, tms_ss)
+        τ_surf_arr, F₀_arr, tms_ss, FT.(_band_wavenumbers(model, iBand)))
 end
 
 # Per-source J₀ NamedTuple deepcopy helper. Each slot is a
@@ -313,6 +313,9 @@ function rt_run_surface(cache::AtmosphereRTCache{FT}, brdf;
     if slim && m_max_needed != 0
         throw(ArgumentError("rt_run_surface: cache was built with cache_mode=:slim (valid only for Lambertian-family surfaces — component_m_max==0); $(typeof(brdf)) needs m_max=$(m_max_needed) support at m>0, which this cache discarded. Rebuild with cache_mode=:full (or cache_mode=:auto with this BRDF in `target_brdfs`)."))
     end
+
+    # Per-spectral-point surface properties, as in `_rt_run_column`.
+    brdf = _resolve_spectral_surface(brdf, cache.spec_wn)
 
     pol_type    = cache.pol_type
     quad_points = cache.quad_points

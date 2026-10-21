@@ -250,17 +250,18 @@ rossli = RossLiSurfaceScalar(0.05, 0.03, 0.1)  ## fvol, fgeo, fiso
 #
 # ### 5f) Water refractive index
 #
-# When `n_water = nothing` (the default), the code uses a built-in lookup
-# table from Segelstein (1981) covering 200 nm -- 2600 nm.  The function
-# `water_refractive_index(λ_nm)` returns the complex refractive index at any
-# wavelength via log-linear interpolation:
+# When `n_water = nothing` (the default), the solver uses the Segelstein
+# (1981) table (34 nm -- 10 m) at the wavelength of every spectral point.  The
+# function `water_refractive_index(λ_nm)` returns the complex refractive index
+# at any wavelength, with n and k interpolated linearly in wavelength:
 
 n_water_550 = water_refractive_index(550.0)
 println("Water RI at 550 nm:  n = ", round(real(n_water_550), digits=4),
         ", k = ", round(imag(n_water_550), sigdigits=3))
 
-# You can also provide a fixed value or a per-wavelength vector via the
-# `n_water` keyword of `CoxMunkSurface`.
+# You can also provide a fixed value for the whole band, or a vector with one
+# value per spectral point (used element-wise), via the `n_water` keyword of
+# `CoxMunkSurface`.
 #
 # ### 5g) TMS single-scattering correction
 #
@@ -270,7 +271,9 @@ println("Water RI at 550 nm:  n = ", round(real(n_water_550), digits=4),
 # correction after the Fourier loop: it adds the difference between the exact
 # single-scattering surface contribution and the truncated Fourier
 # reconstruction at each viewing geometry.  This is handled automatically by
-# `apply_ss_correction!` inside `rt_run`.
+# `apply_ss_correction!` inside `rt_run`, for the TOA radiance only: upwelling
+# radiances at interior observer heights (`obs_alt`) keep the Fourier-series
+# glint, in the forward and the linearized solvers alike.
 #
 # ### 5h) Construction
 

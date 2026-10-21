@@ -43,7 +43,8 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
     dτ_max_threshold = model.numerics.dτ_max_threshold
     dτ_min_floor     = model.numerics.dτ_min_floor
 
-    brdf = common_band_surface(model, iBand)
+    brdf = _resolve_spectral_surface(common_band_surface(model, iBand),
+                                     _band_wavenumbers(model, iBand))
     (; ϖ_Cabannes) = RS_type
 
 

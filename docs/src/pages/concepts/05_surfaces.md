@@ -89,6 +89,29 @@ Refinements, both on by default (`include_whitecaps`, `shadowing`):
 - **Shadowing:** Smith (1967) shadowing function for the incident and
   reflected directions, important at grazing geometries.
 
+**Water refractive index.** With the default `n_water = nothing` the Fresnel
+coefficients use the Segelstein (1981) index of liquid water at the
+wavelength of every spectral point (`water_refractive_index`; n and k
+interpolated linearly in wavelength between table rows). A vector `n_water`
+gives one index per spectral point. Because the index varies slowly within a
+band, the surface operator is evaluated exactly at a few knots and
+interpolated linearly in the index between them (`_n_water_knots`). The
+knots are placed so that the Fresnel elements of every point are reproduced
+to 1e-7 of its reflectance at 11 angles of incidence, and an index with real
+part ≤ 1 is always a knot; for water across 0.25–3.9 µm the operator then
+agrees to better than 1e-7 relative (1e-6 in Float32). A single index gives
+one operator for the whole band, as before. Whitecaps and shadowing do not
+depend on the index.
+
+**Exact glint at TOA.** The specular glint needs far more Fourier moments
+than the diffuse field. After the Fourier loop the solver therefore adds, at
+each requested view, the exact single-bounce glint minus its Fourier series
+(`apply_ss_correction!`), with each spectral point's own index. This
+correction is applied to the **TOA radiance only**: upwelling radiances at
+interior observer heights carry the Fourier-series glint, in the forward and
+the linearized solvers alike, so their radiances and Jacobians stay
+consistent.
+
 ## Canopy surfaces
 
 `CanopySurface` is a *pre-solver* — it solves a discrete-ordinate problem

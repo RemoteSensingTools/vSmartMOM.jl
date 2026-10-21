@@ -39,6 +39,9 @@ using vSmartMOM, vSmartMOM.CoreRT, vSmartMOM.Scattering
     # In a purely absorbing atmosphere the exact direct surface path is the
     # entire TOA field. This checks absolute BRDF normalization, Fourier m=0,
     # and both atmospheric transits, rather than merely solver-to-solver parity.
+    # `n_water = nothing`: the Segelstein (1981) index at each point's wavelength.
+    ν = model.atmosphere.spec_bands[1]
+    n_water = [ComplexF64(CoreRT.water_refractive_index(1e7 / ν[s])) for s in axes(F,2)]
     fill!(model.τ_rayl[1], 0)
     for optical_depth in (0.0, 0.3)
         fill!(model.τ_abs[1], optical_depth / size(model.τ_abs[1], 2))
@@ -46,7 +49,8 @@ using vSmartMOM, vSmartMOM.CoreRT, vSmartMOM.Scattering
         expected = similar(actual)
         for iv in eachindex(p.vza), s in axes(F,2)
             μv, μ0 = cosd(p.vza[iv]), cosd(p.sza)
-            M = CoreRT.coxmunk_brdf_mueller(original, 3, μ0, μv, deg2rad(p.vaz[iv]))
+            M = CoreRT.coxmunk_brdf_mueller(original, 3, μ0, μv, deg2rad(p.vaz[iv]);
+                                            n_water = n_water[s])
             expected[iv,:,s] = μ0 * F[1,s] * M[:,1] *
                               exp(-optical_depth * (inv(μ0) + inv(μv)))
         end
@@ -66,12 +70,13 @@ using vSmartMOM, vSmartMOM.CoreRT, vSmartMOM.Scattering
     τ = [0.2, 0.3, 0.4]
     τdot = reshape([0.5, 0.8, 1.2], 3, 1)
     Rc = zeros(2,3,3); dRc = zeros(2,3,3,2)
-    CoreRT.apply_ss_correction!(Rc, dRc, τdot, 2, original, Stokes_IQU(),
+    resolved = CoreRT._resolve_spectral_surface(original, ν)
+    CoreRT.apply_ss_correction!(Rc, dRc, τdot, 2, resolved, Stokes_IQU(),
         p.vza, p.vaz, cosd(p.sza), τ, 5, 3; F₀=F)
     Rp = zero(Rc); Rm = zero(Rc)
-    CoreRT.apply_ss_correction!(Rp, original, Stokes_IQU(), p.vza, p.vaz,
+    CoreRT.apply_ss_correction!(Rp, resolved, Stokes_IQU(), p.vza, p.vaz,
         cosd(p.sza), τ + h*vec(τdot), 5, 3; F₀=F)
-    CoreRT.apply_ss_correction!(Rm, original, Stokes_IQU(), p.vza, p.vaz,
+    CoreRT.apply_ss_correction!(Rm, resolved, Stokes_IQU(), p.vza, p.vaz,
         cosd(p.sza), τ - h*vec(τdot), 5, 3; F₀=F)
     @test dRc[:,:,:,1] ≈ (Rp-Rm)/(2h) rtol=2e-7 atol=1e-12
 end

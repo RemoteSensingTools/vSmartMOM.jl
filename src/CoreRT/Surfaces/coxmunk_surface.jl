@@ -249,7 +249,7 @@ contribution when enabled.
 """
 function coxmunk_brdf_mueller(surf::CoxMunkSurface{FT}, n_stokes::Int,
                                μᵢ::FT, μᵣ::FT, dϕ::FT;
-                               n_water::Complex{FT} = _get_n_water(surf, FT(550))) where FT
+                               n_water::Complex{FT} = _single_n_water(surf)) where FT
     σ² = wind_to_sigma2(surf.wind_speed)
 
     # Facet geometry and its polarized Fresnel reflection
@@ -291,7 +291,7 @@ Returns `(M, dM_dU)` — both `SMatrix{n_stokes, n_stokes}`.
 """
 function coxmunk_brdf_mueller_and_deriv(surf::CoxMunkSurface{FT}, n_stokes::Int,
                                          μᵢ::FT, μᵣ::FT, dϕ::FT;
-                                         n_water::Complex{FT} = _get_n_water(surf, FT(550))) where FT
+                                         n_water::Complex{FT} = _single_n_water(surf)) where FT
     U  = surf.wind_speed
     σ² = wind_to_sigma2(U)
     dσ²_dU = wind_to_sigma2_dU(FT)
@@ -349,7 +349,7 @@ Returns `(R, dR_dU)` — both `[Nμ·n_stokes, Nμ·n_stokes]` dense matrices.
 """
 function reflectance_and_deriv(surf::CoxMunkSurface{FT}, pol_type,
                                 μ::AbstractArray{FT}, m::Int;
-                                n_water::Complex{FT} = _get_n_water(surf, FT(550))) where FT
+                                n_water::Complex{FT} = _single_n_water(surf)) where FT
     n  = pol_type.n
     Nμ = length(μ)
     nn = Nμ * n
@@ -396,17 +396,244 @@ function _whitecap_mueller(albedo::FT, n_stokes::Int) where FT
     end
 end
 
-"""Get refractive index from surface spec, falling back to built-in table."""
-function _get_n_water(surf::CoxMunkSurface{FT}, λ_nm::FT) where FT
-    if surf.n_water === nothing
-        n = water_refractive_index(λ_nm)
-        return Complex{FT}(real(n), imag(n))
-    elseif surf.n_water isa Complex
-        return surf.n_water::Complex{FT}
-    else
-        # Vector case: caller must select the right index
-        return surf.n_water[1]::Complex{FT}
+# ──────────────────────────────────────────────────────────────────────
+# Water refractive index per spectral point
+# ──────────────────────────────────────────────────────────────────────
+
+"""
+    _resolve_spectral_surface(surface, ν)
+
+The surface as the RT solves it on the spectral grid `ν` (wavenumbers in
+cm⁻¹, one per spectral point, in solver order). A `CoxMunkSurface` with
+`n_water = nothing` is returned with a vector `n_water` holding the
+Segelstein (1981) index at λ = 10⁷/ν nm of every point
+([`water_refractive_index`](@ref)); a vector `n_water` must have one entry
+per spectral point (`ArgumentError` otherwise); a scalar `n_water` and all
+other surfaces are returned unchanged. The RT drivers call this before the
+Fourier loop (a canopy resolves its soil per moment), so the surface layers,
+the exact-glint correction and the Jacobians all see the same index.
+"""
+_resolve_spectral_surface(surface::AbstractSurfaceType, ν) = surface
+
+function _resolve_spectral_surface(surf::CoxMunkSurface{FT}, ν) where {FT}
+    n_water = surf.n_water
+    if n_water === nothing
+        λ_nm = 1e7 ./ Float64.(Array(ν))
+        return CoxMunkSurface{FT}(wind_speed = surf.wind_speed,
+            n_water = Complex{FT}.(water_refractive_index.(λ_nm)),
+            whitecap_albedo = surf.whitecap_albedo,
+            include_whitecaps = surf.include_whitecaps,
+            shadowing = surf.shadowing)
     end
+    n_water isa AbstractVector && _check_n_water_length(n_water, length(ν))
+    return surf
+end
+
+function _check_n_water_length(n_water::AbstractVector, n_spec::Integer)
+    length(n_water) == n_spec || throw(ArgumentError(
+        "CoxMunkSurface: vector n_water has $(length(n_water)) entries, but the " *
+        "band has $n_spec spectral points (one refractive index per spectral point)"))
+    return nothing
+end
+
+"""
+    _spectral_n_water(surf, n_spec)
+
+Water refractive index the surface layer uses on `n_spec` spectral points:
+one `Complex{FT}` when it is the same at every point (scalar `n_water`, or a
+vector with equal entries), otherwise the per-point vector. A surface with
+`n_water = nothing` must first be resolved on the spectral grid
+(`_resolve_spectral_surface`).
+"""
+function _spectral_n_water(surf::CoxMunkSurface{FT}, n_spec::Integer) where {FT}
+    n_water = surf.n_water
+    n_water === nothing && throw(ArgumentError(
+        "CoxMunkSurface(n_water = nothing) reached the surface builder without the " *
+        "wavelengths of the spectral points (the RT drivers resolve it with " *
+        "`_resolve_spectral_surface`). Pass n_water explicitly here: a scalar, or a " *
+        "vector with one entry per spectral point (e.g. from water_refractive_index)."))
+    n_water isa Complex && return n_water
+    _check_n_water_length(n_water, n_spec)
+    return all(==(first(n_water)), n_water) ? first(n_water) : n_water
+end
+
+"""
+    _single_n_water(surf)
+
+Default `n_water` of the single-wavelength BRDF functions
+(`coxmunk_brdf_mueller`, `reflectance`, …): the scalar `n_water`, or the
+common value of a vector with equal entries. Other vectors and `nothing`
+carry no single index and throw an `ArgumentError`; pass `n_water` for the
+wavelength of interest.
+"""
+function _single_n_water(surf::CoxMunkSurface)
+    n_water = surf.n_water
+    n_water isa Complex && return n_water
+    n_water !== nothing && !isempty(n_water) && all(==(first(n_water)), n_water) &&
+        return first(n_water)
+    throw(ArgumentError(
+        "CoxMunkSurface.n_water = $(n_water === nothing ? "nothing" : "a spectral vector") " *
+        "has no single value; pass the n_water keyword for the wavelength of interest " *
+        "(e.g. water_refractive_index(λ_nm))"))
+end
+
+"""
+    _n_water_knots(n_water) -> (knots, lo, hi, t)
+
+Knots for the spectral Cox–Munk operator. The BRDF depends on the spectral
+point only through the Fresnel coefficients of `n_water[s]`, which vary
+slowly across a band. The operator is evaluated exactly at the knot points
+`knots` (indices into `n_water`, first and last point included) and, at every
+other point `s`, interpolated linearly between the knots `lo[s]` and `hi[s]`
+(indices into `knots`) with weight `t[s]`:
+
+    R(n_water[s]) ≈ (1 − t[s]) R(n_water[knots[lo[s]]]) + t[s] R(n_water[knots[hi[s]]]).
+
+`t[s]` projects `n_water[s]` on the complex segment between the two knot
+indices; at knots the operator is exact. A segment between two knots is
+accepted when, at every point on it, the same interpolation reproduces the
+point's own Fresnel Mueller elements — (|r_s|² ± |r_p|²)/2 and the real and
+imaginary parts of r_s r_p* — at the local incidence cosines
+`_N_WATER_PROXY_COS` to `_N_WATER_TOL` times the local reflectance
+(|r_s|² + |r_p|²)/2. The BRDF is a positive slope-weighted sum of these
+elements over local incidence angles, so its intensity element is then
+interpolated to about the same relative accuracy (including n close to 1,
+where the reflectance is most sensitive). An index with real part ≤ 1 admits
+total internal reflection, whose critical angle makes the operator
+non-smooth in n; such points are always knots (exact). The check runs in
+Float64; in Float32 the tolerance is at least 4 eps(Float32), the rounding of
+the stored index. Knots are placed greedily (doubling, then bisection, from
+the previous knot); every accepted segment is checked, though it need not be
+the longest possible one. Adjacent points always form a segment. A constant
+`n_water` gives one knot; an index that is not smooth from point to point
+(e.g. noisy measured values) makes most points knots, i.e. one full
+reflectance evaluation per spectral point.
+"""
+function _n_water_knots(n_water::AbstractVector{Complex{FT}}) where {FT}
+    N = length(n_water)
+    all(==(first(n_water)), n_water) && return [1], ones(Int, N), ones(Int, N), zeros(FT, N)
+    tol = max(_N_WATER_TOL, 4 * eps(FT))
+    n = ComplexF64.(n_water)
+    F = [_fresnel_elements(n[s], c) for c in _N_WATER_PROXY_COS, s in 1:N]
+    # Projection weight of point s on the segment a → e.
+    function project(a, e, s)
+        local Δ = n[e] - n[a]
+        local δ = n[s] - n[a]
+        return iszero(Δ) ? 0.0 : clamp(real(δ * conj(Δ)) / abs2(Δ), 0.0, 1.0)
+    end
+    function valid(a, e)
+        any(s -> real(n[s]) <= 1, a:e) && return false
+        for s in (a + 1):(e - 1)
+            w = project(a, e, s)
+            for j in axes(F, 1)
+                fa, fe, fs = F[j, a], F[j, e], F[j, s]
+                bound = tol * fs[1]
+                for k in 1:4
+                    abs((1 - w) * fa[k] + w * fe[k] - fs[k]) <= bound || return false
+                end
+            end
+        end
+        return true
+    end
+    knots = [1]
+    a = 1
+    while a < N
+        good, probe = a + 1, a + 2
+        while probe <= N && valid(a, probe)
+            good, probe = probe, a + 2 * (probe - a)
+        end
+        bad = min(probe, N + 1)
+        while bad - good > 1
+            mid = (good + bad) ÷ 2
+            valid(a, mid) ? (good = mid) : (bad = mid)
+        end
+        push!(knots, good)
+        a = good
+    end
+    lo = ones(Int, N); hi = ones(Int, N); t = zeros(FT, N)
+    for q in 1:(length(knots) - 1)
+        a, e = knots[q], knots[q + 1]
+        for s in a:e
+            lo[s], hi[s] = q, q + 1
+            t[s] = s == a ? zero(FT) : s == e ? one(FT) : FT(project(a, e, s))
+        end
+    end
+    return knots, lo, hi, t
+end
+
+# The knots depend only on the values of `n_water`; within a run the same
+# values reach the surface builder at every Fourier moment (and the glint
+# correction), so the plan of the last values is kept, with a copy of those
+# values, and reused while an equal vector is passed.
+const _N_WATER_KNOT_CACHE = Ref{Any}(nothing)
+const _N_WATER_KNOT_LOCK = ReentrantLock()
+
+"`_n_water_knots(n_water)`, reused while vectors equal to the last one are passed. The returned arrays are shared with the cache: do not mutate them."
+function _n_water_knot_plan(n_water::AbstractVector{Complex{FT}}) where {FT}
+    lock(_N_WATER_KNOT_LOCK) do
+        cached = _N_WATER_KNOT_CACHE[]
+        if !(cached !== nothing && cached[1] isa Vector{Complex{FT}} && isequal(cached[1], n_water))
+            cached = (Vector(n_water), _n_water_knots(n_water))
+            _N_WATER_KNOT_CACHE[] = cached
+        end
+        return cached[2]::Tuple{Vector{Int}, Vector{Int}, Vector{Int}, Vector{FT}}
+    end
+end
+
+"Fresnel Mueller elements ((|r_s|²+|r_p|²)/2, (|r_s|²−|r_p|²)/2, Re r_s r_p*, Im r_s r_p*) at incidence cosine `c`."
+function _fresnel_elements(n::ComplexF64, c::Float64)
+    r_s, r_p = fresnel_coefficients(n, c)
+    r_sp = r_s * conj(r_p)
+    return ((abs2(r_s) + abs2(r_p)) / 2, (abs2(r_s) - abs2(r_p)) / 2, real(r_sp), imag(r_sp))
+end
+
+# Interpolation tolerance of `_n_water_knots` (relative to the local Fresnel
+# reflectance) and the local incidence cosines where it is checked;
+# test_coxmunk_spectral.jl checks the resulting operator error across
+# 0.2–4 µm and for other indices.
+const _N_WATER_TOL = 1e-7
+const _N_WATER_PROXY_COS = (1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.03)
+
+"""
+    _interpolate_knots!(R, Rk, lo, hi, t)
+
+`R[:, :, s] = (1 − t[s]) Rk[:, :, lo[s]] + t[s] Rk[:, :, hi[s]]` for every
+spectral point `s` (see `_n_water_knots`). All arguments live on the
+device of `R`.
+"""
+function _interpolate_knots!(R::AbstractArray{FT,3}, Rk::AbstractArray{FT,3},
+                             lo::AbstractVector{<:Integer}, hi::AbstractVector{<:Integer},
+                             t::AbstractVector{FT}) where {FT}
+    device = devi(architecture(R))
+    kernel! = _interpolate_knots_kernel!(device)
+    kernel!(R, Rk, lo, hi, t; ndrange = size(R))
+    synchronize_if_gpu()
+    return R
+end
+
+@kernel function _interpolate_knots_kernel!(R, @Const(Rk), @Const(lo), @Const(hi), @Const(t))
+    i, j, s = @index(Global, NTuple)
+    @inbounds begin
+        w = t[s]
+        R[i, j, s] = (one(w) - w) * Rk[i, j, lo[s]] + w * Rk[i, j, hi[s]]
+    end
+end
+
+"""
+    _spectral_knot_operators(f, n_water, arr_type) -> (Rk..., lo, hi, t)
+
+Evaluate `f(n)`, which returns one host matrix or a tuple of host matrices of
+equal size, at the knots of `n_water` (see `_n_water_knots`) and
+upload the stacked `(rows, cols, nKnots)` arrays and the interpolation
+indices and weights with `arr_type`.
+"""
+function _spectral_knot_operators(f, n_water::AbstractVector{Complex{FT}}, arr_type) where {FT}
+    knots, lo, hi, t = _n_water_knot_plan(n_water)
+    values = [f(n_water[k]) for k in knots]
+    stacked = values[1] isa Tuple ?
+        ntuple(i -> arr_type(stack(v[i] for v in values)), length(values[1])) :
+        (arr_type(stack(values)),)
+    return (stacked..., arr_type(lo), arr_type(hi), arr_type(t))
 end
 
 # ──────────────────────────────────────────────────────────────────────
@@ -454,7 +681,7 @@ Returns the Fourier moments of `π * BRDF` as an
 azimuth [0, π] with 100 points.
 """
 function reflectance(surf::CoxMunkSurface{FT}, pol_type, μ::AbstractArray{FT}, m::Int;
-                     n_water::Complex{FT} = _get_n_water(surf, FT(550))) where FT
+                     n_water::Complex{FT} = _single_n_water(surf)) where FT
     n = pol_type.n
     Nμ = length(μ)
     nn = Nμ * n
@@ -483,20 +710,92 @@ function reflectance(surf::CoxMunkSurface{FT}, pol_type, μ::AbstractArray{FT}, 
 end
 
 # ──────────────────────────────────────────────────────────────────────
+# Surface layer
+# ──────────────────────────────────────────────────────────────────────
+
+"""
+    create_surface_layer!(surf::CoxMunkSurface, added_layer, SFI, m, pol_type,
+                          quad_points, τ_sum, architecture; F₀ = nothing)
+
+Cox–Munk surface layer for Fourier moment `m`. With one refractive index for
+the whole band (scalar `n_water`, or a vector with equal entries) this is the
+shared analytic-surface assembly: one reflectance matrix for every spectral
+point. A spectrally varying `n_water` (one entry per spectral point; resolve
+`n_water = nothing` first with `_resolve_spectral_surface`) gives a
+reflectance matrix per spectral point: the Fourier reflectance is evaluated
+at the knots of `_n_water_knots` and interpolated on the device to
+the other points, and the reflected direct beam `j₀⁻` uses each point's
+matrix.
+"""
+function create_surface_layer!(surf::CoxMunkSurface{FT},
+                               added_layer::Union{AddedLayer,AddedLayerRS},
+                               SFI,
+                               m::Int,
+                               pol_type,
+                               quad_points,
+                               τ_sum,
+                               architecture;
+                               F₀=nothing) where {FT}
+    (; qp_μ, qp_μN, wt_μN) = quad_points
+    n_spec = length(τ_sum)
+    Nquad = size(added_layer.r⁻⁺, 1) ÷ pol_type.n
+    arr_type = array_type(architecture)
+    T_surf = arr_type(Diagonal(ones(FT, pol_type.n * Nquad)))
+    μ = collect(qp_μ)
+    # The surface-layer convention carries an additional factor two at m=0.
+    fac = m == 0 ? 2 : 1
+    n_water = _spectral_n_water(surf, n_spec)
+
+    if n_water isa Complex
+        # Same operations as the analytic-surface assembly (analytic_surface.jl).
+        ρ = fac * reflectance(surf, pol_type, μ, m; n_water)
+        R_surf = arr_type(ρ)
+        if SFI
+            _surface_source!(added_layer, R_surf, τ_sum, quad_points, pol_type,
+                             FT, architecture; F₀)
+        end
+        _fill_surface_layer!(added_layer, R_surf * Diagonal(qp_μN .* wt_μN), T_surf)
+        return nothing
+    end
+
+    Rk, lo, hi, t = _spectral_knot_operators(
+        n -> fac * reflectance(surf, pol_type, μ, m; n_water = n), n_water, arr_type)
+    # Unweighted per-point reflectance first (for the direct-beam source),
+    # then the quadrature-weight column scaling, in place.
+    R_surf = added_layer.r⁻⁺
+    _interpolate_knots!(R_surf, Rk, lo, hi, t)
+    if SFI
+        quad_points.external_solar && throw(ArgumentError(
+            "external-solar SFI currently supports Lambertian surfaces only"))
+        (; μ₀) = quad_points
+        beam = _surface_beam_at_surface(F₀, FT, pol_type, quad_points, τ_sum,
+                                        architecture)
+        added_layer.j₀⁺[:, 1, :] .= beam
+        added_layer.j₀⁻ .= μ₀ .* batched_mul(R_surf, reshape(beam, size(beam, 1), 1, n_spec))
+    end
+    R_surf .*= reshape(qp_μN .* wt_μN, 1, :)
+    added_layer.r⁺⁻ .= zero(FT)
+    added_layer.t⁺⁺ .= T_surf
+    added_layer.t⁻⁻ .= zero(FT)
+    return nothing
+end
+
+# ──────────────────────────────────────────────────────────────────────
 # Single-scattering (TMS) correction for the specular hotspot
 # ──────────────────────────────────────────────────────────────────────
 
 """
-    _coxmunk_glint_residual(surf, n, μ_v, μ₀, dϕ, m_max, n_water)
+    _coxmunk_glint_truncated(surf, n, μ_v, μ₀, dϕ, m_max, n_water)
 
-Exact minus truncated direct-solar BRDF column and its analytic wind tangent.
-The surface builder doubles the zeroth moment and postprocessing halves it;
-there is no additional half-weight in this physical BRDF reconstruction.
+Fourier series through order `m_max` of the direct-solar BRDF column
+(incident `μ₀`, reflected `μ_v` at relative azimuth `dϕ`) and of its wind
+tangent, built from the same 100-node azimuth quadrature as the surface
+operator. The surface builder doubles the zeroth moment and postprocessing
+halves it; there is no additional half-weight in this physical BRDF
+reconstruction.
 """
-function _coxmunk_glint_residual(surf::CoxMunkSurface{FT}, n, μ_v, μ₀,
+function _coxmunk_glint_truncated(surf::CoxMunkSurface{FT}, n, μ_v, μ₀,
                                   dϕ, m_max, n_water) where FT
-    exact, dexact = coxmunk_brdf_mueller_and_deriv(
-        surf, n, μ₀, μ_v, dϕ; n_water)
     truncated = zeros(FT, n)
     dtruncated = zeros(FT, n)
     ϕ, w = CanopyOptics.gauleg(100, zero(FT), FT(π))
@@ -511,18 +810,46 @@ function _coxmunk_glint_residual(surf::CoxMunkSurface{FT}, n, μ_v, μ₀,
             dtruncated[si] += scale * az * dM[si, 1]
         end
     end
+    return truncated, dtruncated
+end
+
+"""
+    _coxmunk_glint_residual(surf, n, μ_v, μ₀, dϕ, m_max, n_water)
+
+Exact minus truncated direct-solar BRDF column and its analytic wind tangent
+(see `_coxmunk_glint_truncated`).
+"""
+function _coxmunk_glint_residual(surf::CoxMunkSurface{FT}, n, μ_v, μ₀,
+                                  dϕ, m_max, n_water) where FT
+    exact, dexact = coxmunk_brdf_mueller_and_deriv(
+        surf, n, μ₀, μ_v, dϕ; n_water)
+    truncated, dtruncated = _coxmunk_glint_truncated(
+        surf, n, μ_v, μ₀, dϕ, m_max, n_water)
     return exact[:, 1] - truncated, dexact[:, 1] - dtruncated
 end
 
 """
     apply_ss_correction!(R_SFI, surf, pol_type, vza, vaz, μ₀, τ_total, m_max, nSpec;
-                         F₀, n_water)
+                         F₀, n_water = nothing)
 
 Add exact minus Fourier-truncated Cox–Munk direct-solar reflection at TOA.
 `m_max` is the last included Fourier order. `F₀` is the incident Stokes spectrum
 with shape `(n_stokes, nSpec)`; the direct-solar correction currently requires
 unpolarized illumination. Both downward and upward paths use `τ_total`, the
 solver's cumulative optical depth. A zero incident spectrum adds zero glint.
+
+The refractive index is the surface's own, per spectral point (`n_water =
+nothing`; a surface with `surf.n_water = nothing` must first be resolved with
+`_resolve_spectral_surface`, as the RT drivers do); a `Complex`
+keyword applies one index to every point. With a spectrally varying index the
+exact term uses the index of each point and the truncated term is
+interpolated between the knots of the surface operator
+(`_n_water_knots`), so that it cancels the Fourier-series glint the
+solver carried: the corrected single-bounce glint is exact at every point.
+
+The correction is applied at TOA only. Interior upwelling levels (`obs_alt`
+strictly inside the atmosphere) carry the Fourier-series glint, in the
+forward and in the linearized solver.
 
 The linearized overload additionally accepts `(Ṙ, τ̇_total, wind_column)`
 before `surf`. Its atmospheric columns follow `τ̇_total` and `wind_column`
@@ -534,7 +861,7 @@ function apply_ss_correction!(R_SFI::AbstractArray{FT,3},
                                τ_total::AbstractVector{FT},
                                m_max::Int, nSpec::Int;
                                F₀,
-                               n_water::Complex{FT} = _get_n_water(surf, FT(550))) where FT
+                               n_water::Union{Nothing,Complex{FT}} = nothing) where FT
     return apply_ss_correction!(R_SFI, nothing, nothing, 0, surf, pol_type,
         vza, vaz, μ₀, τ_total, m_max, nSpec; F₀, n_water)
 end
@@ -546,12 +873,16 @@ function apply_ss_correction!(R_SFI::AbstractArray{FT,3}, Ṙ,
                                τ_total::AbstractVector{FT},
                                m_max::Int, nSpec::Int;
                                F₀,
-                               n_water::Complex{FT} = _get_n_water(surf, FT(550))) where FT
+                               n_water::Union{Nothing,Complex{FT}} = nothing) where FT
     _require_unpolarized_solar(F₀, "Cox–Munk direct-solar correction")
+    n_spec_water = n_water === nothing ? _spectral_n_water(surf, nSpec) : n_water
+    n_spec_water isa Complex || return _apply_ss_correction_spectral!(
+        R_SFI, Ṙ, τ̇_total, wind_column, surf, pol_type, vza, vaz, μ₀,
+        τ_total, m_max, nSpec, F₀, n_spec_water)
     for iv in eachindex(vza)
         μ_v = FT(cosd(vza[iv]))
         residual, dresidual = _coxmunk_glint_residual(
-            surf, pol_type.n, μ_v, μ₀, FT(deg2rad(vaz[iv])), m_max, n_water)
+            surf, pol_type.n, μ_v, μ₀, FT(deg2rad(vaz[iv])), m_max, n_spec_water)
         airmass = inv(μ₀) + inv(μ_v)
         for s in 1:nSpec, si in 1:pol_type.n
             atten = μ₀ * F₀[1,s] * exp(-τ_total[s] * airmass)
@@ -562,6 +893,44 @@ function apply_ss_correction!(R_SFI::AbstractArray{FT,3}, Ṙ,
                     Ṙ[iv,si,s,p] -= airmass * τ̇_total[s,p] * correction
                 end
                 Ṙ[iv,si,s,wind_column] += atten * dresidual[si]
+            end
+        end
+    end
+    return nothing
+end
+
+# Spectrally varying refractive index: exact glint at every point, truncated
+# series interpolated between the operator knots (see `apply_ss_correction!`).
+function _apply_ss_correction_spectral!(R_SFI, Ṙ, τ̇_total, wind_column,
+                                        surf::CoxMunkSurface{FT}, pol_type, vza, vaz,
+                                        μ₀::FT, τ_total, m_max, nSpec, F₀,
+                                        n_water::AbstractVector{Complex{FT}}) where FT
+    n = pol_type.n
+    knots, lo, hi, t = _n_water_knot_plan(n_water)
+    for iv in eachindex(vza)
+        μ_v = FT(cosd(vza[iv]))
+        dϕ = FT(deg2rad(vaz[iv]))
+        truncated = [_coxmunk_glint_truncated(surf, n, μ_v, μ₀, dϕ, m_max, n_water[k])
+                     for k in knots]
+        airmass = inv(μ₀) + inv(μ_v)
+        for s in 1:nSpec
+            exact, dexact = coxmunk_brdf_mueller_and_deriv(
+                surf, n, μ₀, μ_v, dϕ; n_water = n_water[s])
+            (T_lo, dT_lo), (T_hi, dT_hi) = truncated[lo[s]], truncated[hi[s]]
+            w = t[s]
+            atten = μ₀ * F₀[1,s] * exp(-τ_total[s] * airmass)
+            for si in 1:n
+                residual = exact[si, 1] - ((one(FT) - w) * T_lo[si] + w * T_hi[si])
+                correction = atten * residual
+                R_SFI[iv,si,s] += correction
+                if Ṙ !== nothing
+                    dresidual = dexact[si, 1] -
+                                ((one(FT) - w) * dT_lo[si] + w * dT_hi[si])
+                    for p in axes(τ̇_total, 2)
+                        Ṙ[iv,si,s,p] -= airmass * τ̇_total[s,p] * correction
+                    end
+                    Ṙ[iv,si,s,wind_column] += atten * dresidual
+                end
             end
         end
     end
