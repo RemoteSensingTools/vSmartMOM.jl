@@ -16,7 +16,7 @@
 <h5 align="center">Written in <a href="https://julialang.org">Julia</a>.</h4>
 
 [![version](https://github.com/RemoteSensingTools/vSmartMOM.jl/actions/workflows/AutomatedTests.yml/badge.svg)](https://github.com/RemoteSensingTools/vSmartMOM.jl/actions/workflows/AutomatedTests.yml/)
-  [![](https://img.shields.io/badge/docs-latest-blue)](https://RemoteSensingTools.github.io/vSmartMOM.jl/dev/)
+  [![](https://img.shields.io/badge/docs-latest-blue)](https://RemoteSensingTools.github.io/vSmartMOM.jl/stable/)
   [![](https://img.shields.io/github/license/RemoteSensingTools/vSmartMOM.jl)](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/master/LICENSE)
   [![DOI](https://joss.theoj.org/papers/10.21105/joss.04575/status.svg)](https://doi.org/10.21105/joss.04575)
   [![](https://img.shields.io/github/commit-activity/y/RemoteSensingTools/vSmartMOM.jl)](https://github.com/RemoteSensingTools/vSmartMOM.jl/commits/master)
