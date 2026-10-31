@@ -329,15 +329,16 @@ end
 """
     get_dtau_ndoubl(computed_layer_properties::CoreDirectionalScatteringOpticalProperties, quad_points)
 
-Variant for directional scattering: uses `G[iμ₀]` to scale optical depth for the solar beam
-direction when computing `dτ_max` for the doubling criterion.
+Variant for directional scattering: uses `G[iμ₀Nstart]` to scale optical depth for the solar beam
+direction when computing `dτ_max` for the doubling criterion. `G` is on the
+Stokes-expanded grid `qp_μN`, so the solar entry is at `iμ₀Nstart`, not `iμ₀`.
 """
 @inline function get_dtau_ndoubl(computed_layer_properties::CoreDirectionalScatteringOpticalProperties, quad_points::QuadPoints{FT};
                                   dτ_max_threshold::Union{Nothing,Real} = nothing,
                                   dτ_min_floor::Union{Nothing,Real} = nothing) where {FT}
-    (; qp_μ, wt_μ, iμ₀) = quad_points
+    (; qp_μ, wt_μ, iμ₀Nstart) = quad_points
     (; τ, ϖ, G) = computed_layer_properties
-    gfct = Array(G)[iμ₀]
+    gfct = Array(G)[iμ₀Nstart]
     # Constrain `dτ_max` using only the TRUE quadrature streams — see
     # comment in the `CoreScatteringOpticalProperties` variant above.
     threshold = FT(dτ_max_threshold === nothing ? 0.001 : dτ_max_threshold)
@@ -371,12 +372,12 @@ and beam attenuation factor ``e^{-d\\tau/\\mu_0}`` (or ``e^{-d\\tau \\cdot G/\\m
                             # order) — substituting would break the bitwise contract.
                             max_τϖ::Union{Nothing,Real} = nothing)
     arr_type = array_type(architecture)
-    (; μ₀, iμ₀) = quad_points
+    (; μ₀, iμ₀Nstart) = quad_points
     (; G) = computed_layer_properties
     dτ, ndoubl = get_dtau_ndoubl(computed_layer_properties, quad_points;
                                  dτ_max_threshold = dτ_max_threshold,
                                  dτ_min_floor = dτ_min_floor)
-    gfct = Array(G)[iμ₀]
+    gfct = Array(G)[iμ₀Nstart]
     expk = exp.(-dτ*gfct/μ₀)
     return dτ, ndoubl, arr_type(expk)
 end

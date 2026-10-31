@@ -515,8 +515,8 @@ function getG_atSun(lod::CoreScatteringOpticalProperties,quad_points::QuadPoints
 end
 
 function getG_atSun(lod::CoreDirectionalScatteringOpticalProperties,quad_points::QuadPoints{FT}) where FT
-    (; iμ₀) = quad_points
-    gfct = collect(lod.G)[iμ₀]
+    (; iμ₀Nstart) = quad_points
+    gfct = collect(lod.G)[iμ₀Nstart]
     return gfct
 end
 
