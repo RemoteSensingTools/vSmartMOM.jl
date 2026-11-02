@@ -395,7 +395,7 @@ function create_surface_layer!(canopy::CanopySurface{FT},
                                F₀=nothing,
                                soil_spec_wn=spec_bands_wn) where {FT}
     arr_type = array_type(architecture)
-    (; qp_μN, iμ₀) = quad_points
+    (; qp_μN, iμ₀Nstart) = quad_points
 
     if canopy._cache === nothing
         _init_canopy_cache!(canopy, added_layer, pol_type, quad_points, architecture;
@@ -419,7 +419,9 @@ function create_surface_layer!(canopy::CanopySurface{FT},
         error("Canopy Z cache was not initialized")
     end
 
-    G_iμ₀ = Array(cache.G)[iμ₀]
+    # `G` is on the Stokes-expanded grid `qp_μN`, so the solar entry is at
+    # `iμ₀Nstart` (equal to `iμ₀` only for Stokes_I).
+    G_iμ₀ = Array(cache.G)[iμ₀Nstart]
 
     ϖ_canopy = _canopy_ssa(canopy, cache, nSpec, FT)
     # Leaf scattering sees the same solar Stokes vector as the soil below

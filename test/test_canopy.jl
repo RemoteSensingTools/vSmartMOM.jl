@@ -209,6 +209,36 @@ end
     @test maximum(R[:, 1, 1]) < 1.0
 end
 
+@testset "CanopySurface conserves energy for every Stokes type" begin
+    # Conservative leaves (R + T = 1) over a white soil reflect all incident
+    # flux. `G` lives on the Stokes-expanded grid, so the solar G must be read
+    # at `iμ₀Nstart`; reading it at `iμ₀` broke this for Stokes_IQU with any
+    # non-spherical LAD (plane albedo 1.24 uniform, 1.66 planophile).
+    FT = Float64
+    arch = vSmartMOM.Architectures.CPU()
+
+    # m = 0 upwelling flux of the reflected direct beam, I component only
+    function reflected_flux(surf, pol_type)
+        qp = _canopy_test_quad_points(l_trunc=15, pol_type=pol_type)
+        NquadN = length(qp.qp_μN)
+        al = CoreRT.make_added_layer(noRS{FT}(), FT, Array, (NquadN, NquadN), 1)
+        CoreRT.create_surface_layer!(surf, al, true, 0, pol_type, qp,
+                                     zeros(FT, 1), arch)
+        iI = 1:pol_type.n:NquadN
+        return sum(qp.wt_μN[iI] .* qp.qp_μN[iI] .* al.j₀⁻[iI, 1, 1])
+    end
+
+    for LAD in (CO.uniform_leaves(FT), CO.planophile_leaves(FT)),
+        pol_type in (CoreRT.Stokes_I{FT}(), CoreRT.Stokes_IQU{FT}())
+        canopy = CanopySurface(; soil=LambertianSurfaceScalar(FT(1)), LAI=FT(4),
+                                n_layers=2, LAD, leaf_reflectance=FT(0.5),
+                                leaf_transmittance=FT(0.5))
+        albedo = reflected_flux(canopy, pol_type) /
+                 reflected_flux(LambertianSurfaceScalar(FT(1)), pol_type)
+        @test albedo ≈ 1 atol=5e-3
+    end
+end
+
 @testset "CanopySurface linearized soil-albedo Jacobian axis regression" begin
     # Build a minimal canopy RT problem: 1 spectral point, 6 streams, Stokes_I.
     # With no aerosols and no gases, Nparams = n_surface = 1 and iparam = 1.

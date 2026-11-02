@@ -44,7 +44,8 @@ function interaction_hdrf!(SFI,
             #for j=i:pol_type.n:NquadN
             j=i:pol_type.n:NquadN
             bhr_J₀⁻[i,:] .= collect(sum(hdr_J₀⁻[j,1,:].*wt_μN[j].*qp_μN[j], dims=1)')
-            bhr_J₀⁺[i,:] .= collect(sum(J₀⁺_diffuse[j,1,:].*wt_μN[j].*qp_μN[j], dims=1)' .+ j₀⁺[iμ₀Nstart,1,:] .* qp[iμ₀Nstart])
+            # Stokes component i of the direct beam sits at row iμ₀Nstart + i - 1
+            bhr_J₀⁺[i,:] .= collect(sum(J₀⁺_diffuse[j,1,:].*wt_μN[j].*qp_μN[j], dims=1)' .+ j₀⁺[iμ₀Nstart+i-1,1,:] .* qp[iμ₀Nstart])
             #if i==1
             #    @show bhr_J₀⁻[i,:], bhr_J₀⁺[i,:]
             #end
@@ -64,9 +65,9 @@ function interaction_hdrf_canopy!(SFI,
     hdr_J₀⁻, bhr_J₀⁻, bhr_J₀⁺)
 
     #@unpack topJ₀⁺, botJ₀⁻      = composite_layer #these are aliases to the respective struct elements 
-    (; Nquad, wt_μN, iμ₀, qp_μN) = quad_points
+    (; Nquad, wt_μN, iμ₀Nstart, qp_μN) = quad_points
     NquadN =  Nquad * pol_type.n
-    
+
     wt = collect(wt_μN)
     qp = collect(qp_μN)
     _uwJ = collect(uwJ)
@@ -93,8 +94,9 @@ function interaction_hdrf_canopy!(SFI,
             #collect(sum(collect(uwJ[j,1,:]).*wt[j].*qp[j], dims=1)')
             bhr_J₀⁻[i,:] .= (sum(_uwJ[j,1,:].*wt[j].*qp[j], dims=1)')
             #@show size(bhr_J₀⁺[i,:]), size(solJ₀[i,:])
-            bhr_J₀⁺[i,:] .= (sum(_dwJ[j,1,:].*wt[j].*qp[j], dims=1)') .+ (solJ₀[i,:] .* qp[iμ₀]) #TODO: Use Radau quadrature and include insolation in the quadrature sum
-            direct = collect(solJ₀[i,:] .* qp[iμ₀])
+            # qp is on the Stokes-expanded grid, so μ₀ is qp[iμ₀Nstart], not qp[iμ₀]
+            bhr_J₀⁺[i,:] .= (sum(_dwJ[j,1,:].*wt[j].*qp[j], dims=1)') .+ (solJ₀[i,:] .* qp[iμ₀Nstart]) #TODO: Use Radau quadrature and include insolation in the quadrature sum
+            direct = collect(solJ₀[i,:] .* qp[iμ₀Nstart])
             diffuse = (sum(_dwJ[j,1,:].*wt[j].*qp[j], dims=1)')
         end
     end

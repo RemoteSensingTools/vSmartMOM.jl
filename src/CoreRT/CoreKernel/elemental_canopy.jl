@@ -93,10 +93,13 @@ and stream denominators.
                     (1 + ϖ_λ[n] * G[i] * Z⁺⁺[i,i,n2] *
                          (dτ_λ[n]  / μ[i]) * wct[i])
             else
-                t⁺⁺[i,j,n] = zero(FT)
+                # Same direction, different Stokes components: the scattered
+                # part of the diagonal term (no direct beam), as in elemental.jl.
+                t⁺⁺[i,j,n] = exp(-dτ_λ[n] * G[j] / μ[j]) *
+                    (ϖ_λ[n] * G[j] * Z⁺⁺[i,j,n2] * (dτ_λ[n] / μ[i]) * wct[j])
             end
         else
-    
+
             # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
             # (𝑖 ≠ 𝑗), with path factors G: μⱼ/(μᵢGⱼ-μⱼGᵢ) [exp(-a)-exp(-b)]
             # = (dτ/μᵢ) expdiff_ratio(a, b) for a = dτGᵢ/μᵢ, b = dτGⱼ/μⱼ,
