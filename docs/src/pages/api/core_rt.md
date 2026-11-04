@@ -150,6 +150,13 @@ vSmartMOM.CoreRT.StreamRTResult
 vSmartMOM.CoreRT.rt_run_streams(::Any)
 ```
 
+## Stream-Level RT Output
+
+```@docs
+vSmartMOM.CoreRT.StreamRTResult
+vSmartMOM.CoreRT.rt_run_streams(::Any)
+```
+
 ## Jacobian Parameter Layout
 
 ```@docs
