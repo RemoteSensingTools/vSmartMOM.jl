@@ -61,14 +61,14 @@ conservative fixture, direct-budget error at 64 streams was approximately
 retained approximately 1.8e-4 error in both precisions; the strict 1e-4 budget
 target is checked at 32 and 64 streams. No result is rescaled to hit that target.
 
-The combined specular Float32 cases used the separate CanopyOptics fix in
-[PR #64](https://github.com/RemoteSensingTools/CanopyOptics.jl/pull/64).
-The complete CPU package suite also passed 25,512 checks, with 16 conditional
-skips reported by Julia in the `Broken` column (CUDA was masked in that run).
-That full run used the azimuth fix from PR #64; after the additional grazing
-limit fix, the focused counts above were rerun against the updated dependency.
-The full CanopyOptics suite passed 86,099 checks with both fixes. Upstream CI
-and release dependencies remain separate gates.
+The combined specular Float32 cases require the CanopyOptics fixes released
+and registered in **v0.2.2**, now the minimum compatible version. The complete
+CPU package suite passed **25,756 checks**, with 16 conditional skips reported
+by Julia in the `Broken` column, against the final increment implementation and
+released dependency. CUDA was masked for that full run; the focused device
+checks below ran separately on physical GPU 1. The final CanopyOptics v0.2.2
+source passed 87,123 checks before the version-only release change. Upstream
+vSmartMOM CI remains a separate gate.
 
 These tests establish numerical agreement over their stated cases, not
 physical correctness of every specular parameterization or infinite-resolution
@@ -91,8 +91,8 @@ in the existing scratch matrix and its right-hand side copied into the output.
 This specialization is local to the canopy increment path. Other backends and
 non-BLAS element types retain `batch_solve!`; the general atmospheric solve API
 is unchanged. After this change, all 3,744 operator/phase, 16 vertical-beam and
-48 production-surface CPU checks passed. The complete package-suite result above
-predates this CPU specialization; it is not a full-suite claim for the new solve.
+48 production-surface CPU checks passed. The final complete package-suite result
+above includes this CPU specialization and the GPU update code below.
 
 `test/bench_canopy_increment.jl` measures warmed doubling calls, including a
 completion synchronization on CUDA. Phase-cache construction, elemental seeding,
@@ -211,5 +211,12 @@ Float32 cases that fit the fused path improve substantially. The four-Stokes
 Float64 case is slower, so the new layout is not a universal performance win;
 no hardware-specific size threshold was fitted to these measurements. Large
 operators keep the same fallback. These remain warmed kernel timings, with the
-exclusions above, not complete canopy simulation times. The full package-suite
-rerun against released CanopyOptics v0.2.2 is a separate verification step.
+exclusions above, not complete canopy simulation times. The final full package
+run against released CanopyOptics v0.2.2 passed 25,756 checks (16 conditional
+skips), using Julia 1.12.6, four Julia threads, one BLAS thread and CUDA masked:
+
+```sh
+cd test
+CUDA_VISIBLE_DEVICES= OPENBLAS_NUM_THREADS=1 JULIA_NUM_THREADS=4 \
+  julia --project=.. -e 'using Pkg; Pkg.test(;allow_reresolve=false,julia_args=["--threads=4"])'
+```
