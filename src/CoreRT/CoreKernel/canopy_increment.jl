@@ -14,7 +14,8 @@ On return all four R/T operators and the solar sources use the ordinary
 production representation. No flux, phase matrix or absorption is rescaled.
 
 This canopy-specific path currently carries the solar source only. A future
-distributed canopy source must supply its own attenuation increment explicitly.
+distributed canopy source needs its own sublayer source construction, rather
+than inheriting the solar attenuation recurrence.
 """
 function canopy_increment_doubling!(pol_type, SFI, dτ,
         properties::CoreDirectionalScatteringOpticalProperties, m::Int, ndoubl::Int,
@@ -50,7 +51,7 @@ function canopy_increment_doubling!(pol_type, SFI, dτ,
     for _ in 1:ndoubl
         _bmm!(rr, r⁻⁺, r⁻⁺)
         system .= I_static .- rr
-        batch_solve!(h, system, rr)
+        canopy_increment_solve!(h, system, rr)
         _bmm!(product, t⁺⁺, h)
         c .= t⁺⁺ .+ h .+ product
 
@@ -81,6 +82,21 @@ function canopy_increment_doubling!(pol_type, SFI, dτ,
     SFI && apply_D_matrix_SFI!(pol_type.n, j₀⁻)
     synchronize_if_gpu()
     return nothing
+end
+
+"Backend fallback for the canopy geometric-series solve."
+canopy_increment_solve!(X,A,B) = batch_solve!(X,A,B)
+
+"Use pivoted LU for square CPU systems; preserve the general backend solve API."
+function canopy_increment_solve!(X::Array{FT,3},A::Array{FT,3},B::Array{FT,3}) where
+        {FT<:LinearAlgebra.BLAS.BlasFloat}
+    Threads.@threads for k in axes(A,3)
+        @views begin
+            copyto!(X[:,:,k],B[:,:,k])
+            ldiv!(lu!(A[:,:,k]),X[:,:,k])
+        end
+    end
+    X
 end
 
 "Construct the diagonal of T-I directly; off-diagonal entries already equal T."

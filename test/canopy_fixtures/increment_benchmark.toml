@@ -1,0 +1,26 @@
+# Synthetic timing workloads; no vegetation calibration or accuracy claim.
+[geometry]
+streams = [8, 32]
+stokes_components = [1, 4]
+spectral_counts = [1, 64]
+leaf_nodes = 16
+azimuth_nodes = 8
+solar_zenith_degrees = 40.0
+leaf_beta_alpha = 2.0
+leaf_beta_beta = 2.0
+lai = 3.0
+fourier_order = 0
+
+[optics]
+leaf_reflectance = 0.4
+leaf_transmittance = 0.1
+single_scattering_albedo = 0.9
+solar_stokes = [1.0, 0.1, 0.05, -0.02]
+soil_albedo = 0.15
+
+[numerics]
+thin_threshold = 0.00001
+thin_floor = 0.00000001
+blas_threads = 1
+warmup_calls = 2
+samples = 5

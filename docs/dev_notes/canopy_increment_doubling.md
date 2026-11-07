@@ -84,6 +84,62 @@ solar attenuation recurrence: its two sublayers emit according to their own
 source distribution. It needs a separate source law and elemental integral.
 The reflection/transmission algebra is reusable when those sources are added.
 
-The current `batch_solve!` backend and temporary allocation strategy prioritize
-validation. Throughput and allocation measurements are required before making
-performance claims or selecting this as an ESM production backend.
+## CPU solve and measured costs
+
+The square CPU geometric-series system now uses pivoted LU, with its factorization
+in the existing scratch matrix and its right-hand side copied into the output.
+This specialization is local to the canopy increment path. Other backends and
+non-BLAS element types retain `batch_solve!`; the general atmospheric solve API
+is unchanged. After this change, all 3,744 operator/phase, 16 vertical-beam and
+48 production-surface CPU checks passed. The complete package-suite result above
+predates this CPU specialization; it is not a full-suite claim for the new solve.
+
+`test/bench_canopy_increment.jl` measures warmed doubling calls, including a
+completion synchronization on CUDA. Phase-cache construction, elemental seeding,
+host transfers, compilation and explicit pre-sample garbage collection are
+outside the timed region. The fixture sets two warm-ups and five measured calls;
+the CSV records minimum and median times and minimum host allocations. Host
+allocations are not GPU device-memory measurements. Run from `test/`:
+
+```sh
+julia --project=.. bench_canopy_increment.jl
+VSMART_CANOPY_BENCH_GPU=true julia --project=.. bench_canopy_increment.jl
+```
+
+On Julia 1.12.6, the Sapphire Rapids host, one Julia thread and one BLAS thread,
+the 64-spectral-point CPU batches gave these median doubling times:
+
+| Precision | Streams | Stokes | Previous QR (ms) | New LU (ms) | LU host allocation (MB) |
+|---|---:|---:|---:|---:|---:|
+| Float32 | 8 | 1 | 12.77 | 4.63 | 0.248 |
+| Float32 | 8 | 4 | 94.90 | 60.19 | 0.642 |
+| Float32 | 32 | 1 | 86.92 | 47.80 | 0.633 |
+| Float32 | 32 | 4 | 1112.08 | 1099.58 | 2.183 |
+| Float64 | 8 | 1 | 14.08 | 4.49 | 0.249 |
+| Float64 | 8 | 4 | 115.52 | 72.49 | 0.643 |
+| Float64 | 32 | 1 | 102.57 | 67.67 | 0.634 |
+| Float64 | 32 | 4 | 2004.48 | 1955.21 | 2.186 |
+
+For the largest Float64 case, host allocations fell from 406.04 MB to 2.19 MB,
+while elapsed time changed little: matrix products remain substantial work.
+The ordinary transmission formulation remains faster in most of these cases,
+but loses thin-seed Float32 accuracy as documented above. Its timings are a
+cost baseline, not evidence that its inaccurate solution is interchangeable.
+
+Raw [QR](data/canopy_increment_cpu_qr.csv) and
+[LU](data/canopy_increment_cpu_lu.csv) CSVs include singleton batches and the
+ordinary baseline. Values are shared-host snapshots, not ESM throughput or a
+claim about ideal parallel scaling. End-to-end and device-allocation measurements
+remain necessary before selecting an ESM backend. GPU timing also needs to
+account for the ordinary path's existing fused solves and updates; the initial
+increment implementation does not yet reuse those optimizations.
+
+The [initial L40S GPU timings](data/canopy_increment_gpu_initial.csv) cover the
+same 32 method/precision/batch cases with scalar indexing disabled. For example,
+the Float32 8-stream, four-Stokes, 64-point case took 5.54 ms in increment form
+versus 1.93 ms in ordinary form. The precision fix is not presently a speed
+optimization. A next implementation step is to reuse the existing fused
+geometric-series solve for `H = R² (I−R²)⁻¹`; this is algebraically equivalent
+to `(I−R²)⁻¹R²` because the two factors commute. It must retain the small `R²`
+right-hand side, rather than subtracting identity from a rounded inverse, and
+must be checked with the same precision and conservation tests before adoption.
