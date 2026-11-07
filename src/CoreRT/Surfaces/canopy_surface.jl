@@ -108,7 +108,8 @@ function _init_canopy_cache!(canopy::CanopySurface{FT},
 
     qμ = collect(qp_μ)
     qμN = collect(qp_μN)
-    G_raw = CanopyOptics.G(qμN, canopy.LAD)
+    # The normalized leaf-area measure and its resolution must match Γ/Z.
+    G_raw = CanopyOptics.G(qμN, canopy.LAD; quadrature=canopy.canopy_quadrature)
     G = arr_type(FT.(CanopyOptics.effective_G(canopy.canopy_clumping, G_raw, qμN)))
 
     dims = (size(added_layer.r⁻⁺, 1), size(added_layer.r⁻⁺, 2))

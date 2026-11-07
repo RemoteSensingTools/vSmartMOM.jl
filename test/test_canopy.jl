@@ -295,3 +295,5 @@ end
     # Shape invariant: parameter axis is last
     @test size(all_lin.ap_ṙ⁻⁺) == (nμ, nμ, nSpec, Nparams)
 end
+
+include("test_canopy_quadrature.jl")
