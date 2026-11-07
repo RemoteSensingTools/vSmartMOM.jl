@@ -119,20 +119,28 @@ if get(ENV,"VSMART_CANOPY_INCREMENT_GPU","false")=="true"
     @testset "Canopy fused-solve and fallback agreement" begin
         g,n=SETTINGS["geometry"],SETTINGS["numerics"]
         original_mode=CoreRT._FUSED_GP_ENABLED[]
+        original_updates=CoreRT._FUSED_DOUBLING_ENABLED[]
         try
             for FT in (Float32,Float64)
                 gpu=context(FT,last(g["stokes_components"]),last(g["spectral_counts"]),
                     true,vSmartMOM.Architectures.GPU())
                 CoreRT._FUSED_GP_ENABLED[]=true
+                CoreRT._FUSED_DOUBLING_ENABLED[]=true
                 probe=seed(gpu,FT,last(g["lai"]),first(g["fourier_orders"]),n["fine_floor"])
                 @test CoreRT._use_fused_gp(probe.added.r⁺⁻)
                 fused=result(gpu,FT,last(g["lai"]),first(g["fourier_orders"]),n["fine_floor"])
+                dark=result(gpu,FT,last(g["lai"]),first(g["fourier_orders"]),n["fine_floor"];SFI=false)
+                compare(dark,fused,FT;sources=false)
+                CoreRT._FUSED_DOUBLING_ENABLED[]=false
+                solve_only=result(gpu,FT,last(g["lai"]),first(g["fourier_orders"]),n["fine_floor"])
+                compare(fused,solve_only,FT)
                 CoreRT._FUSED_GP_ENABLED[]=false
                 fallback=result(gpu,FT,last(g["lai"]),first(g["fourier_orders"]),n["fine_floor"])
                 compare(fused,fallback,FT)
             end
         finally
             CoreRT._FUSED_GP_ENABLED[]=original_mode
+            CoreRT._FUSED_DOUBLING_ENABLED[]=original_updates
         end
     end
 end

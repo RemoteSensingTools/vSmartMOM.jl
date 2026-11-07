@@ -50,6 +50,7 @@ CPU; they do not add cases.
 | `test_batched_kernels.jl` | active + flagged | Batched solve/inverse mutation contract; smoke arm under `Metal` |
 | `test_canopy.jl` | active | Canopy surface construction and YAML |
 | `test_canopy_increment.jl` | active + flagged | Transmission-increment doubling, Float32/Float64, Stokes and source algebra; CUDA under `VSMART_CANOPY_INCREMENT_GPU` |
+| `test_canopy_increment_updates.jl` | active + flagged | Fused source and R/Delta updates against independent dense equations; CPU and optional CUDA |
 | `test_canopy_precision_surface.jl` | active + flagged | Production canopy conservation under stream refinement; optional CUDA |
 | `bench_canopy_increment.jl` | benchmark | Warm doubling times and host allocations, ordinary vs increment form; optional CUDA under `VSMART_CANOPY_BENCH_GPU` |
 | `test_component_m_max.jl` | active | Per-component Fourier `m_max` traits |

@@ -166,5 +166,50 @@ The largest case exceeds the fused kernel's shared-memory budget and follows
 the same fallback as before. Float64 results are mixed: the 8-stream scalar
 case improves from 5.52 to 4.30 ms, while 8-stream IQUV changes from 8.92 to
 9.12 ms. This does not establish an across-the-board acceleration. The source
-and R/T increment updates still use multiple matrix products and broadcasts;
-reducing their launch overhead is a separate optimization with its own tests.
+and R/T update changes below address their remaining launch overhead.
+
+## Fused source and operator updates
+
+`canopy_increment_updates.jl` implements the same increment equations in two
+KernelAbstractions launches per doubling step. The source kernel keeps four
+shared vectors containing the old sources and the two source brackets. It reads
+R and C without modifying them. The operator kernel assigns one output column
+to each workitem; shared tiles retain old R, C and Delta, and a private vector
+retains Q. A barrier completes all old-input loads before any global writes.
+One workitem updates the beam increment per spectral point.
+
+The existing geometric-series shared-memory gate also bounds these kernels.
+The operator's three tiles fit within that gate's three tiles plus pivots; the
+source kernel needs only four vectors. CPU and oversized GPU systems keep the
+matrix-product path. The existing doubling flag can disable the fused updates
+independently of the fused solve, as exercised by the regression tests.
+
+Validation after the final shared-memory layout: 3,988 CPU checks and 3,810 CUDA
+checks passed. These include all earlier operator and conservation cases, 70
+checks comparing fully fused, solve-only and unfused paths (including disabled
+solar sources), and 180 checks per backend against independent dense adding
+equations. The latter use signed, noncommuting synthetic matrices, multiple
+batch sizes and both precisions; they check the storage algorithm independently
+of a particular canopy's symmetries. Test inputs and tolerances are in TOML.
+Metal and arbitrary dual-number differentiation remain unvalidated.
+
+The [final update benchmark](data/canopy_increment_gpu_fused_updates.csv) gives
+these median times for 64-point batches on the L40S:
+
+| Precision | Streams | Stokes | Initial increment (ms) | Fused updates (ms) |
+|---|---:|---:|---:|---:|
+| Float32 | 8 | 1 | 5.48 | 1.36 |
+| Float32 | 8 | 4 | 5.54 | 2.58 |
+| Float32 | 32 | 1 | 6.23 | 2.31 |
+| Float32 | 32 | 4 | 31.97 | 31.88 |
+| Float64 | 8 | 1 | 5.52 | 1.38 |
+| Float64 | 8 | 4 | 8.92 | 10.68 |
+| Float64 | 32 | 1 | 9.73 | 9.03 |
+| Float64 | 32 | 4 | 134.92 | 134.86 |
+
+Float32 cases that fit the fused path improve substantially. The four-Stokes
+Float64 case is slower, so the new layout is not a universal performance win;
+no hardware-specific size threshold was fitted to these measurements. Large
+operators keep the same fallback. These remain warmed kernel timings, with the
+exclusions above, not complete canopy simulation times. The full package-suite
+rerun against released CanopyOptics v0.2.2 is a separate verification step.

@@ -89,6 +89,7 @@ include("CoreKernel/elemental_canopy.jl")
 # Solvers -- Doubling
 include("CoreKernel/doubling.jl")              # Doubling (elastic)
 include("CoreKernel/canopy_increment.jl")      # Canopy transmission-increment doubling
+include("CoreKernel/canopy_increment_updates.jl") # Fused GPU increment updates
 include("CoreKernel/jacobian_blocked.jl")
 include("CoreKernel/jacobian_batched.jl")      # Batched physical-parameter propagation
 include("CoreKernel/doubling_lin.jl")          # Doubling (linearized)

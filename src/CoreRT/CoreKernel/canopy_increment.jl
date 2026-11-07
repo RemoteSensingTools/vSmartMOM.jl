@@ -47,14 +47,19 @@ function canopy_increment_doubling!(pol_type, SFI, dτ,
     v2 = dbl_v2 === nothing ? similar(j₀⁺) : dbl_v2
     beta = expm1.(-dτ .* view(G, iμ₀Nstart:iμ₀Nstart) ./ μ₀)
     beta_row = reshape(beta, 1, 1, :)
+    backend = KernelAbstractions.get_backend(h)
+    fused_solve = _use_fused_gp(h)
+    # The existing 3N² solve gate is conservative for both update kernels.
+    # Honor the ordinary doubling switch as well for independent comparisons.
+    fused_updates = fused_solve && _FUSED_DOUBLING_ENABLED[]
 
     for _ in 1:ndoubl
         _bmm!(rr, r⁻⁺, r⁻⁺)
-        if _use_fused_gp(h)
+        if fused_solve
             # RR commutes with its resolvent: RR*(I-RR)^(-1) equals
             # (I-RR)^(-1)*RR. Keep RR as the small RHS; never recover H by
             # subtracting identity from a near-identity rounded inverse.
-            ka_fused_gp_solve!(h,r⁻⁺,rr,KernelAbstractions.get_backend(h))
+            ka_fused_gp_solve!(h,r⁻⁺,rr,backend)
         else
             system .= I_static .- rr
             canopy_increment_solve!(h, system, rr)
@@ -63,26 +68,34 @@ function canopy_increment_doubling!(pol_type, SFI, dτ,
         c .= t⁺⁺ .+ h .+ product
 
         if SFI
-            jd1 .= j₀⁺ .+ beta_row .* j₀⁺
-            ju1 .= j₀⁻ .+ beta_row .* j₀⁻
-            _bmm!(v1, r⁻⁺, j₀⁺)
-            v1 .+= ju1
-            _bmm!(v2, c, v1)
-            j₀⁻ .+= v1 .+ v2
-            _bmm!(v1, r⁻⁺, ju1)
-            v1 .+= j₀⁺
-            _bmm!(v2, c, v1)
-            j₀⁺ .= jd1 .+ v1 .+ v2
+            if fused_updates
+                ka_canopy_increment_sources!(j₀⁺,j₀⁻,r⁻⁺,c,beta,backend)
+            else
+                jd1 .= j₀⁺ .+ beta_row .* j₀⁺
+                ju1 .= j₀⁻ .+ beta_row .* j₀⁻
+                _bmm!(v1, r⁻⁺, j₀⁺)
+                v1 .+= ju1
+                _bmm!(v2, c, v1)
+                j₀⁻ .+= v1 .+ v2
+                _bmm!(v1, r⁻⁺, ju1)
+                v1 .+= j₀⁺
+                _bmm!(v2, c, v1)
+                j₀⁺ .= jd1 .+ v1 .+ v2
+            end
         end
 
         # Q=R+RΔ; R'=R+Q+CQ; Δ'=C+Δ+CΔ. Form no near-identity T.
-        _bmm!(rr, r⁻⁺, t⁺⁺)
-        rr .+= r⁻⁺
-        _bmm!(product, c, rr)
-        r⁻⁺ .+= rr .+ product
-        _bmm!(product, c, t⁺⁺)
-        t⁺⁺ .= c .+ t⁺⁺ .+ product
-        beta .= beta .* (FT(2) .+ beta)
+        if fused_updates
+            ka_canopy_increment_operators!(r⁻⁺,t⁺⁺,c,beta,backend)
+        else
+            _bmm!(rr, r⁻⁺, t⁺⁺)
+            rr .+= r⁻⁺
+            _bmm!(product, c, rr)
+            r⁻⁺ .+= rr .+ product
+            _bmm!(product, c, t⁺⁺)
+            t⁺⁺ .= c .+ t⁺⁺ .+ product
+            beta .= beta .* (FT(2) .+ beta)
+        end
     end
     t⁺⁺ .+= I_static
     apply_D_matrix!(pol_type.n, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
