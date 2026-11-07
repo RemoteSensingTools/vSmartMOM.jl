@@ -50,8 +50,15 @@ function canopy_increment_doubling!(pol_type, SFI, dτ,
 
     for _ in 1:ndoubl
         _bmm!(rr, r⁻⁺, r⁻⁺)
-        system .= I_static .- rr
-        canopy_increment_solve!(h, system, rr)
+        if _use_fused_gp(h)
+            # RR commutes with its resolvent: RR*(I-RR)^(-1) equals
+            # (I-RR)^(-1)*RR. Keep RR as the small RHS; never recover H by
+            # subtracting identity from a near-identity rounded inverse.
+            ka_fused_gp_solve!(h,r⁻⁺,rr,KernelAbstractions.get_backend(h))
+        else
+            system .= I_static .- rr
+            canopy_increment_solve!(h, system, rr)
+        end
         _bmm!(product, t⁺⁺, h)
         c .= t⁺⁺ .+ h .+ product
 

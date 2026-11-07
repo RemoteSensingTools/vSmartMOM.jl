@@ -131,15 +131,40 @@ Raw [QR](data/canopy_increment_cpu_qr.csv) and
 ordinary baseline. Values are shared-host snapshots, not ESM throughput or a
 claim about ideal parallel scaling. End-to-end and device-allocation measurements
 remain necessary before selecting an ESM backend. GPU timing also needs to
-account for the ordinary path's existing fused solves and updates; the initial
-increment implementation does not yet reuse those optimizations.
+account for the ordinary path's existing fused solves and updates.
 
 The [initial L40S GPU timings](data/canopy_increment_gpu_initial.csv) cover the
 same 32 method/precision/batch cases with scalar indexing disabled. For example,
 the Float32 8-stream, four-Stokes, 64-point case took 5.54 ms in increment form
 versus 1.93 ms in ordinary form. The precision fix is not presently a speed
-optimization. A next implementation step is to reuse the existing fused
-geometric-series solve for `H = R² (I−R²)⁻¹`; this is algebraically equivalent
-to `(I−R²)⁻¹R²` because the two factors commute. It must retain the small `R²`
-right-hand side, rather than subtracting identity from a rounded inverse, and
-must be checked with the same precision and conservation tests before adoption.
+optimization.
+
+The increment path now reuses the existing fused geometric-series solve for
+`H = R² (I−R²)⁻¹` when the backend's existing local-memory gate permits it.
+This is algebraically equivalent to `(I−R²)⁻¹R²` because the two factors commute.
+The small `R²` right-hand side is retained; no identity is subtracted from a
+rounded inverse. CPU LU and the large-GPU-matrix fallback are preserved.
+
+After this change, 3,744 CPU operator/phase checks, 16 vertical-beam checks,
+48 CPU production-surface checks, 3,552 CUDA operator/phase checks, 30 explicit
+fused/fallback checks and 8 CUDA conservation checks passed. The small-matrix
+comparison temporarily disables the existing fused-solve flag and restores it
+in a `finally` block. This verifies the alternate solve against the previous
+backend as well as against the CPU references.
+
+The [fused-solve GPU benchmark](data/canopy_increment_gpu_fused_solve.csv) repeats
+the same workloads. For 64-point Float32 batches, median times changed as follows:
+
+| Streams | Stokes | Initial increment (ms) | Fused solve (ms) |
+|---|---:|---:|---:|
+| 8 | 1 | 5.48 | 4.33 |
+| 8 | 4 | 5.54 | 4.25 |
+| 32 | 1 | 6.23 | 4.92 |
+| 32 | 4 | 31.97 | 31.88 |
+
+The largest case exceeds the fused kernel's shared-memory budget and follows
+the same fallback as before. Float64 results are mixed: the 8-stream scalar
+case improves from 5.52 to 4.30 ms, while 8-stream IQUV changes from 8.92 to
+9.12 ms. This does not establish an across-the-board acceleration. The source
+and R/T increment updates still use multiple matrix products and broadcasts;
+reducing their launch overhead is a separate optimization with its own tests.
