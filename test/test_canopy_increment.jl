@@ -8,23 +8,26 @@ const OPERATORS = (:r⁻⁺,:r⁺⁻,:t⁺⁺,:t⁻⁻,:j₀⁺,:j₀⁻)
 const ORIGINAL_BLAS_THREADS = BLAS.get_num_threads()
 BLAS.set_num_threads(SETTINGS["numerics"]["blas_threads"])
 
-function context(::Type{FT}, npol, nspec, specular, architecture) where {FT}
+function context(::Type{FT}, npol, nspec, specular, architecture;
+        solar_zenith=SETTINGS["geometry"]["solar_zenith_degrees"]) where {FT}
     g,o=SETTINGS["geometry"],SETTINGS["optics"]
     pol=npol==1 ? CoreRT.Stokes_I{FT}() : npol==3 ? CoreRT.Stokes_IQU{FT}() : CoreRT.Stokes_IQUV{FT}()
-    observation=CoreRT.ObsGeometry(FT(g["solar_zenith_degrees"]),FT[0],FT[0],FT[0])
+    observation=CoreRT.ObsGeometry(FT(solar_zenith),FT[0],FT[0],FT[0])
     arr=vSmartMOM.Architectures.array_type(architecture)
     qp=CoreRT.rt_set_streams(CoreRT.GaussLegQuad(),2*g["streams"]-1,observation,pol,arr)
     dim=length(qp.qp_μ)*npol
     added=CoreRT.make_added_layer(noRS{FT}(),FT,arr,(dim,dim),nspec)
     diffuse=BiLambertianCanopyScattering(R=FT(o["leaf_reflectance"]),T=FT(o["leaf_transmittance"]))
     scattering=specular ? diffuse+SpecularCanopyScattering(
-        nᵣ=FT(o["specular_refractive_index"]),κ=FT(o["specular_extinction_index"])) : diffuse
+        nᵣ=FT(o["specular_refractive_index"]),κ=FT(o["specular_roughness"])) : diffuse
     canopy=CoreRT.CanopySurface(;soil=CoreRT.LambertianSurfaceScalar(FT(o["soil_albedo"])),
         LAI=FT(first(g["lai"])),LAD=beta_leaves(FT(g["leaf_beta_alpha"]),FT(g["leaf_beta_beta"])),
         canopy_scattering=scattering,leaf_reflectance=FT(o["leaf_reflectance"]),
         leaf_transmittance=FT(o["leaf_transmittance"]),
         canopy_quadrature=CanopyQuadrature(n_leaf=g["leaf_nodes"],n_azimuth=g["azimuth_nodes"]))
     CoreRT._init_canopy_cache!(canopy,added,pol,qp,architecture;m_max=maximum(g["fourier_orders"]))
+    @test all(isfinite,canopy._cache.Z_coarse_pp)
+    @test all(isfinite,canopy._cache.Z_coarse_mp)
     F0=FT.(o["solar_stokes"][1:npol])*transpose(FT.(o["solar_spectral_scale"][1:nspec]))
     (;pol,qp,dim,nspec,arr,architecture,cache=canopy._cache,F0=arr(F0))
 end
@@ -83,6 +86,15 @@ end
         lit=result(c64,Float64,last(g["lai"]),first(g["fourier_orders"]),n["fine_floor"])
         compare(dark,lit,Float64;sources=false)
     end
+end
+
+@testset "Specular canopy with vertical solar beam" begin
+    g,n=SETTINGS["geometry"],SETTINGS["numerics"]
+    cpu=vSmartMOM.Architectures.CPU()
+    c32=context(Float32,last(g["stokes_components"]),last(g["spectral_counts"]),true,cpu;solar_zenith=0)
+    c64=context(Float64,last(g["stokes_components"]),last(g["spectral_counts"]),true,cpu;solar_zenith=0)
+    compare(result(c32,Float32,last(g["lai"]),first(g["fourier_orders"]),n["fine_floor"]),
+        result(c64,Float64,last(g["lai"]),first(g["fourier_orders"]),n["fine_floor"]),Float32)
 end
 
 if get(ENV,"VSMART_CANOPY_INCREMENT_GPU","false")=="true"

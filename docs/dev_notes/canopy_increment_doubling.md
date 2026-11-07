@@ -51,8 +51,9 @@ scalar indexing. `test_canopy_precision_surface.jl` checks the actual canopy
 wrapper against a conservative photon budget, including multiple physical
 layers over a perfectly reflecting soil. Settings and tolerances are in TOML.
 
-Local validation on Julia 1.12.6 and an NVIDIA L40S: 3,696 operator checks on
-CPU and 3,456 on CUDA passed, including zero-thickness layers. The production
+Local validation on Julia 1.12.6 and an NVIDIA L40S: 3,744 operator/phase checks
+on CPU, 16 vertical-solar-beam checks, and 3,552 CUDA checks passed, including
+zero-thickness layers and finite entries throughout the cached phase matrices. The production
 surface tests passed 48 CPU and 8 CUDA checks; the existing canopy suite passed
 135 checks, including its soil-albedo derivative regression. For the dense
 conservative fixture, direct-budget error at 64 streams was approximately
@@ -62,7 +63,12 @@ target is checked at 32 and 64 streams. No result is rescaled to hit that target
 
 The combined specular Float32 cases used the separate CanopyOptics fix in
 [PR #64](https://github.com/RemoteSensingTools/CanopyOptics.jl/pull/64).
-These local checks do not replace the complete vSmartMOM suite or upstream CI.
+The complete CPU package suite also passed 25,512 checks, with 16 conditional
+skips reported by Julia in the `Broken` column (CUDA was masked in that run).
+That full run used the azimuth fix from PR #64; after the additional grazing
+limit fix, the focused counts above were rerun against the updated dependency.
+The full CanopyOptics suite passed 86,099 checks with both fixes. Upstream CI
+and release dependencies remain separate gates.
 
 These tests establish numerical agreement over their stated cases, not
 physical correctness of every specular parameterization or infinite-resolution
