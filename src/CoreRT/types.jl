@@ -891,6 +891,33 @@ struct LambertianSurfaceSpline{FT} <: AbstractSurfaceType
 end
 
 """
+    CanopyNumericalParameters(FT=Float64; dτ_max_threshold=1e-5, dτ_min_floor=0)
+
+Controls for directional canopy elemental-layer subdivision. The threshold
+multiplies the smallest positive-weight stream cosine; the floor limits that
+target from below. These are dimensionless numerical controls, not leaf
+parameters. Smaller targets reduce finite single-scattering seed error.
+Canopy doubling carries `T-I` directly, so no Float32 epsilon floor is needed.
+Angular and leaf-angle quadrature errors must still be checked independently.
+"""
+struct CanopyNumericalParameters{FT<:AbstractFloat}
+    dτ_max_threshold::FT
+    dτ_min_floor::FT
+    function CanopyNumericalParameters{FT}(threshold, floor) where {FT<:AbstractFloat}
+        threshold, floor = FT(threshold), FT(floor)
+        isfinite(threshold) && threshold > zero(FT) ||
+            throw(ArgumentError("Canopy dτ_max_threshold must be finite and positive"))
+        isfinite(floor) && floor >= zero(FT) ||
+            throw(ArgumentError("Canopy dτ_min_floor must be finite and nonnegative"))
+        new{FT}(threshold, floor)
+    end
+end
+
+CanopyNumericalParameters(::Type{FT}=Float64;
+        dτ_max_threshold=1e-5, dτ_min_floor=0) where {FT<:AbstractFloat} =
+    CanopyNumericalParameters{FT}(dτ_max_threshold, dτ_min_floor)
+
+"""
     CanopySurface{FT} <: AbstractSurfaceType
 
 Composite lower boundary: a vegetation canopy (one or more scattering layers)
@@ -919,6 +946,8 @@ mutable struct CanopySurface{FT} <: AbstractSurfaceType
     canopy_scattering
     "CanopyOptics Z-matrix integration controls"
     canopy_quadrature
+    "Elemental-layer subdivision controls for increment-based canopy doubling"
+    canopy_numerics::CanopyNumericalParameters{FT}
     "Canopy clumping model; affects effective G for propagation, not Z normalization"
     canopy_clumping
     "Leaf reflectance (scalar or spectral vector on leaf_optics_grid)"
@@ -945,6 +974,7 @@ function CanopySurface(; soil::AbstractSurfaceType,
                         LAI, n_layers::Int=1, LAD=nothing,
                         canopy_scattering=nothing,
                         canopy_quadrature=nothing,
+                        canopy_numerics=nothing,
                         canopy_clumping=nothing,
                         leaf_reflectance=0.4, leaf_transmittance=0.05,
                         leaf_optics_grid=nothing, grid_unit::Symbol=:nm,
@@ -966,6 +996,10 @@ function CanopySurface(; soil::AbstractSurfaceType,
     if canopy_quadrature === nothing
         canopy_quadrature = CanopyOptics.CanopyQuadrature()
     end
+    numerics = canopy_numerics === nothing ? CanopyNumericalParameters(FT) :
+        CanopyNumericalParameters(FT;
+            dτ_max_threshold=canopy_numerics.dτ_max_threshold,
+            dτ_min_floor=canopy_numerics.dτ_min_floor)
     if canopy_clumping === nothing
         canopy_clumping = CanopyOptics.NoClumping{FT}()
     end
@@ -991,7 +1025,7 @@ function CanopySurface(; soil::AbstractSurfaceType,
     dp = canopy_dp === nothing ? nothing : FT(canopy_dp)
     lf = lai_fractions === nothing ? nothing : convert(Vector{FT}, lai_fractions)
     CanopySurface{FT}(soil, FT(LAI), n_layers, LAD, canopy_scattering,
-                      canopy_quadrature, canopy_clumping,
+                      canopy_quadrature, numerics, canopy_clumping,
                       lr, lt, lg, grid_unit, include_atm, dp, lf, nothing, nothing)
 end
 
