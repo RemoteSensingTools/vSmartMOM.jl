@@ -69,6 +69,7 @@ function CanopySurface_from_prospect(leaf_prospect, prospect_grid=400.0:1.0:2500
                                      soil::AbstractSurfaceType,
                                      LAI, n_layers::Int=1, LAD=nothing,
                                      canopy_quadrature=nothing,
+                                     canopy_numerics=nothing,
                                      canopy_clumping=nothing,
                                      include_atm::Bool=false,
                                      canopy_dp=nothing,
@@ -80,6 +81,7 @@ function CanopySurface_from_prospect(leaf_prospect, prospect_grid=400.0:1.0:2500
                    leaf_reflectance=R, leaf_transmittance=T,
                    leaf_optics_grid=λ_nm, grid_unit=:nm,
                    canopy_quadrature=canopy_quadrature,
+                   canopy_numerics=canopy_numerics,
                    canopy_clumping=canopy_clumping,
                    include_atm=include_atm, canopy_dp=canopy_dp,
                    lai_fractions=lai_fractions)
@@ -440,13 +442,15 @@ function create_surface_layer!(canopy::CanopySurface{FT},
             arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺), cache.G)
 
         τ_sum_dev = arr_type(τ_sum_curr)
-        dτ, ndoubl, expk = init_layer(canopy_core, quad_points, pol_type, architecture)
+        dτ, ndoubl, _ = init_layer(canopy_core, quad_points, pol_type, architecture;
+            dτ_max_threshold=canopy.canopy_numerics.dτ_max_threshold,
+            dτ_min_floor=canopy.canopy_numerics.dτ_min_floor)
 
         @timeit "canopy elemental" elemental!(
             pol_type, SFI, τ_sum_dev, dτ, F₀_dev, canopy_core,
             m, ndoubl, true, quad_points, cache.canopy_added, architecture)
-        @timeit "canopy doubling" doubling!(
-            pol_type, SFI, expk, ndoubl, cache.canopy_added,
+        @timeit "canopy doubling" canopy_increment_doubling!(
+            pol_type, SFI, dτ, canopy_core, m, ndoubl, quad_points, cache.canopy_added,
             cache.I_static, architecture)
 
         if ilay == 1
@@ -686,7 +690,7 @@ function _perturb_soil_albedo(canopy::CanopySurface{FT}, ε::FT) where {FT}
         perturbed_soil = soil
     end
     CanopySurface{FT}(perturbed_soil, canopy.LAI, canopy.n_layers, canopy.LAD,
-                      canopy.canopy_scattering, canopy.canopy_quadrature,
+                      canopy.canopy_scattering, canopy.canopy_quadrature, canopy.canopy_numerics,
                       canopy.canopy_clumping,
                       canopy.leaf_reflectance,
                       canopy.leaf_transmittance, canopy.leaf_optics_grid,

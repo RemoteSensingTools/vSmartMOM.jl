@@ -100,6 +100,8 @@ end
 @testset "IO Validation" begin include("test_io_validation.jl") end
 
 @testset "Canopy Surface" begin include("test_canopy.jl") end
+@testset "Canopy Precision" begin include("test_canopy_increment.jl") end
+@testset "Canopy Photon Budget" begin include("test_canopy_precision_surface.jl") end
 
 # Phase A — `Nstreams` field on `QuadPoints` (count of nonzero weights;
 # distinct from augmented `Nquad`). See docs/src/pages/conventions.md §6.

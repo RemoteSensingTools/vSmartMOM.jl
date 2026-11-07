@@ -88,6 +88,7 @@ include("CoreKernel/elemental_canopy.jl")
 
 # Solvers -- Doubling
 include("CoreKernel/doubling.jl")              # Doubling (elastic)
+include("CoreKernel/canopy_increment.jl")      # Canopy transmission-increment doubling
 include("CoreKernel/jacobian_blocked.jl")
 include("CoreKernel/jacobian_batched.jl")      # Batched physical-parameter propagation
 include("CoreKernel/doubling_lin.jl")          # Doubling (linearized)
@@ -242,7 +243,7 @@ export SolarBeam, PreparedSolarBeam, prepare_source, prepare_sources, BlackbodyS
 export AbstractSingleScatteringCorrection, NoSSCorrection, TMSCorrection
 export RadauQuad, GaussLegQuad,
        LambertianSurfaceScalar, LambertianSurfaceSpectrum,
-       CanopySurface, CanopySurface_from_prospect, invalidate_canopy_cache!,
+       CanopySurface, CanopyNumericalParameters, CanopySurface_from_prospect, invalidate_canopy_cache!,
        CoxMunkSurface, water_refractive_index
 
 end
