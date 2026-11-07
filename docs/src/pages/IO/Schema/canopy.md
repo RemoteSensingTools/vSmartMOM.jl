@@ -36,6 +36,17 @@ will not catch a typo'd `canopy:` field name.
 | `soil` | `String` or `"from_surface"` | `"from_surface"` | Soil BRDF underneath the canopy. `"from_surface"` reuses the band's existing `radiative_transfer.surface` entry as soil; otherwise a surface constructor string using the same vocabulary as [`Schema/surface.md`](surface.md). |
 | `n_leaf_quadrature` | `Integer` | `CanopyOptics.CanopyQuadrature()` default | Leaf-angle quadrature point count (advanced; forwarded to `CanopyOptics.CanopyQuadrature`). |
 | `n_azimuth_quadrature` | `Integer` | `CanopyOptics.CanopyQuadrature()` default | Azimuth quadrature point count (advanced; forwarded to `CanopyOptics.CanopyQuadrature`). |
+| `numerics.dτ_max_threshold` | positive finite `Real` | `1e-5` | Elemental-layer target factor multiplying the smallest positive-weight stream cosine. Reduce to check finite-layer convergence. |
+| `numerics.dτ_min_floor` | nonnegative finite `Real` | `0` | Lower bound on that target. Increment-based canopy doubling does not require the atmospheric solver's Float32 epsilon floor. |
+
+Julia callers set `canopy_numerics=CanopyNumericalParameters(FT; ...)` on
+`CanopySurface` or `CanopySurface_from_prospect`. These controls govern only
+canopy layers; atmospheric subdivision keeps its existing controls.
+The canopy solver carries `T-I` and `exp(-δτ G₀/μ₀)-1` during doubling,
+constructed with `expm1`, to preserve thin-layer information in Float32.
+This does not enforce conservation by rescaling: finite elemental layers and
+angular quadrature still have separate convergence errors. See the
+[derivation and validation limits](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/docs/dev_notes/canopy_increment_doubling.md).
 
 Not YAML-configurable (Julia-only, set by constructing `CanopySurface`
 directly): `LAD` (leaf-angle distribution; defaults to

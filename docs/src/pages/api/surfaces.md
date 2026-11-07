@@ -16,6 +16,7 @@ vSmartMOM.CoreRT.RossLiSurfaceScalar
 vSmartMOM.CoreRT.CoxMunkSurface
 vSmartMOM.CoreRT.CanopySurface
 vSmartMOM.CoreRT.CanopySurface_from_prospect
+vSmartMOM.CoreRT.CanopyNumericalParameters
 ```
 
 ## Surface Construction and Optics Helpers
