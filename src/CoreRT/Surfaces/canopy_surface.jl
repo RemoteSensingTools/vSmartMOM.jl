@@ -74,7 +74,7 @@ function CanopySurface_from_prospect(leaf_prospect, prospect_grid=400.0:1.0:2500
                                      canopy_dp=nothing,
                                      lai_fractions=nothing)
     opti = CanopyOptics.createLeafOpticalStruct(prospect_grid)
-    R, T = CanopyOptics.prospect(leaf_prospect, opti)
+    T, R = CanopyOptics.prospect(leaf_prospect, opti)
     λ_nm = [Float64(v.val) for v in opti.λ]
     CanopySurface(; soil=soil, LAI=LAI, n_layers=n_layers, LAD=LAD,
                    leaf_reflectance=R, leaf_transmittance=T,
