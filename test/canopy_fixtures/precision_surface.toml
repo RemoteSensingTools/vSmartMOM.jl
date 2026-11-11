@@ -1,0 +1,24 @@
+# Synthetic conservative stress test. All incident photons must escape upward.
+# LAI is one-sided leaf area per ground area; optical fractions are dimensionless.
+[canopy]
+lai = 20.0
+reflectance = 0.4
+transmittance = 0.6
+soil_albedo = 1.0
+solar_zenith_degrees = 0.0
+leaf_beta_alpha = 4.0
+leaf_beta_beta = 0.7
+
+[numerics]
+streams = [16, 32, 64]
+converged_streams = [32, 64] # 16 streams leaves ~1.8e-4 angular budget error
+physical_layers = [1, 4]
+leaf_nodes = 128
+azimuth_nodes = 12
+blas_threads = 1
+custom_threshold = 0.000001
+custom_floor = 0.000000001
+
+[validation]
+conservation_atol = 0.0001 # fraction of incident photons; never rescale the result
+precision_atol = 0.00002

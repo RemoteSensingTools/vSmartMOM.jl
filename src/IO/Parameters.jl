@@ -200,6 +200,11 @@ function _parse_canopy_section(canopy_dict::Dict, FT, brdf_list::Vector)
     dp        = dp_raw === nothing ? nothing : FT(dp_raw)
     n_leaf    = get(canopy_dict, "n_leaf_quadrature", nothing)
     n_azimuth = get(canopy_dict, "n_azimuth_quadrature", nothing)
+    numerics_dict = get(canopy_dict, "numerics", Dict())
+    numerics_defaults = CoreRT.CanopyNumericalParameters(FT)
+    canopy_numerics = CoreRT.CanopyNumericalParameters(FT;
+        dτ_max_threshold=get(numerics_dict, "dτ_max_threshold", numerics_defaults.dτ_max_threshold),
+        dτ_min_floor=get(numerics_dict, "dτ_min_floor", numerics_defaults.dτ_min_floor))
 
     lr = leaf_R isa AbstractVector ? convert(Vector{FT}, leaf_R) : FT(leaf_R)
     lt = leaf_T isa AbstractVector ? convert(Vector{FT}, leaf_T) : FT(leaf_T)
@@ -230,6 +235,7 @@ function _parse_canopy_section(canopy_dict::Dict, FT, brdf_list::Vector)
             leaf_reflectance=lr, leaf_transmittance=lt,
             leaf_optics_grid=lg, grid_unit=gu,
             canopy_quadrature=canopy_quadrature,
+            canopy_numerics=canopy_numerics,
             canopy_clumping=canopy_clumping,
             include_atm=incl_atm, canopy_dp=dp)
     end
